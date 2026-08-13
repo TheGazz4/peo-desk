@@ -152,6 +152,14 @@
 
 <main>
   <section>
+    <h2>Ready plays <small>— the funnel to actionable</small></h2>
+    <p class="blurb">Plays ready to fire: live, in timing window, not suppressed. Sendable = also has a contact.</p>
+    <table id="tblPlays"><thead><tr>
+      <th>angle</th><th class="num">minted</th><th class="num">live</th><th class="num">in window</th><th class="num">ready</th><th class="num">sendable</th><th class="num">24h</th><th class="num">last minted</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
     <h2>Rate limits <small>— used vs cap, live</small></h2>
     <p class="blurb">Paid/capped resources vs their caps. Yellow = 80%+ or running low. Red = cap hit; spending lanes stop.</p>
     <table id="tblLimits"><thead><tr>
@@ -226,7 +234,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -340,6 +348,13 @@ function renderStrip(d) {
     ["exhaust queue", (sb.exhaust_queue_pending ?? 0).toLocaleString(), "pending crawl", null],
     ["attributed", (sb.companies_attributed ?? 0).toLocaleString(), "companies", null],
   ];
+  const playTotal = (d.desk_ready_plays?.rows || []).find((r) => r.angle_type === "TOTAL");
+  if (playTotal) {
+    const st = Number(playTotal.ready) > 0 && Number(playTotal.sendable) === 0 ? "warning"
+             : Number(playTotal.sendable) > 0 ? "good" : null;
+    tiles.unshift(["ready plays", Number(playTotal.ready).toLocaleString(),
+      `${Number(playTotal.sendable).toLocaleString()} sendable · ${Number(playTotal.minted_24h).toLocaleString()} minted 24h`, st]);
+  }
   const sev = { critical: 0, warning: 1, good: 2 };
   tiles.sort((a, b) => (sev[a[3]] ?? 3) - (sev[b[3]] ?? 3));
   $("#strip").innerHTML = tiles.map(([k, v, dd, st]) => {
@@ -497,8 +512,29 @@ function renderTicker(d) {
   }).join("") || '<tr><td colspan="4" class="age cold">no intelligence events yet</td></tr>';
 }
 
+function renderPlays(d) {
+  const rows = d.desk_ready_plays?.rows || [];
+  $("#tblPlays tbody").innerHTML = rows.map((r) => {
+    const total = r.angle_type === "TOTAL";
+    const ready = Number(r.ready), sendable = Number(r.sendable);
+    const chip = total ? "" : ready > 0 && sendable === 0 ? " " + stateChip("warn", "no contacts")
+               : sendable > 0 ? " " + stateChip("ok", "sendable") : "";
+    return `<tr${total ? ' style="font-weight:650"' : ""}>
+      <td>${esc(r.angle_type)}${chip}</td>
+      <td class="num">${Number(r.minted).toLocaleString()}</td>
+      <td class="num">${Number(r.live).toLocaleString()}</td>
+      <td class="num">${Number(r.in_window).toLocaleString()}</td>
+      <td class="num">${ready.toLocaleString()}</td>
+      <td class="num">${sendable.toLocaleString()}</td>
+      <td class="num">${Number(r.minted_24h).toLocaleString()}</td>
+      <td class="num">${ageSpan(r.last_minted_at, 86400)}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="8" class="age cold">no plays minted yet</td></tr>';
+}
+
 function renderAll(d) {
   renderStrip(d);
+  renderPlays(d);
   renderLimits(d);
   renderAppend(d);
   renderApi(d);
@@ -607,6 +643,13 @@ function demoData() {
     desk_mesh_mail_live: { rows: [
       { route: "efast_5500 -> tx_wc", sent_5m: 0, sent_60m: 2, sent_24h: 11, unconsumed: 1, oldest_unconsumed_at: ago(4000), expired_unread: 0, last_sent_at: ago(1300), last_kind: "offer/ein" },
       { route: "peo_intel -> fingerprint", sent_5m: 0, sent_60m: 0, sent_24h: 3, unconsumed: 0, oldest_unconsumed_at: null, expired_unread: 2, last_sent_at: ago(30000), last_kind: "fact/peo" },
+    ] },
+    desk_ready_plays: { rows: [
+      { angle_type: "TOTAL", minted: 12029, live: 12029, in_window: 4480, ready: 4480, sendable: 0, ready_companies: 4480, minted_24h: 0, last_minted_at: ago(100000) },
+      { angle_type: "acquisition_disruption", minted: 6091, live: 6091, in_window: 2802, ready: 2802, sendable: 0, ready_companies: 2802, minted_24h: 0, last_minted_at: ago(250000) },
+      { angle_type: "cpeo_cert_risk", minted: 1024, live: 1024, in_window: 1024, ready: 1024, sendable: 0, ready_companies: 1024, minted_24h: 0, last_minted_at: ago(160000) },
+      { angle_type: "proven_switcher", minted: 636, live: 636, in_window: 636, ready: 636, sendable: 0, ready_companies: 636, minted_24h: 0, last_minted_at: ago(100000) },
+      { angle_type: "acquired_book", minted: 4060, live: 4060, in_window: 0, ready: 0, sendable: 0, ready_companies: 0, minted_24h: 0, last_minted_at: ago(160000) },
     ] },
     desk_intel_ticker: { rows: [
       { at: ago(300), kind: "switch", subject: "ACME STAFFING LLC", detail: "insperity -> adp_totalsource (tx_wc_lcf)" },
