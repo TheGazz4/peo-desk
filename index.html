@@ -137,11 +137,11 @@
 </header>
 
 <div id="legend">
-  <span class="chip ok">green = good / flowing / on time</span>
-  <span class="chip warn">yellow = watch closely (gated, slow, 80%+ of a cap)</span>
-  <span class="chip serious">orange = stalled or piling up — needs a look</span>
-  <span class="chip critical">red = bad — act now</span>
-  <span class="chip">gray = idle / nothing to do (not a problem by itself)</span>
+  <span class="chip ok">green = good</span>
+  <span class="chip warn">yellow = watch</span>
+  <span class="chip serious">orange = stalled, needs a look</span>
+  <span class="chip critical">red = act now</span>
+  <span class="chip">gray = idle (fine)</span>
 </div>
 
 <div id="strip"></div>
@@ -149,7 +149,7 @@
 <main>
   <section>
     <h2>Rate limits <small>— used vs cap, live</small></h2>
-    <p class="blurb">How much of every paid or capped resource is burned — Serper credits, Anthropic spend, mesh mail quotas. <b>Green</b>: plenty of headroom. <b>Yellow</b>: 80%+ used or balance running low. <b>Red</b>: cap hit or gate closed — the lanes that spend that resource stop until it's raised or topped up.</p>
+    <p class="blurb">Paid/capped resources vs their caps. Yellow = 80%+ or running low. Red = cap hit; spending lanes stop.</p>
     <table id="tblLimits"><thead><tr>
       <th>resource</th><th>window</th><th class="num">used</th><th class="num">cap</th><th style="width:110px">meter</th><th>state</th>
     </tr></thead><tbody></tbody></table>
@@ -157,7 +157,7 @@
 
   <section>
     <h2>Append throughput <small>— rows/runs landed per window</small></h2>
-    <p class="blurb">Data actually landing in the database right now, per pipeline (last 5 min / hour / day). <b>Green "appending"</b>: rows flowing this minute. <b>Yellow "slow"</b>: moved this hour but not in the last 5 min. <b>Orange "stalled"</b>: work is queued but nothing is moving — usually the spend gate, or a drain that needs attention. <b>Gray "idle"</b>: queue empty, nothing to do.</p>
+    <p class="blurb">Rows landing per pipeline. Green = flowing now. Orange "stalled" = work queued, nothing moving. Gray = no work.</p>
     <table id="tblAppend"><thead><tr>
       <th>pipeline</th><th class="num">pending</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
       <th>trend</th><th class="num">last activity</th>
@@ -166,7 +166,7 @@
 
   <section>
     <h2>API usage <small>— calls by module</small></h2>
-    <p class="blurb">Every external API call (Anthropic models, Serper) by the module making it: run rate over 5m/60m/24h, dollars spent in 24h, and when it last fired. <b>Green ages</b>: called recently. Quiet rows just mean that module hasn't been needed — if you expected activity, check Freshness and Rate limits for what's holding it.</p>
+    <p class="blurb">External API calls by module — run rate, 24h cost, last fired.</p>
     <table id="tblApi"><thead><tr>
       <th>module</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
       <th class="num">$ 24h</th><th>trend</th><th class="num">last call</th>
@@ -175,14 +175,14 @@
 
   <section>
     <h2>Freshness <small>— is measurement itself alive?</small></h2>
-    <p class="blurb">Watches the watchers: every lane heartbeat and every scheduled job compared to how often it's <i>supposed</i> to run. <b>Green ages</b>: on schedule. Anything under <b>"overdue / failed"</b> missed its window or errored — that's the machinery misbehaving, not the data. If this panel is unhappy, trust the other panels less until it's green.</p>
+    <p class="blurb">Every heartbeat and cron vs its schedule. Anything overdue or failed = the machinery itself slipped.</p>
     <div id="freshLanes"></div>
     <div id="freshCrons" style="margin-top:10px"></div>
   </section>
 
   <section>
     <h2>System health <small>— platform vitals</small></h2>
-    <p class="blurb">Platform vitals, sorted worst-first. <b>Red</b>: broken right now (e.g. the AI API unreachable) — act. <b>Yellow</b>: degraded, held, or accumulating — watch closely. <b>Green</b>: clear. The <b>n</b> column is the count behind the check (errors this hour, active holds, open flags, live sessions).</p>
+    <p class="blurb">Vitals, worst first. Red = broken now. Yellow = degraded or held. <b>n</b> = count behind the check.</p>
     <table id="tblHealth"><thead><tr>
       <th>check</th><th>state</th><th class="num">n</th><th class="num">as of</th><th>detail</th>
     </tr></thead><tbody></tbody></table>
@@ -190,7 +190,7 @@
 
   <section>
     <h2>Data purification <small>— catches &amp; burn-down</small></h2>
-    <p class="blurb">The data-quality defense line: bad writes caught at the gate, quarantines, corrections, and flags. Here activity is usually <b>good news</b> — catches mean the filters are working. The number to watch is <b>backlog</b>: a growing backlog on a quiet row means junk is piling up faster than it's being judged.</p>
+    <p class="blurb">Junk caught and cleaned — activity here is good. Watch <b>backlog</b>: growing on a quiet row = piling up.</p>
     <table id="tblPurify"><thead><tr>
       <th>stream</th><th class="num">backlog</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
       <th>trend</th><th class="num">last activity</th>
@@ -199,7 +199,7 @@
 
   <section>
     <h2>Mesh mail <small>— inner-office routes</small></h2>
-    <p class="blurb">Hub-to-hub letters — how your subsystems share findings with each other. Sent columns show conversation volume. <b>"Unread"</b> with an aging timestamp means a hub isn't consuming its mail; <b>"expired unread"</b> means intelligence died on the shelf. Either way: a listener is asleep on that route.</p>
+    <p class="blurb">Hub-to-hub letters. Aging unread or expired = a listener is asleep on that route.</p>
     <table id="tblMail"><thead><tr>
       <th>route</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
       <th class="num">unread</th><th class="num">oldest unread</th><th class="num">last sent</th>
@@ -208,7 +208,7 @@
 
   <section>
     <h2>Intel ticker <small>— switches, departures, hub conclusions</small></h2>
-    <p class="blurb">The product actually working: PEO <b>switches</b> (green), <b>departures</b> (yellow), and hub conclusions as they're detected, newest first. This should keep moving whenever pipelines are appending — if it goes quiet for days while ingestion runs, detection is lagging behind the data.</p>
+    <p class="blurb">Detections as they land: switches (green), departures (yellow), hub conclusions. Quiet for days = detection lagging.</p>
     <table id="tblTicker"><thead><tr>
       <th class="num">when</th><th>kind</th><th>subject</th><th>detail</th>
     </tr></thead><tbody></tbody></table>
