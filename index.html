@@ -81,9 +81,13 @@
   .age.hot { color: var(--good); }
   .age.cold { color: var(--ink-muted); }
 
-  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 1px 8px;
-    border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; color: var(--ink-2); }
-  .chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-muted); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; padding: 2px 9px;
+    border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; color: var(--ink-1); }
+  .chip::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--ink-muted); flex: none; }
+  .chip.ok       { background: color-mix(in srgb, var(--good) 14%, transparent);     border-color: color-mix(in srgb, var(--good) 50%, transparent); }
+  .chip.warn     { background: color-mix(in srgb, var(--warning) 16%, transparent);  border-color: color-mix(in srgb, var(--warning) 55%, transparent); }
+  .chip.serious  { background: color-mix(in srgb, var(--serious) 18%, transparent);  border-color: color-mix(in srgb, var(--serious) 60%, transparent); }
+  .chip.critical { background: color-mix(in srgb, var(--critical) 26%, transparent); border-color: var(--critical); font-weight: 700; }
   .chip.ok::before { background: var(--good); }
   .chip.warn::before { background: var(--warning); }
   .chip.serious::before { background: var(--serious); }
@@ -336,6 +340,8 @@ function renderStrip(d) {
     ["exhaust queue", (sb.exhaust_queue_pending ?? 0).toLocaleString(), "pending crawl", null],
     ["attributed", (sb.companies_attributed ?? 0).toLocaleString(), "companies", null],
   ];
+  const sev = { critical: 0, warning: 1, good: 2 };
+  tiles.sort((a, b) => (sev[a[3]] ?? 3) - (sev[b[3]] ?? 3));
   $("#strip").innerHTML = tiles.map(([k, v, dd, st]) => {
     const color = st === "good" ? "var(--good)" : st === "critical" ? "var(--critical)" : st === "warning" ? "var(--warning)" : "var(--ink-1)";
     return `<div class="tile"><div class="k">${esc(k)}</div><div class="v" style="color:${color}">${esc(String(v))}</div><div class="d">${esc(dd)}</div></div>`;
