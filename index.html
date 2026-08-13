@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEO Engine — Command Desk (Live)</title>
+<style>
+  /* ------ palette: reference dataviz palette, roles only ------ */
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --ink-1: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --ink-1: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--page); color: var(--ink-1);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--series-1); }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 20px;
+    padding: 14px 20px 10px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: 0.04em; }
+  header .sub { color: var(--ink-muted); font-size: 12px; }
+  #conn { font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); }
+  #conn.ok   { color: var(--good); }
+  #conn.err  { color: var(--critical); }
+  #themeBtn { margin-left: auto; background: none; border: 1px solid var(--border);
+    color: var(--ink-2); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+
+  #strip { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 20px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; min-width: 128px; }
+  .tile .k { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .tile .v { font-size: 22px; font-weight: 650; margin-top: 2px; }
+  .tile .d { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 14px; padding: 0 20px 30px; }
+  section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
+  section h2 { font-size: 12px; margin: 0 0 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.08em; }
+  section h2 small { color: var(--ink-muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--ink-muted); font-weight: 500; font-size: 11px;
+    border-bottom: 1px solid var(--grid); padding: 3px 8px 5px 0; }
+  td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--grid); vertical-align: middle; white-space: nowrap; }
+  td:last-child, th:last-child { padding-right: 0; }
+  td .age { white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .age { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .age.hot { color: var(--good); }
+  .age.cold { color: var(--ink-muted); }
+
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 1px 8px;
+    border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; color: var(--ink-2); }
+  .chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-muted); }
+  .chip.ok::before { background: var(--good); }
+  .chip.warn::before { background: var(--warning); }
+  .chip.serious::before { background: var(--serious); }
+  .chip.critical::before { background: var(--critical); }
+
+  .meter { position: relative; height: 8px; background: var(--grid); border-radius: 4px; min-width: 90px; }
+  .meter > i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--series-1); }
+  .meter.warn > i { background: var(--warning); }
+  .meter.critical > i { background: var(--critical); }
+
+  svg.spark { display: block; }
+  svg.spark polyline { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  svg.spark line.base { stroke: var(--baseline); stroke-width: 1; }
+
+  #overlay { position: fixed; inset: 0; background: var(--page); display: flex;
+    align-items: center; justify-content: center; z-index: 10; }
+  #overlay .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 26px 30px; width: 360px; }
+  #overlay h2 { margin: 0 0 6px; font-size: 15px; }
+  #overlay p { color: var(--ink-2); font-size: 13px; }
+  #overlay input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--baseline);
+    background: var(--page); color: var(--ink-1); font-size: 13px; }
+  #overlay button { margin-top: 12px; width: 100%; padding: 8px; border-radius: 8px; border: none;
+    background: var(--series-1); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+  #overlay .err { color: var(--critical); font-size: 12px; min-height: 16px; margin-top: 8px; }
+  .hidden { display: none !important; }
+
+  #tip { position: fixed; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink-1); z-index: 20;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
+</style>
+</head>
+<body>
+
+<div id="overlay" class="hidden">
+  <div class="card">
+    <h2>Command Desk</h2>
+    <p>Enter your desk access key. It is stored only in this browser.</p>
+    <input id="keyInput" type="password" placeholder="dk_…" autocomplete="off">
+    <div class="err" id="keyErr"></div>
+    <button id="keyGo">Open the desk</button>
+  </div>
+</div>
+
+<header>
+  <h1>PEO ENGINE — COMMAND DESK</h1>
+  <span class="sub" id="clock">—</span>
+  <span class="sub">poll: 5s · <span id="lastPoll">never</span></span>
+  <span id="conn">connecting…</span>
+  <button id="themeBtn" title="Toggle light/dark">◐ theme</button>
+</header>
+
+<div id="strip"></div>
+
+<main>
+  <section>
+    <h2>Rate limits <small>— used vs cap, live</small></h2>
+    <table id="tblLimits"><thead><tr>
+      <th>resource</th><th>window</th><th class="num">used</th><th class="num">cap</th><th style="width:110px">meter</th><th>state</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>Append throughput <small>— rows/runs landed per window</small></h2>
+    <table id="tblAppend"><thead><tr>
+      <th>pipeline</th><th class="num">pending</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
+      <th>trend</th><th class="num">last activity</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>API usage <small>— calls by module</small></h2>
+    <table id="tblApi"><thead><tr>
+      <th>module</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
+      <th class="num">$ 24h</th><th>trend</th><th class="num">last call</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>Freshness <small>— is measurement itself alive?</small></h2>
+    <div id="freshLanes"></div>
+    <div id="freshCrons" style="margin-top:10px"></div>
+  </section>
+</main>
+
+<div id="tip" class="hidden"></div>
+
+<script>
+"use strict";
+/* ================= config ================= */
+const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
+const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health"];
+const POLL_MS = 5000;
+const HISTORY_MAX = 180;           /* 15 min of 5s samples */
+const DEMO = new URLSearchParams(location.search).has("demo");
+
+/* ================= state ================= */
+let deskKey = localStorage.getItem("desk_key") || "";
+let skewMs = 0;                    /* serverNow - clientNow */
+let lastPollAt = null;
+let latest = null;
+const history = new Map();         /* key -> [{t, v}] */
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ================= theme ================= */
+const savedTheme = localStorage.getItem("desk_theme");
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+$("#themeBtn").onclick = () => {
+  const cur = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = cur;
+  localStorage.setItem("desk_theme", cur);
+};
+
+/* ================= helpers ================= */
+function serverNow() { return Date.now() + skewMs; }
+function fmtAge(secs) {
+  if (secs == null || isNaN(secs)) return "—";
+  if (secs < 0) secs = 0;
+  if (secs < 90) return Math.round(secs) + "s";
+  if (secs < 5400) return Math.round(secs / 60) + "m";
+  if (secs < 172800) return (secs / 3600).toFixed(1) + "h";
+  return (secs / 86400).toFixed(1) + "d";
+}
+function ageSpan(ts, hotSecs) {
+  if (!ts) return '<span class="age cold" data-ts="">never</span>';
+  return `<span class="age" data-ts="${new Date(ts).getTime()}" data-hot="${hotSecs || 600}"></span>`;
+}
+function tickAges() {
+  const now = serverNow();
+  document.querySelectorAll(".age[data-ts]").forEach((el) => {
+    if (!el.dataset.ts) return;
+    const secs = (now - Number(el.dataset.ts)) / 1000;
+    el.textContent = fmtAge(secs) + " ago";
+    el.classList.toggle("hot", secs < Number(el.dataset.hot));
+    el.classList.toggle("cold", secs >= Number(el.dataset.hot) * 6);
+  });
+  $("#clock").textContent = new Date().toLocaleTimeString() + (Math.abs(skewMs) > 3000 ? ` (db skew ${(skewMs/1000).toFixed(0)}s)` : "");
+  if (lastPollAt) {
+    const s = (Date.now() - lastPollAt) / 1000;
+    $("#lastPoll").textContent = "updated " + fmtAge(s) + " ago";
+    if (s > 20) setConn("stale — no data for " + fmtAge(s), false);
+  }
+}
+setInterval(tickAges, 1000);
+
+function setConn(msg, ok) {
+  const el = $("#conn");
+  el.textContent = msg;
+  el.className = ok ? "ok" : "err";
+}
+function pushHistory(key, v) {
+  let arr = history.get(key);
+  if (!arr) { arr = []; history.set(key, arr); }
+  arr.push({ t: Date.now(), v: Number(v) || 0 });
+  if (arr.length > HISTORY_MAX) arr.shift();
+}
+function spark(key, w = 64, h = 22) {
+  const arr = history.get(key) || [];
+  if (arr.length < 2) return `<svg class="spark" width="${w}" height="${h}"><line class="base" x1="0" y1="${h-1}" x2="${w}" y2="${h-1}"/></svg>`;
+  const max = Math.max(...arr.map((p) => p.v), 1);
+  const pts = arr.map((p, i) => `${(i / (arr.length - 1)) * (w - 2) + 1},${h - 2 - (p.v / max) * (h - 6)}`).join(" ");
+  return `<svg class="spark" width="${w}" height="${h}" data-spark="${esc(key)}"><line class="base" x1="0" y1="${h-1}" x2="${w}" y2="${h-1}"/><polyline points="${pts}"/></svg>`;
+}
+/* sparkline hover tooltip */
+document.addEventListener("mousemove", (e) => {
+  const svg = e.target.closest && e.target.closest("svg.spark[data-spark]");
+  const tip = $("#tip");
+  if (!svg) { tip.classList.add("hidden"); return; }
+  const arr = history.get(svg.dataset.spark) || [];
+  if (!arr.length) return;
+  const r = svg.getBoundingClientRect();
+  const idx = Math.min(arr.length - 1, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * (arr.length - 1))));
+  const p = arr[idx];
+  tip.textContent = `${p.v} — ${fmtAge((Date.now() - p.t) / 1000)} ago`;
+  tip.style.left = e.clientX + 12 + "px";
+  tip.style.top = e.clientY - 10 + "px";
+  tip.classList.remove("hidden");
+});
+
+function stateChip(state, label) {
+  const cls = { ok: "ok", good: "ok", alive: "ok", warn: "warn", warning: "warn", gated: "warn",
+    starving: "serious", serious: "serious", stalled: "serious",
+    critical: "critical", failing: "critical", failed: "critical" }[state] || "";
+  return `<span class="chip ${cls}">${esc(label || state)}</span>`;
+}
+
+/* ================= renderers ================= */
+function renderStrip(d) {
+  const sb = (d.desk_status_board?.rows || [])[0] || {};
+  const sp = (d.desk_spend?.rows || [])[0] || {};
+  const fresh = d.desk_freshness?.rows || [];
+  const cronsBad = fresh.filter((r) => r.kind === "cron" && !r.ok).length;
+  const cronsAll = fresh.filter((r) => r.kind === "cron").length;
+  const tiles = [
+    ["spend gate", sp.gate_open ? "OPEN" : "CLOSED", `$${Number(sp.spend_mtd_usd ?? 0).toFixed(0)} / $${Number(sp.platform_cap_usd ?? 0).toFixed(0)} MTD`, sp.gate_open ? "good" : "critical"],
+    ["lanes alive", sb.lanes_alive ?? "—", `${sb.lanes_failing ?? 0} failing · ${sb.lanes_starving ?? 0} starving`, (sb.lanes_failing > 0) ? "critical" : "good"],
+    ["crons on time", `${cronsAll - cronsBad}/${cronsAll}`, cronsBad ? `${cronsBad} overdue or failed` : "all on schedule", cronsBad ? "warning" : "good"],
+    ["red flags", sb.red_flags ?? "—", "open live conditions", (sb.red_flags > 0) ? "warning" : "good"],
+    ["rulings waiting", sb.rulings_waiting ?? "—", "need Gazz", (sb.rulings_waiting > 0) ? "warning" : "good"],
+    ["domain queue", (sb.domain_queue_pending ?? 0).toLocaleString(), "pending adjudication", null],
+    ["exhaust queue", (sb.exhaust_queue_pending ?? 0).toLocaleString(), "pending crawl", null],
+    ["attributed", (sb.companies_attributed ?? 0).toLocaleString(), "companies", null],
+  ];
+  $("#strip").innerHTML = tiles.map(([k, v, dd, st]) => {
+    const color = st === "good" ? "var(--good)" : st === "critical" ? "var(--critical)" : st === "warning" ? "var(--warning)" : "var(--ink-1)";
+    return `<div class="tile"><div class="k">${esc(k)}</div><div class="v" style="color:${color}">${esc(String(v))}</div><div class="d">${esc(dd)}</div></div>`;
+  }).join("");
+}
+
+function renderLimits(d) {
+  const rows = d.desk_rate_limits?.rows || [];
+  const mesh = rows.filter((r) => String(r.resource).startsWith("mesh_mail:"));
+  const main = rows.filter((r) => !String(r.resource).startsWith("mesh_mail:"));
+  const meshMax = mesh.reduce((a, r) => Math.max(a, Number(r.used) || 0), 0);
+  const meshRow = mesh.length ? [{
+    resource: `mesh mail (${mesh.length} hubs)`, window_label: "today",
+    used: meshMax, cap: mesh[0].cap, pct_used: mesh[0].cap ? (meshMax * 100 / mesh[0].cap) : null,
+    state: mesh.some((r) => r.state === "critical") ? "critical" : mesh.some((r) => r.state === "warn") ? "warn" : "ok",
+    detail: "busiest hub today vs per-hub limit",
+  }] : [];
+  $("#tblLimits tbody").innerHTML = main.concat(meshRow).map((r) => {
+    const pct = r.pct_used == null ? null : Math.min(Number(r.pct_used), 100);
+    const meterCls = r.state === "critical" ? "critical" : r.state === "warn" ? "warn" : "";
+    return `<tr title="${esc(r.detail)}">
+      <td>${esc(r.resource)}</td>
+      <td class="age cold">${esc(r.window_label)}</td>
+      <td class="num">${Number(r.used).toLocaleString()}</td>
+      <td class="num">${r.cap == null ? "—" : Number(r.cap).toLocaleString()}</td>
+      <td>${pct == null ? "" : `<div class="meter ${meterCls}"><i style="width:${pct}%"></i></div>`}</td>
+      <td>${stateChip(r.state, r.state + (r.pct_used != null ? " · " + Number(r.pct_used).toFixed(0) + "%" : ""))}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderAppend(d) {
+  const rows = (d.desk_append_live?.rows || []).slice().sort((a, b) => (b.done_5m - a.done_5m) || (b.done_60m - a.done_60m));
+  $("#tblAppend tbody").innerHTML = rows.map((r) => {
+    pushHistory("ap:" + r.pipeline, r.done_5m);
+    const state = r.done_5m > 0 ? "alive" : (Number(r.queue_pending) > 0 && r.done_60m === 0) ? "stalled" : r.done_60m > 0 ? "warn" : "idle";
+    const label = state === "alive" ? "appending" : state === "stalled" ? "stalled" : state === "warn" ? "slow" : "idle";
+    return `<tr title="${esc(r.note)}">
+      <td>${esc(r.pipeline)}<br>${stateChip(state, label)}</td>
+      <td class="num">${Number(r.queue_pending).toLocaleString()}</td>
+      <td class="num">${Number(r.done_5m).toLocaleString()}</td>
+      <td class="num">${Number(r.done_60m).toLocaleString()}</td>
+      <td class="num">${Number(r.done_24h).toLocaleString()}</td>
+      <td>${spark("ap:" + r.pipeline)}</td>
+      <td class="num">${ageSpan(r.last_activity_at, 300)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderApi(d) {
+  const rows = (d.desk_api_usage_live?.rows || []).slice().sort((a, b) => (b.calls_5m - a.calls_5m) || (b.calls_60m - a.calls_60m) || (b.calls_24h - a.calls_24h));
+  $("#tblApi tbody").innerHTML = rows.map((r) => {
+    const key = "api:" + r.source + ":" + r.module;
+    pushHistory(key, r.calls_5m);
+    return `<tr>
+      <td>${esc(r.module)} <span class="age cold">(${esc(r.source)})</span></td>
+      <td class="num">${Number(r.calls_5m).toLocaleString()}</td>
+      <td class="num">${Number(r.calls_60m).toLocaleString()}</td>
+      <td class="num">${Number(r.calls_24h).toLocaleString()}</td>
+      <td class="num">${r.usd_24h == null ? "—" : "$" + Number(r.usd_24h).toFixed(2)}</td>
+      <td>${spark(key)}</td>
+      <td class="num">${ageSpan(r.last_call_at, 300)}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="7" class="age cold">no API calls in the last 24h</td></tr>';
+}
+
+function renderFresh(d) {
+  const fresh = d.desk_freshness?.rows || [];
+  const laneHealth = new Map((d.desk_lane_health?.rows || []).map((r) => [r.lane, r]));
+  const lanes = fresh.filter((r) => r.kind === "lane");
+  $("#freshLanes").innerHTML = `<table><thead><tr>
+      <th>lane</th><th class="num">cadence</th><th class="num">checked</th><th>state</th><th>meaning</th>
+    </tr></thead><tbody>` + lanes.map((r) => {
+    const lh = laneHealth.get(r.name) || {};
+    const st = (r.detail.match(/state=(\w+)/) || [])[1] || (r.ok ? "ok" : "failing");
+    return `<tr>
+      <td>${esc(r.name)}</td>
+      <td class="num">${fmtAge(r.expected_secs)}</td>
+      <td class="num">${ageSpan(r.last_seen_at, 1500)}</td>
+      <td>${stateChip(st, st)}</td>
+      <td class="age cold" style="white-space:normal">${esc(lh.meaning || r.detail)}</td>
+    </tr>`;
+  }).join("") + "</tbody></table>";
+
+  const crons = fresh.filter((r) => r.kind === "cron");
+  const bad = crons.filter((r) => !r.ok);
+  $("#freshCrons").innerHTML =
+    `<div class="age cold" style="margin-bottom:6px">crons: ${crons.length - bad.length}/${crons.length} on schedule</div>` +
+    (bad.length ? `<table><thead><tr><th>overdue / failed cron</th><th class="num">expected every</th><th class="num">last ran</th><th>detail</th></tr></thead><tbody>` +
+      bad.map((r) => `<tr>
+        <td>${esc(r.name)}</td>
+        <td class="num">${fmtAge(r.expected_secs)}</td>
+        <td class="num">${ageSpan(r.last_seen_at, r.expected_secs || 3600)}</td>
+        <td class="age cold" style="white-space:normal">${esc(r.detail)}</td>
+      </tr>`).join("") + "</tbody></table>"
+      : "");
+}
+
+function renderAll(d) {
+  renderStrip(d);
+  renderLimits(d);
+  renderAppend(d);
+  renderApi(d);
+  renderFresh(d);
+  tickAges();
+}
+
+/* ================= polling ================= */
+async function poll() {
+  if (DEMO) { renderAll(demoData()); setConn("demo data", true); lastPollAt = Date.now(); return; }
+  if (!deskKey) return;
+  try {
+    const res = await fetch(`${API}?view=${VIEWS.join(",")}`, {
+      headers: { "Authorization": `Bearer ${ANON}`, "x-desk-key": deskKey },
+    });
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem("desk_key"); deskKey = "";
+      setConn("key rejected", false);
+      showOverlay("That key was rejected.");
+      return;
+    }
+    if (!res.ok) { setConn(`error ${res.status}`, false); return; }
+    const body = await res.json();
+    latest = body.views || {};
+    lastPollAt = Date.now();
+    const clockRow = (latest.desk_freshness?.rows || []).find((r) => r.kind === "clock");
+    if (clockRow) skewMs = new Date(clockRow.last_seen_at).getTime() - Date.now();
+    else if (body.served_at) skewMs = new Date(body.served_at).getTime() - Date.now();
+    renderAll(latest);
+    setConn("live", true);
+  } catch (e) {
+    setConn("unreachable — " + (e.message || e), false);
+  }
+}
+
+/* ================= key overlay ================= */
+function showOverlay(err) {
+  $("#overlay").classList.remove("hidden");
+  $("#keyErr").textContent = err || "";
+  $("#keyInput").focus();
+}
+$("#keyGo").onclick = async () => {
+  deskKey = $("#keyInput").value.trim();
+  if (!deskKey) return;
+  localStorage.setItem("desk_key", deskKey);
+  $("#overlay").classList.add("hidden");
+  await poll();
+};
+$("#keyInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#keyGo").click(); });
+
+/* ================= demo data (layout preview only) ================= */
+function demoData() {
+  const now = new Date().toISOString();
+  const ago = (s) => new Date(Date.now() - s * 1000).toISOString();
+  return {
+    desk_status_board: { rows: [{ lanes_alive: 4, lanes_failing: 0, lanes_starving: 1, red_flags: 2, rulings_waiting: 1, domain_queue_pending: 66830, exhaust_queue_pending: 107865, companies_attributed: 8123 }] },
+    desk_spend: { rows: [{ gate_open: false, spend_mtd_usd: 439.17, platform_cap_usd: 400 }] },
+    desk_rate_limits: { rows: [
+      { resource: "serper_credits", window_label: "credit pool", used: 31624, cap: 50000, remaining: 18376, pct_used: 63.2, state: "ok", detail: "gate closes at 500" },
+      { resource: "serper_today", window_label: "today", used: 1240, cap: null, remaining: null, pct_used: null, state: "ok", detail: "credits burned today" },
+      { resource: "anthropic_month", window_label: "month to date", used: 439.17, cap: 400, remaining: -39.17, pct_used: 109.8, state: "critical", detail: "spend gate CLOSED" },
+      { resource: "anthropic_credits", window_label: "credit pool", used: 757.77, cap: 100, remaining: -657.77, pct_used: 100, state: "critical", detail: "drawn since anchor" },
+      { resource: "mesh_mail:intent", window_label: "today", used: 12, cap: 500, pct_used: 2.4, state: "ok", detail: "" },
+      { resource: "mesh_mail:mesh", window_label: "today", used: 3, cap: 500, pct_used: 0.6, state: "ok", detail: "" },
+    ] },
+    desk_api_usage_live: { rows: [
+      { source: "anthropic", module: "domain-resolve", calls_5m: 14, calls_60m: 122, calls_24h: 289, usd_24h: 26.28, last_call_at: ago(12) },
+      { source: "serper", module: "serper:search", calls_5m: 9, calls_60m: 80, calls_24h: 1893, usd_24h: null, last_call_at: ago(40) },
+      { source: "anthropic", module: "sonnet-escalate", calls_5m: 0, calls_60m: 3, calls_24h: 47, usd_24h: 3.52, last_call_at: ago(4200) },
+    ] },
+    desk_append_live: { rows: [
+      { pipeline: "exhaust_crawl", queue_pending: 107865, done_5m: 150, done_60m: 1794, done_24h: 39710, per_min_60m: 29.9, last_activity_at: ago(20), note: "crawl requests fired" },
+      { pipeline: "exhaust_mine", queue_pending: 12, done_5m: 150, done_60m: 1790, done_24h: 36253, per_min_60m: 29.8, last_activity_at: ago(60), note: "responses mined" },
+      { pipeline: "domain_resolve", queue_pending: 66830, done_5m: 0, done_60m: 0, done_24h: 5779, per_min_60m: 0, last_activity_at: ago(80596), note: "domains adjudicated" },
+      { pipeline: "serper_enrich", queue_pending: 16074, done_5m: 0, done_60m: 0, done_24h: 1013, per_min_60m: 0, last_activity_at: ago(67176), note: "companies enriched" },
+    ] },
+    desk_freshness: { rows: [
+      { kind: "clock", name: "db_now", expected_secs: null, last_seen_at: now, age_secs: 0, ok: true, detail: "server time" },
+      { kind: "lane", name: "exhaust_crawl", expected_secs: 1800, last_seen_at: ago(300), ok: true, detail: "state=alive consecutive_bad=0" },
+      { kind: "lane", name: "domain_resolve", expected_secs: 600, last_seen_at: ago(300), ok: true, detail: "state=gated consecutive_bad=0 (spend-gated)" },
+      { kind: "lane", name: "snippet_miner", expected_secs: 5400, last_seen_at: ago(300), ok: true, detail: "state=starving consecutive_bad=13" },
+      { kind: "cron", name: "hub_contract_sentinel", expected_secs: 3600, last_seen_at: ago(537), ok: false, detail: "schedule=0 * * * * last_status=failed" },
+      { kind: "cron", name: "watchdog", expected_secs: 300, last_seen_at: ago(60), ok: true, detail: "schedule=*/5 * * * * last_status=succeeded" },
+    ] },
+    desk_lane_health: { rows: [
+      { lane: "exhaust_crawl", meaning: "firing and mining normally" },
+      { lane: "domain_resolve", meaning: "waiting on spend gate" },
+    ] },
+  };
+}
+
+/* ================= boot ================= */
+if (DEMO) { poll(); }
+else if (!deskKey) { showOverlay(); }
+else { poll(); }
+setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>
