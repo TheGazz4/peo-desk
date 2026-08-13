@@ -193,6 +193,14 @@
   </section>
 
   <section>
+    <h2>Module utilization <small>— are the hubs running on their own?</small></h2>
+    <p class="blurb">Each module's runs in 24h vs what its schedules promise. Green = running as scheduled. Failures &gt; 0 = look. Dormant = installed but not ticking.</p>
+    <table id="tblHubs"><thead><tr>
+      <th>module</th><th class="num">1h</th><th class="num">24h</th><th class="num">expected</th><th style="width:100px">utilization</th><th class="num">failed</th><th class="num">last run</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
     <h2>System health <small>— platform vitals</small></h2>
     <p class="blurb">Vitals, worst first. Red = broken now. Yellow = degraded or held. <b>n</b> = count behind the check.</p>
     <table id="tblHealth"><thead><tr>
@@ -234,7 +242,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -532,9 +540,29 @@ function renderPlays(d) {
   }).join("") || '<tr><td colspan="8" class="age cold">no plays minted yet</td></tr>';
 }
 
+function renderHubs(d) {
+  const rows = (d.desk_hub_utilization?.rows || []).slice().sort((a, b) => (b.fires_24h - a.fires_24h) || String(a.hub_slug).localeCompare(String(b.hub_slug)));
+  $("#tblHubs tbody").innerHTML = rows.map((r) => {
+    pushHistory("hub:" + r.hub_slug, r.fires_1h);
+    const stCls = { active: "ok", degraded: "warn", quiet: "serious", dormant: "serious", planned: "", "on-demand": "" }[r.state] || "";
+    const pct = r.utilization_pct == null ? null : Math.min(Number(r.utilization_pct), 100);
+    const meterCls = pct == null ? "" : pct >= 80 ? "" : pct >= 40 ? "warn" : "critical";
+    return `<tr title="${esc(r.hub_type)} · ${esc(String(r.crons_active))} active crons · ${esc(String(r.thoughts_24h))} brain thoughts 24h">
+      <td>${esc(r.hub_slug)}<br><span class="chip ${stCls}">${esc(r.state)}</span></td>
+      <td class="num">${Number(r.fires_1h).toLocaleString()}</td>
+      <td class="num">${Number(r.fires_24h).toLocaleString()}</td>
+      <td class="num">${r.expected_24h == null ? "—" : Number(r.expected_24h).toLocaleString()}</td>
+      <td>${pct == null ? '<span class="age cold">n/a</span>' : `<div class="meter ${meterCls}"><i style="width:${pct}%"></i></div>`}</td>
+      <td class="num"${Number(r.failed_24h) > 0 ? ' style="color:var(--critical);font-weight:650"' : ""}>${Number(r.failed_24h).toLocaleString()}</td>
+      <td class="num">${ageSpan(r.last_activity_at, 3600)}</td>
+    </tr>`;
+  }).join("");
+}
+
 function renderAll(d) {
   renderStrip(d);
   renderPlays(d);
+  renderHubs(d);
   renderLimits(d);
   renderAppend(d);
   renderApi(d);
@@ -643,6 +671,14 @@ function demoData() {
     desk_mesh_mail_live: { rows: [
       { route: "efast_5500 -> tx_wc", sent_5m: 0, sent_60m: 2, sent_24h: 11, unconsumed: 1, oldest_unconsumed_at: ago(4000), expired_unread: 0, last_sent_at: ago(1300), last_kind: "offer/ein" },
       { route: "peo_intel -> fingerprint", sent_5m: 0, sent_60m: 0, sent_24h: 3, unconsumed: 0, oldest_unconsumed_at: null, expired_unread: 2, last_sent_at: ago(30000), last_kind: "fact/peo" },
+    ] },
+    desk_hub_utilization: { rows: [
+      { hub_slug: "ca_sos", hub_type: "reporter", crons_active: 3, fires_1h: 240, fires_24h: 5331, failed_24h: 0, expected_24h: 5760, utilization_pct: 93, thoughts_24h: 0, last_activity_at: ago(30), state: "active" },
+      { hub_slug: "efast_5500", hub_type: "reporter", crons_active: 4, fires_1h: 63, fires_24h: 1400, failed_24h: 0, expected_24h: 1513, utilization_pct: 93, thoughts_24h: 0, last_activity_at: ago(45), state: "active" },
+      { hub_slug: "fingerprint", hub_type: "thinker", crons_active: 8, fires_1h: 36, fires_24h: 821, failed_24h: 0, expected_24h: 889, utilization_pct: 92, thoughts_24h: 0, last_activity_at: ago(70), state: "active" },
+      { hub_slug: "enrichment", hub_type: "thinker", crons_active: 1, fires_1h: 2, fires_24h: 45, failed_24h: 18, expected_24h: 48, utilization_pct: 94, thoughts_24h: 0, last_activity_at: ago(500), state: "active" },
+      { hub_slug: "postmaster", hub_type: "thinker", crons_active: 0, fires_1h: 0, fires_24h: 0, failed_24h: 0, expected_24h: 0, utilization_pct: null, thoughts_24h: 0, last_activity_at: ago(200000), state: "dormant" },
+      { hub_slug: "fl_wc", hub_type: "reporter", crons_active: 0, fires_1h: 0, fires_24h: 0, failed_24h: 0, expected_24h: 0, utilization_pct: null, thoughts_24h: 0, last_activity_at: null, state: "planned" },
     ] },
     desk_ready_plays: { rows: [
       { angle_type: "TOTAL", minted: 12029, live: 12029, in_window: 4480, ready: 4480, sendable: 0, ready_companies: 4480, minted_24h: 0, last_minted_at: ago(100000) },
