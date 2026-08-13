@@ -163,6 +163,36 @@
     <div id="freshLanes"></div>
     <div id="freshCrons" style="margin-top:10px"></div>
   </section>
+
+  <section>
+    <h2>System health <small>— platform vitals</small></h2>
+    <table id="tblHealth"><thead><tr>
+      <th>check</th><th>state</th><th class="num">n</th><th class="num">as of</th><th>detail</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>Data purification <small>— catches &amp; burn-down</small></h2>
+    <table id="tblPurify"><thead><tr>
+      <th>stream</th><th class="num">backlog</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
+      <th>trend</th><th class="num">last activity</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>Mesh mail <small>— inner-office routes</small></h2>
+    <table id="tblMail"><thead><tr>
+      <th>route</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
+      <th class="num">unread</th><th class="num">oldest unread</th><th class="num">last sent</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>Intel ticker <small>— switches, departures, hub conclusions</small></h2>
+    <table id="tblTicker"><thead><tr>
+      <th class="num">when</th><th>kind</th><th>subject</th><th>detail</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
 </main>
 
 <div id="tip" class="hidden"></div>
@@ -172,7 +202,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -384,12 +414,73 @@ function renderFresh(d) {
       : "");
 }
 
+function renderHealth(d) {
+  const rows = d.desk_system_health?.rows || [];
+  const rank = { critical: 0, warn: 1, ok: 2 };
+  rows.sort((a, b) => (rank[a.state] ?? 3) - (rank[b.state] ?? 3));
+  $("#tblHealth tbody").innerHTML = rows.map((r) => `<tr>
+      <td>${esc(r.item)}</td>
+      <td>${stateChip(r.state, r.state)}</td>
+      <td class="num">${r.metric == null ? "—" : Number(r.metric).toLocaleString()}</td>
+      <td class="num">${ageSpan(r.last_at, 3600)}</td>
+      <td class="age cold" style="white-space:normal">${esc(r.detail)}</td>
+    </tr>`).join("");
+}
+
+function renderPurify(d) {
+  const rows = (d.desk_purification_live?.rows || []).slice().sort((a, b) => (b.done_5m - a.done_5m) || (b.done_60m - a.done_60m) || (b.done_24h - a.done_24h));
+  $("#tblPurify tbody").innerHTML = rows.map((r) => {
+    pushHistory("pu:" + r.stream, r.done_5m);
+    const state = r.done_5m > 0 ? "alive" : r.done_60m > 0 ? "warn" : "idle";
+    const label = state === "alive" ? "active" : state === "warn" ? "slow" : "quiet";
+    return `<tr title="${esc(r.note)}">
+      <td>${esc(r.stream)}<br>${stateChip(state, label)}</td>
+      <td class="num">${r.backlog == null ? "—" : Number(r.backlog).toLocaleString()}</td>
+      <td class="num">${Number(r.done_5m).toLocaleString()}</td>
+      <td class="num">${Number(r.done_60m).toLocaleString()}</td>
+      <td class="num">${Number(r.done_24h).toLocaleString()}</td>
+      <td>${spark("pu:" + r.stream)}</td>
+      <td class="num">${ageSpan(r.last_activity_at, 3600)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderMail(d) {
+  const rows = (d.desk_mesh_mail_live?.rows || []).slice().sort((a, b) => (b.sent_24h - a.sent_24h) || (b.unconsumed - a.unconsumed));
+  $("#tblMail tbody").innerHTML = rows.map((r) => `<tr title="${esc(r.last_kind || "")}">
+      <td>${esc(r.route)}${Number(r.expired_unread) > 0 ? " " + stateChip("warn", r.expired_unread + " expired unread") : ""}</td>
+      <td class="num">${Number(r.sent_5m).toLocaleString()}</td>
+      <td class="num">${Number(r.sent_60m).toLocaleString()}</td>
+      <td class="num">${Number(r.sent_24h).toLocaleString()}</td>
+      <td class="num">${Number(r.unconsumed).toLocaleString()}</td>
+      <td class="num">${ageSpan(r.oldest_unconsumed_at, 7200)}</td>
+      <td class="num">${ageSpan(r.last_sent_at, 3600)}</td>
+    </tr>`).join("") || '<tr><td colspan="7" class="age cold">no inner-office mail yet</td></tr>';
+}
+
+function renderTicker(d) {
+  const rows = d.desk_intel_ticker?.rows || [];
+  $("#tblTicker tbody").innerHTML = rows.map((r) => {
+    const cls = r.kind === "switch" ? "ok" : r.kind === "departure" ? "warn" : "";
+    return `<tr>
+      <td class="num">${ageSpan(r.at, 3600)}</td>
+      <td><span class="chip ${cls}">${esc(r.kind)}</span></td>
+      <td>${esc(r.subject)}</td>
+      <td class="age cold" style="white-space:normal">${esc(r.detail)}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="4" class="age cold">no intelligence events yet</td></tr>';
+}
+
 function renderAll(d) {
   renderStrip(d);
   renderLimits(d);
   renderAppend(d);
   renderApi(d);
   renderFresh(d);
+  renderHealth(d);
+  renderPurify(d);
+  renderMail(d);
+  renderTicker(d);
   tickAges();
 }
 
@@ -473,6 +564,28 @@ function demoData() {
     desk_lane_health: { rows: [
       { lane: "exhaust_crawl", meaning: "firing and mining normally" },
       { lane: "domain_resolve", meaning: "waiting on spend gate" },
+    ] },
+    desk_system_health: { rows: [
+      { item: "anthropic_reachability", state: "critical", metric: 429, last_at: ago(120), detail: "rate_limit_error: monthly usage threshold crossed" },
+      { item: "health_check", state: "warn", metric: null, last_at: ago(400), detail: "status=RED" },
+      { item: "operator_holds", state: "warn", metric: 13, last_at: ago(19000), detail: "entity_resolve_drain, serper_enrich_drain, ..." },
+      { item: "edge_errors_60m", state: "ok", metric: 0, last_at: null, detail: "no edge errors in the last hour" },
+      { item: "exceptions_open", state: "ok", metric: 0, last_at: null, detail: "exception desk clear" },
+    ] },
+    desk_purification_live: { rows: [
+      { stream: "quality_flags", backlog: 85, done_5m: 1, done_60m: 4, done_24h: 66, last_activity_at: ago(60), note: "flags raised (backlog = still open)" },
+      { stream: "ingest_quarantine", backlog: 17339, done_5m: 0, done_60m: 0, done_24h: 570, last_activity_at: ago(56000), note: "bad writes caught at the gate" },
+      { stream: "noncompete_quarantine", backlog: 720, done_5m: 0, done_60m: 0, done_24h: 15, last_activity_at: ago(22000), note: "noncompete entities pulled" },
+      { stream: "attribution_adjudication", backlog: 390, done_5m: 0, done_60m: 0, done_24h: 0, last_activity_at: ago(140000), note: "suspect groups resolved" },
+    ] },
+    desk_mesh_mail_live: { rows: [
+      { route: "efast_5500 -> tx_wc", sent_5m: 0, sent_60m: 2, sent_24h: 11, unconsumed: 1, oldest_unconsumed_at: ago(4000), expired_unread: 0, last_sent_at: ago(1300), last_kind: "offer/ein" },
+      { route: "peo_intel -> fingerprint", sent_5m: 0, sent_60m: 0, sent_24h: 3, unconsumed: 0, oldest_unconsumed_at: null, expired_unread: 2, last_sent_at: ago(30000), last_kind: "fact/peo" },
+    ] },
+    desk_intel_ticker: { rows: [
+      { at: ago(300), kind: "switch", subject: "ACME STAFFING LLC", detail: "insperity -> adp_totalsource (tx_wc_lcf)" },
+      { at: ago(2000), kind: "departure", subject: "BLUE MESA FOODS", detail: "left justworks after 2025 [candidate]" },
+      { at: ago(3600), kind: "hub:efast_5500", subject: "wring_merge_complete", detail: "load_progress" },
     ] },
   };
 }
