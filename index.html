@@ -160,6 +160,15 @@
   </section>
 
   <section>
+    <h2>Enrichment progress <small>— coverage of the targetable universe</small></h2>
+    <p class="blurb">How enriched the book is, stage by stage, toward narratives and plays. Bars fill as appending lands. <b>Δ7d</b> = companies gained this week — green movement = progress.</p>
+    <table id="tblEnrich"><thead><tr>
+      <th>stage</th><th style="width:150px">coverage</th><th class="num">companies</th><th class="num">pct</th><th class="num">Δ24h</th><th class="num">Δ7d</th>
+    </tr></thead><tbody></tbody></table>
+    <p class="blurb" style="margin:8px 0 0" id="enrichFoot"></p>
+  </section>
+
+  <section>
     <h2>Rate limits <small>— used vs cap, live</small></h2>
     <p class="blurb">Paid/capped resources vs their caps. Yellow = 80%+ or running low. Red = cap hit; spending lanes stop.</p>
     <table id="tblLimits"><thead><tr>
@@ -242,7 +251,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -559,9 +568,35 @@ function renderHubs(d) {
   }).join("");
 }
 
+function renderEnrich(d) {
+  const rows = d.desk_enrichment_progress?.rows || [];
+  const fmtDelta = (v) => {
+    if (v == null) return '<span style="color:var(--ink-muted)">—</span>';
+    if (v > 0) return `<span style="color:var(--good);font-weight:650">+${Number(v).toLocaleString()}</span>`;
+    if (v < 0) return `<span style="color:var(--serious)">${Number(v).toLocaleString()}</span>`;
+    return '<span style="color:var(--ink-muted)">0</span>';
+  };
+  $("#tblEnrich tbody").innerHTML = rows.map((r) => {
+    const pct = Number(r.pct) || 0;
+    return `<tr>
+      <td>${esc(r.label)}</td>
+      <td><div class="meter"><i style="width:${Math.max(pct, r.n > 0 ? 1 : 0)}%"></i></div></td>
+      <td class="num">${Number(r.n).toLocaleString()}</td>
+      <td class="num">${pct.toFixed(1)}%</td>
+      <td class="num">${fmtDelta(r.delta_24h)}</td>
+      <td class="num">${fmtDelta(r.delta_7d)}</td>
+    </tr>`;
+  }).join("");
+  const cap = rows[0];
+  $("#enrichFoot").innerHTML = cap
+    ? `universe: <b>${Number(cap.universe).toLocaleString()}</b> targetable companies · snapshot ${ageSpan(cap.captured_at, 1200)} · refreshed every 15 min`
+    : "";
+}
+
 function renderAll(d) {
   renderStrip(d);
   renderPlays(d);
+  renderEnrich(d);
   renderHubs(d);
   renderLimits(d);
   renderAppend(d);
