@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEO Engine — Send Desk (Live)</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d; --ink-1: #ffffff; --ink-2: #c3c2b7;
+    --ink-muted: #898781; --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7; --ink-1: #0b0b0b; --ink-2: #52514e;
+    --ink-muted: #898781; --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6; --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--page); color: var(--ink-1);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--series-1); }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 20px;
+    padding: 14px 20px 10px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: 0.04em; }
+  header .sub { color: var(--ink-muted); font-size: 12px; }
+  #conn { font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); }
+  #conn.ok { color: var(--good); }
+  #conn.err { color: var(--critical); }
+  #themeBtn { margin-left: auto; background: none; border: 1px solid var(--border);
+    color: var(--ink-2); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+  #gatebar { padding: 10px 20px; font-size: 12px; border-bottom: 1px solid var(--border); }
+  #gatebar.locked { background: rgba(208,59,59,0.10); color: var(--serious); }
+  #gatebar.open { background: rgba(12,163,12,0.10); color: var(--good); }
+  #strip { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 20px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; min-width: 128px; }
+  .tile .k { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .tile .v { font-size: 22px; font-weight: 650; margin-top: 2px; }
+  .tile .d { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 14px; padding: 0 20px 30px; }
+  section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
+  section h2 { font-size: 12px; margin: 0 0 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.08em; }
+  section h2 small { color: var(--ink-muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .blurb { font-size: 12px; line-height: 1.5; font-style: italic; color: var(--ink-2); margin: -4px 0 12px; max-width: 72ch; }
+  .blurb b { font-weight: 600; }
+  .wide { grid-column: 1 / -1; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; font-weight: 600; color: var(--ink-muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 8px 6px; border-bottom: 1px solid var(--grid); }
+  td { padding: 5px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--ink-muted); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
+  .ok, .good { color: var(--good); }
+  .warn { color: var(--warning); }
+  .bad, .critical { color: var(--critical); }
+  .serious { color: var(--serious); }
+  .dim { color: var(--ink-muted); }
+  .bar { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; min-width: 60px; }
+  .bar > i { display: block; height: 100%; background: var(--series-1); }
+  .spark { display: block; }
+  .age.hot { color: var(--good); }
+  .age.cold { color: var(--ink-muted); }
+  .hidden { display: none !important; }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex;
+    align-items: center; justify-content: center; z-index: 50; }
+  #overlay .box { background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 22px; width: min(420px, 92vw); }
+  #overlay h3 { margin: 0 0 8px; font-size: 14px; }
+  #overlay p { font-size: 12px; color: var(--ink-2); margin: 0 0 14px; }
+  #keyInput { width: 100%; padding: 8px 10px; background: var(--page); color: var(--ink-1);
+    border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  #keyGo { margin-top: 10px; width: 100%; padding: 8px; background: var(--series-1); color: #fff;
+    border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  #keyErr { color: var(--critical); font-size: 12px; min-height: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PEO ENGINE — SEND DESK</h1>
+  <span class="sub">outbound engine · live monitoring</span>
+  <span id="conn">connecting…</span>
+  <a class="sub" href="./index.html">← ops desk</a>
+  <button id="themeBtn">theme</button>
+</header>
+<div id="gatebar" class="locked">send gate: —</div>
+<div id="strip"></div>
+<main>
+  <section>
+    <h2>Component health <small>— nine checks</small></h2>
+    <div class="blurb">Each row is a live component of the send machine. <b>SEALED</b> on lockdown conformance means the platform is structurally incapable of sending.</div>
+    <div id="health"></div>
+  </section>
+  <section>
+    <h2>Red flags <small>— severity ranked</small></h2>
+    <div class="blurb">Empty is the correct state. A <b>live lane without a vaulted key</b> or a stopped cron outranks everything else.</div>
+    <div id="flags"></div>
+  </section>
+  <section>
+    <h2>Lane board <small>— 18 lanes</small></h2>
+    <div class="blurb">dark = registered but unbuilt · shadow = generates held requests · live = dispatch-capable (gate still governs).</div>
+    <div id="lanes"></div>
+  </section>
+  <section>
+    <h2>Guard blockers <small>— triage</small></h2>
+    <div class="blurb">Ranked by volume. Fix the top row first; the nine-layer guard stack stamps every verdict onto the request.</div>
+    <div id="blockers"></div>
+  </section>
+  <section>
+    <h2>Sequences</h2>
+    <div class="blurb">Enrollments advance on the */15 tick. Requests generated hold at the gate until meetings infrastructure ships.</div>
+    <div id="sequences"></div>
+  </section>
+  <section>
+    <h2>Templates <small>— approval workflow</small></h2>
+    <div class="blurb">Only <b>approved</b> copy passes the guard. Drafts are visible here but cannot ship.</div>
+    <div id="templates"></div>
+  </section>
+  <section>
+    <h2>Outcomes by lane <small>— Doctrine 51</small></h2>
+    <div class="blurb">Meetings held is the only success metric. Dispatch counts are activity, not results.</div>
+    <div id="outcomes"></div>
+  </section>
+  <section>
+    <h2>Suppression</h2>
+    <div class="blurb">Unsubscribes, bounces, complaints, manual do-not-contact. Honored at the guard, before any lane sees the request.</div>
+    <div id="suppression"></div>
+  </section>
+  <section class="wide">
+    <h2>Throughput <small>— daily</small></h2>
+    <div class="blurb">Requests created vs dispatched vs blocked. While the gate is locked, held should track requests exactly.</div>
+    <div id="throughput"></div>
+  </section>
+  <section class="wide">
+    <h2>Send queue <small>— most recent 60</small></h2>
+    <div id="queue"></div>
+  </section>
+  <section class="wide">
+    <h2>Activity ticker</h2>
+    <div id="ticker"></div>
+  </section>
+</main>
+<div id="overlay" class="hidden">
+  <div class="box">
+    <h3>Desk key</h3>
+    <p>Enter the desk key to connect to the live feed.</p>
+    <input id="keyInput" type="password" placeholder="desk key" autocomplete="off">
+    <div id="keyErr"></div>
+    <button id="keyGo">Connect</button>
+  </div>
+</div>
+<script>
+"use strict";
+const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
+const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+const VIEWS = ["desk_send_status","desk_send_health","desk_send_red_flags","desk_lane_board",
+  "desk_send_blockers","desk_sequence_board","desk_template_board","desk_send_outcomes",
+  "desk_suppression","desk_send_throughput","desk_send_queue","desk_send_ticker"];
+const POLL_MS = 5000;
+let deskKey = localStorage.getItem("desk_key") || "";
+let skewMs = 0;
+let latest = null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rows = (d, v) => (d && d[v] && d[v].rows) || [];
+const savedTheme = localStorage.getItem("desk_theme");
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+$("#themeBtn").onclick = () => {
+  const cur = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = cur;
+  localStorage.setItem("desk_theme", cur);
+};
+function serverNow() { return Date.now() + skewMs; }
+function fmtAge(secs) {
+  if (secs == null || isNaN(secs)) return "—";
+  if (secs < 0) secs = 0;
+  if (secs < 90) return Math.round(secs) + "s";
+  if (secs < 5400) return Math.round(secs / 60) + "m";
+  if (secs < 172800) return (secs / 3600).toFixed(1) + "h";
+  return (secs / 86400).toFixed(1) + "d";
+}
+function ageSpan(ts, hotSecs) {
+  if (!ts) return '<span class="age cold">never</span>';
+  return '<span class="age" data-ts="' + new Date(ts).getTime() + '" data-hot="' + (hotSecs || 900) + '"></span>';
+}
+function tickAges() {
+  const now = serverNow();
+  document.querySelectorAll(".age[data-ts]").forEach((el) => {
+    const secs = (now - Number(el.dataset.ts)) / 1000;
+    el.textContent = fmtAge(secs) + " ago";
+    el.classList.toggle("hot", secs < Number(el.dataset.hot));
+    el.classList.toggle("cold", secs >= Number(el.dataset.hot) * 6);
+  });
+}
+function stateClass(s) {
+  const v = String(s || "").toUpperCase();
+  if (["OK","CLEAR","SEALED","GOOD","LIVE"].indexOf(v) >= 0) return "good";
+  if (["LOCKED","BLOCKING","REVIEW","SHADOW"].indexOf(v) >= 0) return "warn";
+  if (["STOPPED","STUCK","DEGRADED","DISABLED"].indexOf(v) >= 0) return "bad";
+  return "dim";
+}
+function sevClass(s) {
+  return s === "critical" ? "critical" : s === "high" ? "bad" : s === "medium" ? "warn" : "dim";
+}
+function table(headers, bodyRows, empty) {
+  if (!bodyRows.length) return '<div class="muted" style="font-size:12px">' + esc(empty || "nothing here") + '</div>';
+  return '<table><thead><tr>' + headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join("") +
+    '</tr></thead><tbody>' + bodyRows.join("") + '</tbody></table>';
+}
+function sparkline(vals) {
+  const w = 620, h = 46;
+  if (!vals.length) return "";
+  const max = Math.max(1, Math.max.apply(null, vals));
+  const step = vals.length > 1 ? w / (vals.length - 1) : w;
+  const pts = vals.map(function (v, i) {
+    return (i * step).toFixed(1) + "," + (h - (v / max) * (h - 4)).toFixed(1);
+  }).join(" ");
+  return '<svg class="spark" viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="' + h + '" preserveAspectRatio="none">' +
+    '<polyline fill="none" stroke="var(--series-1)" stroke-width="1.6" points="' + pts + '"></polyline></svg>';
+}
+function renderStrip(d) {
+  const s = rows(d, "desk_send_status")[0] || {};
+  const tiles = [
+    ["queue held", s.queue_held == null ? "—" : s.queue_held, "awaiting gate"],
+    ["blocked", s.queue_blocked == null ? "—" : s.queue_blocked, "guard rejections"],
+    ["failed", s.queue_failed == null ? "—" : s.queue_failed, "after 3 retries"],
+    ["lanes live", s.lanes_live == null ? "—" : s.lanes_live, (s.lanes_shadow || 0) + " shadow · " + (s.lanes_dark || 0) + " dark"],
+    ["sequences", s.sequences_running == null ? "—" : s.sequences_running, (s.enrollments_active || 0) + " enrollments"],
+    ["templates", s.templates_approved == null ? "—" : s.templates_approved, (s.templates_draft || 0) + " draft"],
+    ["module", s.module_enabled ? "ON" : "OFF", "outbound_engine"],
+    ["lockdown", s.lockdown_all_pass ? "SEALED" : "REVIEW", "conformance"]
+  ];
+  $("#strip").innerHTML = tiles.map(function (t) {
+    return '<div class="tile"><div class="k">' + esc(t[0]) + '</div><div class="v">' + esc(t[1]) +
+      '</div><div class="d">' + esc(t[2]) + '</div></div>';
+  }).join("");
+  const bar = $("#gatebar");
+  const open = !!s.gate_open;
+  bar.className = open ? "open" : "locked";
+  bar.innerHTML = open
+    ? "SEND GATE OPEN — dispatch permitted; all guard layers still apply."
+    : "SEND GATE LOCKED — " + esc(s.gate_lock_reason || "locked") + ". Requests accumulate and hold; nothing dispatches.";
+}
+function renderHealth(d) {
+  $("#health").innerHTML = table(["component","state","metric","last","detail"],
+    rows(d, "desk_send_health").map(function (r) {
+      return '<tr><td class="mono">' + esc(r.item) + '</td><td><span class="pill ' + stateClass(r.state) + '">' +
+        esc(r.state) + '</span></td><td class="num">' + (r.metric == null ? "—" : r.metric) + '</td><td>' +
+        ageSpan(r.last_at, 900) + '</td><td class="muted">' + esc(r.detail) + '</td></tr>';
+    }));
+}
+function renderFlags(d) {
+  $("#flags").innerHTML = table(["sev","flag","scope","evidence","open"],
+    rows(d, "desk_send_red_flags").map(function (r) {
+      return '<tr><td><span class="pill ' + sevClass(r.severity) + '">' + esc(r.severity) + '</span></td>' +
+        '<td class="mono">' + esc(r.flag_kind) + '</td><td class="muted">' + esc(r.subject_scope) + '</td>' +
+        '<td>' + esc(r.evidence) + '</td><td class="num">' + (r.hours_open == null ? "—" : r.hours_open) + 'h</td></tr>';
+    }), "no flags — clear");
+}
+function renderLanes(d) {
+  $("#lanes").innerHTML = table(["lane","channel","status","adapter","key","consent","reqs","sent"],
+    rows(d, "desk_lane_board").map(function (r) {
+      return '<tr><td class="mono">' + esc(r.lane_key) + '</td><td class="muted">' + esc(r.channel) + '</td>' +
+        '<td><span class="pill ' + stateClass(r.status) + '">' + esc(r.status) + '</span></td>' +
+        '<td>' + (r.adapter_wired ? '<span class="good">wired</span>' : '<span class="dim">—</span>') + '</td>' +
+        '<td>' + (r.vault_key_name ? (r.key_vaulted ? '<span class="good">vaulted</span>' : '<span class="warn">missing</span>') : '<span class="dim">n/a</span>') + '</td>' +
+        '<td>' + (r.consent_required ? '<span class="warn">required</span>' : '<span class="dim">—</span>') + '</td>' +
+        '<td class="num">' + (r.requests_all_time || 0) + '</td><td class="num">' + (r.dispatched || 0) + '</td></tr>';
+    }));
+}
+function renderBlockers(d) {
+  const b = rows(d, "desk_send_blockers");
+  const max = Math.max(1, Math.max.apply(null, b.map(function (r) { return Number(r.requests_blocked) || 0; }).concat([1])));
+  $("#blockers").innerHTML = table(["layer","verdict","blocked",""],
+    b.map(function (r) {
+      return '<tr><td class="mono">' + esc(r.guard_layer) + '</td><td class="muted">' + esc(r.verdict) + '</td>' +
+        '<td class="num">' + r.requests_blocked + '</td><td style="width:120px"><div class="bar"><i style="width:' +
+        (100 * r.requests_blocked / max).toFixed(0) + '%"></i></div></td></tr>';
+    }), "no blocked requests");
+}
+function renderSequences(d) {
+  $("#sequences").innerHTML = table(["sequence","status","steps","enrolled","active","requests"],
+    rows(d, "desk_sequence_board").map(function (r) {
+      return '<tr><td class="mono">' + esc(r.sequence_key) + '<div class="muted">' + esc(r.name) + '</div></td>' +
+        '<td><span class="pill ' + stateClass(r.status) + '">' + esc(r.status) + '</span></td>' +
+        '<td class="num">' + r.steps + '</td><td class="num">' + r.enrolled + '</td>' +
+        '<td class="num">' + r.active + '</td><td class="num">' + r.requests_generated + '</td></tr>';
+    }), "no sequences");
+}
+function renderTemplates(d) {
+  $("#templates").innerHTML = table(["template","lane","phase","status","vars","used"],
+    rows(d, "desk_template_board").map(function (r) {
+      return '<tr><td class="mono">' + esc(r.template_key) + '<div class="muted">' + esc(r.subject || "—") + '</div></td>' +
+        '<td class="muted">' + esc(r.lane_key) + '</td><td class="muted">' + esc(r.window_phase || "—") + '</td>' +
+        '<td><span class="pill ' + (r.status === "approved" ? "good" : "warn") + '">' + esc(r.status) + '</span></td>' +
+        '<td class="num">' + r.variable_count + '</td><td class="num">' + r.used_by_requests + '</td></tr>';
+    }), "no templates");
+}
+function renderOutcomes(d) {
+  $("#outcomes").innerHTML = table(["lane","reqs","sent","touches","outcomes","meetings","billable"],
+    rows(d, "desk_send_outcomes").filter(function (r) { return r.requests > 0; }).map(function (r) {
+      return '<tr><td class="mono">' + esc(r.lane_key) + '</td><td class="num">' + r.requests + '</td>' +
+        '<td class="num">' + r.dispatched + '</td><td class="num">' + r.touches_logged + '</td>' +
+        '<td class="num">' + r.outcomes_recorded + '</td><td class="num ' + (r.meetings > 0 ? "good" : "dim") + '">' + r.meetings + '</td>' +
+        '<td class="num">' + r.billable_sends + '</td></tr>';
+    }), "no activity yet");
+}
+function renderSuppression(d) {
+  $("#suppression").innerHTML = table(["scope","target","reason","when"],
+    rows(d, "desk_suppression").slice(0, 25).map(function (r) {
+      return '<tr><td class="muted">' + esc(r.scope) + '</td><td>' + esc(r.legal_name || r.contact_email || r.domain || "—") + '</td>' +
+        '<td class="mono">' + esc(r.reason) + '</td><td>' + ageSpan(r.suppressed_at, 86400) + '</td></tr>';
+    }), "suppression list empty");
+}
+function renderThroughput(d) {
+  const t = rows(d, "desk_send_throughput").slice(0, 30).reverse();
+  const spark = sparkline(t.map(function (r) { return Number(r.requests) || 0; }));
+  $("#throughput").innerHTML = spark + table(["day","requests","dispatched","held","blocked","failed","companies"],
+    t.slice().reverse().map(function (r) {
+      return '<tr><td class="mono">' + esc(r.day) + '</td><td class="num">' + r.requests + '</td>' +
+        '<td class="num">' + r.dispatched + '</td><td class="num">' + r.held + '</td>' +
+        '<td class="num">' + r.blocked + '</td><td class="num ' + (r.failed > 0 ? "bad" : "") + '">' + r.failed + '</td>' +
+        '<td class="num">' + r.companies_touched + '</td></tr>';
+    }), "no throughput yet");
+}
+function renderQueue(d) {
+  $("#queue").innerHTML = table(["id","status","lane","company","template","trigger","gate verdict","when"],
+    rows(d, "desk_send_queue").slice(0, 60).map(function (r) {
+      const g = r.guard_results || {};
+      const cls = r.status === "dispatched" ? "good" : (r.status === "guard_blocked" || r.status === "failed") ? "bad" : "warn";
+      return '<tr><td class="num mono">' + r.id + '</td><td><span class="pill ' + cls + '">' + esc(r.status) + '</span></td>' +
+        '<td class="mono">' + esc(r.lane_key) + '</td><td>' + esc(r.legal_name || r.company_id) + '</td>' +
+        '<td class="muted mono">' + esc(r.template_key || "—") + '</td><td class="muted">' + esc(r.trigger_source) + '</td>' +
+        '<td class="muted">' + esc(g.send_gate || g.module || "—") + '</td><td>' + ageSpan(r.requested_at, 900) + '</td></tr>';
+    }), "queue empty");
+}
+function renderTicker(d) {
+  $("#ticker").innerHTML = table(["when","kind","detail","subject"],
+    rows(d, "desk_send_ticker").slice(0, 60).map(function (r) {
+      return '<tr><td>' + ageSpan(r.at, 900) + '</td><td class="muted">' + esc(r.kind) + '</td>' +
+        '<td class="mono">' + esc(r.detail) + '</td><td class="muted mono">' + esc(String(r.subject || "").slice(0, 12)) + '</td></tr>';
+    }), "no activity");
+}
+function renderAll(d) {
+  renderStrip(d); renderHealth(d); renderFlags(d); renderLanes(d);
+  renderBlockers(d); renderSequences(d); renderTemplates(d); renderOutcomes(d);
+  renderSuppression(d); renderThroughput(d); renderQueue(d); renderTicker(d);
+  tickAges();
+}
+function setConn(msg, ok) {
+  const el = $("#conn");
+  el.textContent = msg;
+  el.className = ok ? "ok" : "err";
+}
+async function poll() {
+  if (!deskKey) { showOverlay(""); return; }
+  try {
+    const res = await fetch(API + "?view=" + VIEWS.join(","), {
+      headers: { "Authorization": "Bearer " + ANON, "x-desk-key": deskKey }
+    });
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem("desk_key"); deskKey = "";
+      setConn("key rejected", false);
+      showOverlay("That key was rejected.");
+      return;
+    }
+    if (!res.ok) { setConn("error " + res.status, false); return; }
+    const body = await res.json();
+    latest = body.views || {};
+    if (body.served_at) skewMs = new Date(body.served_at).getTime() - Date.now();
+    renderAll(latest);
+    setConn("live", true);
+  } catch (e) {
+    setConn("unreachable — " + (e.message || e), false);
+  }
+}
+function showOverlay(err) {
+  $("#overlay").classList.remove("hidden");
+  $("#keyErr").textContent = err || "";
+  $("#keyInput").focus();
+}
+$("#keyGo").onclick = async () => {
+  deskKey = $("#keyInput").value.trim();
+  if (!deskKey) return;
+  localStorage.setItem("desk_key", deskKey);
+  $("#overlay").classList.add("hidden");
+  await poll();
+};
+$("#keyInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#keyGo").click(); });
+if (deskKey) $("#overlay").classList.add("hidden"); else showOverlay("");
+poll();
+setInterval(poll, POLL_MS);
+setInterval(tickAges, 1000);
+</script>
+</body>
+</html>
