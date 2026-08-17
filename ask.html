@@ -8,7 +8,7 @@
   /* palette: Gazz platform scheme (2026-08-17) — deep blue-black + coral/blue/green/purple.
      Validator-passing categorical order: coral → blue → green → purple (blue+purple never adjacent unlabeled). */
   :root{
-    --page:#0a0f14; --surface:#101820; --surface2:#16212b;
+    --page:#070b0f; --surface:#0d141b; --surface2:#131c25;
     --ink:#ecf1f4; --ink2:#aebac3; --muted:#71808b;
     --grid:#223039; --base:#2e3e4a; --ring:rgba(255,255,255,.08);
     --accent:#6390ee; --accent-dim:#4470c8;
@@ -17,7 +17,7 @@
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1100px 700px at 6% -8%, rgba(24,58,64,.55) 0%, rgba(24,58,64,0) 60%), var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:14px 16px 60px}
+  body{margin:0;background:radial-gradient(1100px 700px at 6% -8%, rgba(22,52,58,.45) 0%, rgba(22,52,58,0) 60%), var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:14px 16px 60px}
   h1{font-size:15px;letter-spacing:.14em;margin:0;font-weight:700}
   .blurb{font-style:italic;color:var(--muted);font-size:12px}
   header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px}
@@ -334,7 +334,7 @@
   function showCard(on){ $('r-card').style.display=on?'block':'none'; $('r-wrap').style.display=on?'none':'block'; $('r-actions').style.display=on?'none':'flex'; $('r-sqlbox').style.display=on?'none':'block'; }
   function tableHTML(cols,rows){
     var h='<div class="tablewrap mini"><table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
-    rows.forEach(function(r){ h+='<tr>'+cols.map(function(c){ var f=cellFmt(r[c]); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; });
+    rows.forEach(function(r){ h+='<tr>'+cols.map(function(c){ var f=cellFmt(r[c],c); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; });
     return h+'</tbody></table></div>';
   }
   function renderCompany(j){
@@ -365,9 +365,12 @@
   var NOSUM=/(^|_)(id|ein|year|month|day|zip|decile|score|confidence|pct|percent|share|rate|ratio|lat|lng|version|seq)$/i;
   var UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function isNumCol(rows,c){ var n=0,t=0; for(var i=0;i<rows.length&&i<50;i++){ var v=rows[i][c]; if(v==null) continue; t++; if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(v)&&String(v).trim()!=='')) n++; } return t>0&&n/t>=0.8; }
-  function cellFmt(v){
+  var YEARCOL=/(^|_)(year|yr)s?($|_)/i;
+  function isYearish(col,v){ var n=Number(v); return !!col&&YEARCOL.test(col)&&Number.isInteger(n)&&n>=1000&&n<=9999; }
+  function cellFmt(v,col){
     if(v==null) return {h:'∅',cls:'null',raw:'',title:'no observed value yet for this field — the platform records only source-attested facts and never guesses'};
     if(typeof v==='boolean') return {h:v?'✓':'—',cls:'',raw:v};
+    if(isYearish(col,v)) return {h:String(Number(v)),cls:'num',raw:Number(v)}; // years never get thousands separators
     if(typeof v==='number') return {h:v.toLocaleString(undefined,{maximumFractionDigits:4}),cls:'num',raw:v};
     if(typeof v==='object') { var j=JSON.stringify(v); return {h:esc(j.length>120?j.slice(0,120)+'…':j),cls:'',raw:j,title:j.slice(0,800)}; }
     var s=String(v);
@@ -400,7 +403,7 @@
     displayedRows=rows;
     var clickable=cols.indexOf('company_id')>=0 || (cols.indexOf('id')>=0 && (cols.indexOf('legal_name')>=0||cols.indexOf('dba_name')>=0));
     var h='<thead><tr>'+cols.map(function(c){ return '<th class="'+(numCols[c]?'num':'')+'" data-c="'+esc(c)+'">'+esc(c)+(sortC===c?' <span class="arr">'+(sortDir==='desc'?'▼':'▲')+'</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody'+(clickable?' class="clickable" title="click a row for the company card"':'')+'>';
-    for(var i=0;i<rows.length;i++){ h+='<tr data-i="'+i+'">'+cols.map(function(c){ var f=cellFmt(rows[i][c]); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; }
+    for(var i=0;i<rows.length;i++){ h+='<tr data-i="'+i+'">'+cols.map(function(c){ var f=cellFmt(rows[i][c],c); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; }
     h+='</tbody>';
     if(rows.length>1){
       var sums={},any=false;
