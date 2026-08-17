@@ -255,7 +255,7 @@
       chip(gOpen?'good':'crit', gOpen?'var(--good)':'var(--crit)','AI <b>'+(gOpen?'ON':'GATED')+'</b>') +
       chip('', 'var(--accent)','MTD <b>$'+Number(s.mtd||0).toFixed(2)+'</b> / $'+Number(s.cap||0).toFixed(0)) +
       chip('', 'var(--accent)','today <b>$'+Number(s.today||0).toFixed(2)+'</b>');
-    var t=[['companies',s.companies,''],['observations',s.observations,'bitemporal ledger'],['switches',s.switches,'peo_switch_ledger'],['live plays',s.plays_live,fmtN(s.plays_hot)+' hot now']];
+    var t=[['companies',s.companies,'resolved universe · to date'],['observations',s.observations,'bitemporal ledger · to date'],['switches detected',s.switches,'to date'],['plays in feed',s.plays_live,fmtN(s.plays_hot)+' hot right now']];
     $('tiles').innerHTML=t.map(function(x){ return '<div class="tile"><div class="l">'+x[0]+'</div><div class="v">'+fmtN(x[1])+'</div><div class="s">'+esc(x[2])+'</div></div>'; }).join('');
     if(!gOpen) banner('warn','<b>Only the Ask-AI tab is gated</b> (Anthropic cap: $'+Number(s.mtd||0).toFixed(2)+' / $'+Number(s.cap||0).toFixed(0)+' on org “'+esc(org)+'”). Everything on the Pull, Browse, SQL and History tabs works free right now. To unlock Ask-AI: Supabase → Settings → Vault → add secret <b>anthropic_api_key_b</b> with your instance-B API key.');
     else banner(null);
@@ -264,20 +264,20 @@
 
   // ---------- quick pulls ----------
   var PULLS=[
-    ['Latest PEO switches','who moved where — newest detections first',"select c.legal_name, s.from_family_slug, s.to_family_slug, s.evidence_as_of, s.detected_at, s.detection_method from peo_switch_ledger s left join companies c on c.id=s.company_id order by s.detected_at desc limit 100"],
-    ['Top PEOs by clients','current attributed client companies per PEO family',"select peo_family_slug, count(*) as companies from companies where peo_current group by 1 order by 2 desc limit 30"],
-    ['Companies by state','universe spread — the Σ row is your total',"select state, count(*) as companies from companies group by 1 order by 2 desc limit 60"],
-    ['Hot plays now','in-window scored plays from the feed',"select play, legal_name, state, peo, target_score, trigger_as_of, bullet from v_play_feed where hot_now order by target_score desc limit 100"],
-    ['Plays by angle','totals and how many are hot per play type',"select play, count(*) as total, count(*) filter (where hot_now) as hot from v_play_feed group by 1 order by 2 desc"],
-    ['Recent departures','clients gone dark on their last PEO',"select display_name, last_peo, state, last_seen_expiration, months_dark, status from peo_departure_candidates order by last_seen_expiration desc nulls last limit 100"],
-    ['WC renewals — next 90 days','policies expiring soon: the call-timing window',"select legal_name, state, peo_name, wc_carrier, wc_renewal_month, wc_policy_expiration from companies where wc_policy_expiration between current_date and current_date + 90 order by wc_policy_expiration limit 200"],
-    ['FL master policy book','master policies with client counts per carrier',"select peo_name, carrier, client_count, eff_min, eff_max, anchor_mmdd from fl_master_policy_book order by client_count desc nulls last limit 100"],
-    ['TX clients under PEOs','client counts per parent PEO policyholder',"select parent_peo_name, count(*) as clients, min(eff) as earliest, max(exp) as latest from tx_policy_parentage group by 1 order by 2 desc limit 50"],
-    ['Multi-state companies','footprint bigger than one state, widest first',"select legal_name, state as hq, array_length(operating_states,1) as states_count, operating_states, peo_name from companies where array_length(operating_states,1)>1 order by 3 desc limit 100"],
-    ['Recently updated intel','companies with the freshest intelligence',"select legal_name, state, peo_name, latest_intel_at from companies where latest_intel_at is not null order by latest_intel_at desc limit 100"],
-    ['5500 MEP roster (latest yr)','employers per PEO in the newest filing year',"select peo_slug, count(*) as employers from form5500_mep_participants where filing_year=(select max(filing_year) from form5500_mep_participants) group by 1 order by 2 desc limit 30"],
-    ['PEO ratings','benchmark composite + google ratings',"select peo_slug, google_rating, google_review_count, benchmark_score, trend, employee_signal from peo_review_ratings order by benchmark_score desc nulls last limit 50"],
-    ['Switch flow matrix','from → to counts across the whole ledger',"select from_family_slug, to_family_slug, count(*) as moves from peo_switch_ledger group by 1,2 order by 3 desc limit 50"]
+    ['Latest PEO switches','TO-DATE feed — evidence_as_of = when it happened; detected_at = when we learned',"select c.legal_name, s.from_family_slug, s.to_family_slug, s.evidence_as_of, s.detected_at, s.detection_method from peo_switch_ledger s left join companies c on c.id=s.company_id order by s.detected_at desc limit 100"],
+    ['Top PEOs by clients — current book','NOW — companies attributed today (knowledge-as-of), plus how many were affirmed in the last 12 mo',"select peo_family_slug, count(*) as current_clients, count(*) filter (where latest_intel_at >= current_date - 365) as affirmed_last_12mo from companies where peo_current group by 1 order by 2 desc limit 30"],
+    ['Companies by state','NOW — the resolved universe today; Σ row = total',"select state, count(*) as companies from companies group by 1 order by 2 desc limit 60"],
+    ['Hot plays now','NOW — inside their timing window at this moment',"select play, legal_name, state, peo, target_score, trigger_as_of, bullet from v_play_feed where hot_now order by target_score desc limit 100"],
+    ['Plays by angle','TO-DATE minted vs NOW hot — two clocks, on purpose',"select play, count(*) as minted_to_date, count(*) filter (where hot_now) as hot_now from v_play_feed group by 1 order by 2 desc"],
+    ['Recent departures','NOW — still dark on their last PEO as of last check',"select display_name, last_peo, state, last_seen_expiration, months_dark, status from peo_departure_candidates order by last_seen_expiration desc nulls last limit 100"],
+    ['WC renewals — next 90 days','WINDOW — today through +90 days',"select legal_name, state, peo_name, wc_carrier, wc_renewal_month, wc_policy_expiration from companies where wc_policy_expiration between current_date and current_date + 90 order by wc_policy_expiration limit 200"],
+    ['FL master policy book','NOW — book as last captured from the FL feed; eff_max = last activity seen',"select peo_name, carrier, client_count, eff_min, eff_max, anchor_mmdd from fl_master_policy_book order by client_count desc nulls last limit 100"],
+    ['TX clients under PEOs','NOW vs TO-DATE — active (exp ≥ today; ~105-day feed lag) beside ever-seen',"select parent_peo_name, count(distinct client_name) filter (where exp >= current_date) as active_clients_now, count(distinct client_name) as clients_ever_seen, max(exp) as latest_exp from tx_policy_parentage group by 1 order by 2 desc nulls last limit 50"],
+    ['Multi-state companies','NOW — current known footprint, widest first',"select legal_name, state as hq, array_length(operating_states,1) as states_count, operating_states, peo_name from companies where array_length(operating_states,1)>1 order by 3 desc limit 100"],
+    ['Recently updated intel','freshest first — latest_intel_at is the knowledge date',"select legal_name, state, peo_name, latest_intel_at from companies where latest_intel_at is not null order by latest_intel_at desc limit 100"],
+    ['5500 MEP roster by year','WINDOW — latest filing year runs thin (filing lag), so the prior year sits beside it',"with y as (select max(filing_year) as maxy from form5500_mep_participants) select peo_slug, max(y.maxy) as latest_year, count(*) filter (where filing_year = y.maxy) as latest_yr_employers, count(*) filter (where filing_year = y.maxy - 1) as prior_yr_employers from form5500_mep_participants, y group by 1 order by 4 desc limit 30"],
+    ['PEO ratings','NOW — as last graded; graded column shows freshness',"select peo_slug, google_rating, google_review_count, benchmark_score, trend, employee_signal, graded_at::date as graded from peo_review_ratings order by benchmark_score desc nulls last limit 50"],
+    ['Switch flow matrix','TO-DATE with a NOW lens — all detections beside the last 12 months',"select from_family_slug, to_family_slug, count(*) as moves_to_date, count(*) filter (where evidence_as_of >= current_date - 365) as last_12mo from peo_switch_ledger group by 1,2 order by 3 desc limit 50"]
   ];
   function renderPulls(){
     $('pulls').innerHTML=PULLS.map(function(p,i){ return '<button class="pull" data-i="'+i+'"><div class="pl">'+esc(p[0])+'</div><div class="pb">'+esc(p[1])+'</div></button>'; }).join('');
@@ -348,7 +348,7 @@
   var UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function isNumCol(rows,c){ var n=0,t=0; for(var i=0;i<rows.length&&i<50;i++){ var v=rows[i][c]; if(v==null) continue; t++; if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(v)&&String(v).trim()!=='')) n++; } return t>0&&n/t>=0.8; }
   function cellFmt(v){
-    if(v==null) return {h:'∅',cls:'null',raw:''};
+    if(v==null) return {h:'∅',cls:'null',raw:'',title:'no observed value yet for this field — the platform records only source-attested facts and never guesses'};
     if(typeof v==='boolean') return {h:v?'✓':'—',cls:'',raw:v};
     if(typeof v==='number') return {h:v.toLocaleString(undefined,{maximumFractionDigits:4}),cls:'num',raw:v};
     if(typeof v==='object') { var j=JSON.stringify(v); return {h:esc(j.length>120?j.slice(0,120)+'…':j),cls:'',raw:j,title:j.slice(0,800)}; }
