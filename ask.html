@@ -5,17 +5,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PEO_Engine — AI Data Desk</title>
 <style>
-  /* palette: validated dark-mode tokens (dataviz reference instance) */
+  /* palette: Gazz platform scheme (2026-08-17) — deep blue-black + coral/blue/green/purple.
+     Validator-passing categorical order: coral → blue → green → purple (blue+purple never adjacent unlabeled). */
   :root{
-    --page:#0d0d0d; --surface:#1a1a19; --surface2:#232322;
-    --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --base:#383835; --ring:rgba(255,255,255,.10);
-    --accent:#3987e5; --accent-dim:#1c5cab;
-    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --page:#0a0f14; --surface:#101820; --surface2:#16212b;
+    --ink:#ecf1f4; --ink2:#aebac3; --muted:#71808b;
+    --grid:#223039; --base:#2e3e4a; --ring:rgba(255,255,255,.08);
+    --accent:#6390ee; --accent-dim:#4470c8;
+    --good:#43a566; --warn:#e0985c; --serious:#e0985c; --crit:#de6b5f;
+    --rem:#9781ea;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:14px 16px 60px}
+  body{margin:0;background:radial-gradient(1100px 700px at 6% -8%, rgba(24,58,64,.55) 0%, rgba(24,58,64,0) 60%), var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:14px 16px 60px}
   h1{font-size:15px;letter-spacing:.14em;margin:0;font-weight:700}
   .blurb{font-style:italic;color:var(--muted);font-size:12px}
   header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px}
@@ -23,7 +25,7 @@
   .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--ring);background:var(--surface);font-size:11.5px;color:var(--ink2);white-space:nowrap}
   .chip b{color:var(--ink);font-weight:600}
   .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
-  .chip.good{background:rgba(12,163,12,.12)} .chip.crit{background:rgba(208,59,59,.14);font-weight:600} .chip.warn{background:rgba(250,178,25,.10)}
+  .chip.good{background:rgba(67,165,102,.14)} .chip.crit{background:rgba(222,107,95,.16);font-weight:600} .chip.warn{background:rgba(224,152,92,.12)}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
   .tile{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px}
   .tile .v{font-size:22px;font-weight:700} .tile .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
@@ -50,12 +52,12 @@
   .pulls{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px;margin-top:14px}
   .pull{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;font:inherit;color:var(--ink)}
   .pull:hover{border-color:var(--accent)}
-  .pull.viewing{border-color:#d55181;box-shadow:0 0 0 1px #d55181}
+  .pull.viewing{border-color:var(--rem);box-shadow:0 0 0 1px var(--rem)}
   .pull .pl{font-weight:600;font-size:13px}
   .pull .pb{font-size:11px;color:var(--muted);font-style:italic;margin-top:2px}
   #banner{display:none;margin:10px 0;padding:10px 12px;border-radius:8px;font-size:12.5px;border:1px solid}
-  #banner.warn{display:block;background:rgba(250,178,25,.08);border-color:rgba(250,178,25,.4);color:#ffd873}
-  #banner.crit{display:block;background:rgba(208,59,59,.10);border-color:rgba(208,59,59,.45);color:#ff9d9d}
+  #banner.warn{display:block;background:rgba(224,152,92,.10);border-color:rgba(224,152,92,.4);color:#f0c9a6}
+  #banner.crit{display:block;background:rgba(222,107,95,.10);border-color:rgba(222,107,95,.45);color:#f2ada4}
   #result{margin-top:16px;display:none}
   #r-title{font-size:15px;font-weight:700;margin:0}
   #r-summary{font-style:italic;color:var(--ink2);font-size:12.5px;margin:2px 0 6px}
@@ -67,7 +69,7 @@
   thead th{position:sticky;top:0;background:var(--surface2);color:var(--ink2);text-align:left;padding:7px 10px;border-bottom:1px solid var(--base);cursor:pointer;white-space:nowrap;user-select:none}
   thead th .arr{color:var(--accent);font-size:10px}
   tbody td{padding:6px 10px;border-bottom:1px solid var(--grid);vertical-align:top;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  tbody tr:hover{background:rgba(57,135,229,.07)}
+  tbody tr:hover{background:rgba(99,144,238,.08)}
   tbody.clickable tr{cursor:pointer}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   td.null{color:var(--base)}
