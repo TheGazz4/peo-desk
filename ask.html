@@ -170,6 +170,8 @@
 <div id="keygate"><div class="gatecard">
   <h2>AI DATA DESK</h2>
   <div class="blurb" style="margin-bottom:14px">sign in — this login also unlocks the Command Desk in this browser.</div>
+  <button class="btn" id="googleBtn" style="display:none;width:100%;background:#fff;color:#1a1a19;margin-bottom:10px">Continue with Google</button>
+  <div class="mini" id="orSep" style="display:none;text-align:center;margin-bottom:10px">— or —</div>
   <input type="text" id="emailIn" placeholder="email" autocomplete="username">
   <div style="height:8px"></div>
   <input type="password" id="pwIn" placeholder="password" autocomplete="current-password">
@@ -216,6 +218,14 @@
         saveAuth({access_token:j.access_token,refresh_token:j.refresh_token||AUTH.refresh_token,expires_at:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600)});
       });
   }
+
+  // OAuth return (Google): tokens arrive in the URL hash — capture, store, clean the URL
+  try{
+    if(location.hash.indexOf('access_token=')>=0){
+      var hp={}; location.hash.slice(1).split('&').forEach(function(kv){ var p=kv.split('='); hp[p[0]]=decodeURIComponent((p[1]||'').replace(/\+/g,' ')); });
+      if(hp.access_token){ saveAuth({access_token:hp.access_token,refresh_token:hp.refresh_token||null,expires_at:Number(hp.expires_at)||Math.floor(Date.now()/1000)+(Number(hp.expires_in)||3600)}); history.replaceState(null,'',location.pathname+location.search); }
+    }
+  }catch(e){}
 
   var last={q:null,sql:null}, lastRes=null, tables=[], statusTimer=null, rowFilter='';
 
@@ -484,7 +494,12 @@
     if(name==='browse'&&!tables.length) loadTables();
     if(name==='history') loadHistory();
   }
-  function showGate(msg){ $('keygate').classList.add('on'); $('keyMsg').textContent=msg||''; if($('emailIn')) $('emailIn').focus(); }
+  function checkGoogle(){
+    fetch(SB+'/auth/v1/settings',{headers:{'apikey':ANON}}).then(function(r){return r.json();}).then(function(j){
+      if(j&&j.external&&j.external.google){ $('googleBtn').style.display='block'; $('orSep').style.display='block'; }
+    }).catch(function(){});
+  }
+  function showGate(msg){ $('keygate').classList.add('on'); $('keyMsg').textContent=msg||''; checkGoogle(); if($('emailIn')) $('emailIn').focus(); }
   function afterAuth(statusJ){ $('keygate').classList.remove('on'); boot(statusJ&&statusJ.status?statusJ.status:null); }
   function fetchDeskKey(){
     return api({mode:'desk_key'},20000).then(function(j){ if(j&&j.ok&&j.desk_key){ KEY=j.desk_key; sset('desk_key',KEY); sset('peo_dash_key',KEY); } }).catch(function(){});
@@ -551,6 +566,7 @@
   $('refineBtn').onclick=function(){ switchTab('ask'); $('followup').checked=true; $('q').focus(); };
   $('coBtn').onclick=coSearch;
   $('coQ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); coSearch(); } });
+  $('googleBtn').onclick=function(){ location.href=SB+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(location.origin+location.pathname); };
   $('loginBtn').onclick=function(){ signIn($('emailIn').value.trim(),$('pwIn').value,$('keyMsg')).catch(function(){}); };
   $('pwIn').addEventListener('keydown',function(e){ if(e.key==='Enter') $('loginBtn').click(); });
   $('setupBtn').onclick=doSetup;
