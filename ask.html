@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PEO_Engine — AI Data Desk</title>
+<style>
+  /* palette: validated dark-mode tokens (dataviz reference instance) */
+  :root{
+    --page:#0d0d0d; --surface:#1a1a19; --surface2:#232322;
+    --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --base:#383835; --ring:rgba(255,255,255,.10);
+    --accent:#3987e5; --accent-dim:#1c5cab;
+    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:14px 16px 60px}
+  h1{font-size:15px;letter-spacing:.14em;margin:0;font-weight:700}
+  .blurb{font-style:italic;color:var(--muted);font-size:12px}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .hd-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--ring);background:var(--surface);font-size:11.5px;color:var(--ink2);white-space:nowrap}
+  .chip b{color:var(--ink);font-weight:600}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .chip.good{background:rgba(12,163,12,.12)} .chip.crit{background:rgba(208,59,59,.14);font-weight:600} .chip.warn{background:rgba(250,178,25,.10)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+  .tile{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px}
+  .tile .v{font-size:22px;font-weight:700} .tile .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .tile .s{font-size:11px;color:var(--ink2)}
+  .tabs{display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--grid);margin:14px 0 12px}
+  .tabs button{background:none;border:none;color:var(--ink2);font:inherit;font-size:13px;padding:7px 12px;cursor:pointer;border-bottom:2px solid transparent}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+  .tabs .desklink{margin-left:auto;color:var(--muted);font-size:12px;text-decoration:none}
+  .tabs .desklink:hover{color:var(--ink2)}
+  section.tab{display:none} section.tab.on{display:block}
+  textarea,input[type=text],select{width:100%;background:var(--surface);color:var(--ink);border:1px solid var(--base);border-radius:8px;padding:9px 11px;font:inherit}
+  textarea{resize:vertical;min-height:64px} textarea.sqlbox{font-family:var(--mono);font-size:12.5px;min-height:96px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .btn{background:var(--accent);border:none;color:#fff;font:inherit;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer}
+  .btn:hover{background:var(--accent-dim)} .btn[disabled]{opacity:.5;cursor:wait}
+  .btn.ghost{background:var(--surface);border:1px solid var(--base);color:var(--ink2);font-weight:500}
+  .btn.ghost:hover{color:var(--ink)}
+  .mini{font-size:11.5px;color:var(--muted)}
+  label.ck{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--ink2);cursor:pointer}
+  .ex{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .ex button{background:var(--surface2);border:1px solid var(--ring);color:var(--ink2);font-size:11.5px;padding:4px 10px;border-radius:999px;cursor:pointer}
+  .ex button:hover{color:var(--ink);border-color:var(--accent)}
+  #banner{display:none;margin:10px 0;padding:10px 12px;border-radius:8px;font-size:12.5px;border:1px solid}
+  #banner.warn{display:block;background:rgba(250,178,25,.08);border-color:rgba(250,178,25,.4);color:#ffd873}
+  #banner.crit{display:block;background:rgba(208,59,59,.10);border-color:rgba(208,59,59,.45);color:#ff9d9d}
+  #result{margin-top:16px;display:none}
+  #r-title{font-size:15px;font-weight:700;margin:0}
+  #r-summary{font-style:italic;color:var(--ink2);font-size:12.5px;margin:2px 0 6px}
+  #r-meta{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+  #r-meta b{color:var(--ink2)}
+  .tablewrap{overflow:auto;border:1px solid var(--grid);border-radius:10px;max-height:62vh;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  thead th{position:sticky;top:0;background:var(--surface2);color:var(--ink2);text-align:left;padding:7px 10px;border-bottom:1px solid var(--base);cursor:pointer;white-space:nowrap;user-select:none}
+  thead th .arr{color:var(--accent);font-size:10px}
+  tbody td{padding:6px 10px;border-bottom:1px solid var(--grid);vertical-align:top;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  tbody tr:hover{background:rgba(57,135,229,.07)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.null{color:var(--base)}
+  tfoot td{padding:7px 10px;border-top:2px solid var(--base);background:var(--surface2);font-weight:700;font-variant-numeric:tabular-nums}
+  details{margin-top:8px} summary{cursor:pointer;color:var(--muted);font-size:12px}
+  pre.sql{background:var(--surface);border:1px solid var(--grid);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;color:var(--ink2)}
+  .hist{border:1px solid var(--grid);border-radius:8px;background:var(--surface);margin-bottom:6px;padding:8px 12px;cursor:pointer}
+  .hist:hover{border-color:var(--accent)}
+  .hist .q{font-size:13px} .hist .m{font-size:11px;color:var(--muted);margin-top:2px}
+  #keygate{position:fixed;inset:0;background:var(--page);display:none;align-items:center;justify-content:center;z-index:50}
+  #keygate.on{display:flex}
+  .gatecard{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:26px;max-width:420px;width:92%}
+  .gatecard h2{margin:0 0 4px;font-size:15px;letter-spacing:.1em}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--base);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (max-width:640px){ body{padding:10px 10px 50px} .tile .v{font-size:18px} }
+</style>
+</head>
+<body>
+
+<header>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">ask the database in English — tables out, SQL receipts attached.</div></div>
+  <div class="hd-chips" id="chips"></div>
+</header>
+
+<section class="tiles" id="tiles"></section>
+<div id="banner"></div>
+
+<nav class="tabs">
+  <button data-tab="ask" class="on">Ask</button>
+  <button data-tab="browse">Browse</button>
+  <button data-tab="sql">SQL</button>
+  <button data-tab="history">History</button>
+  <a class="desklink" href="index.html">← Command Desk</a>
+</nav>
+
+<section class="tab on" id="tab-ask">
+  <div class="blurb" style="margin-bottom:6px">plain English in, table out; totals appear automatically on numeric columns.</div>
+  <textarea id="q" placeholder="e.g. top 20 PEOs by client companies, with their earliest and latest switch dates" autofocus></textarea>
+  <div class="row">
+    <button class="btn" id="askBtn">Ask</button>
+    <label class="ck"><input type="checkbox" id="tierSonnet"> Sonnet only <span class="mini">(sharper, pricier — default waterfalls Haiku→Sonnet)</span></label>
+    <label class="ck"><input type="checkbox" id="followup"> follow-up <span class="mini">(carries last answer as context)</span></label>
+  </div>
+  <div class="ex" id="examples"></div>
+</section>
+
+<section class="tab" id="tab-browse">
+  <div class="blurb" style="margin-bottom:6px">raw peek — 50 rows of any table or view in reach.</div>
+  <div class="row" style="margin-top:0">
+    <input type="text" id="tblFilter" placeholder="filter tables…" style="max-width:260px">
+    <select id="tblSelect" style="max-width:420px"></select>
+    <button class="btn" id="sampleBtn">Load 50 rows</button>
+  </div>
+</section>
+
+<section class="tab" id="tab-sql">
+  <div class="blurb" style="margin-bottom:6px">exact SQL, executed read-only (single SELECT, 20s timeout, 500-row cap).</div>
+  <textarea id="sqlIn" class="sqlbox" placeholder="select state, count(*) as companies from companies group by 1 order by 2 desc limit 20"></textarea>
+  <div class="row"><button class="btn" id="runSqlBtn">Run read-only</button></div>
+</section>
+
+<section class="tab" id="tab-history">
+  <div class="blurb" style="margin-bottom:6px">recent asks (stored server-side in jobs) — click to re-run.</div>
+  <div id="histList"></div>
+</section>
+
+<section id="result">
+  <h2 id="r-title"></h2>
+  <div id="r-summary"></div>
+  <div id="r-meta"></div>
+  <div class="tablewrap"><table id="r-table"></table></div>
+  <div class="row">
+    <button class="btn ghost" id="csvBtn">Download CSV</button>
+    <button class="btn ghost" id="refineBtn">Refine ↩</button>
+    <span class="mini" id="r-trunc"></span>
+  </div>
+  <details><summary>SQL</summary><pre class="sql" id="r-sql"></pre></details>
+</section>
+
+<div id="keygate"><div class="gatecard">
+  <h2>AI DATA DESK</h2>
+  <div class="blurb" style="margin-bottom:14px">same personal key as the Command Desk. It stays in this browser.</div>
+  <input type="text" id="keyIn" placeholder="desk key" autocomplete="off">
+  <div class="row"><button class="btn" id="keyBtn">Enter</button><span class="mini" id="keyMsg"></span></div>
+</div></div>
+
+<script>
+(function(){
+  'use strict';
+  var SB='https://lzasgflrxxrssjntrfmt.supabase.co';
+  var FN=SB+'/functions/v1/dash-ai';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
+  var PAGES='https://thegazz4.github.io/peo-desk/ask.html';
+
+  var mem={}; // storage fallback (artifact surfaces block localStorage)
+  function sget(k){ try{ return localStorage.getItem(k); }catch(e){ return mem[k]||null; } }
+  function sset(k,v){ try{ localStorage.setItem(k,v); }catch(e){ mem[k]=v; } }
+  function sdel(k){ try{ localStorage.removeItem(k); }catch(e){ delete mem[k]; } }
+
+  var KEY=sget('peo_dash_key')||'';
+  var last={q:null,sql:null}, lastRes=null, tables=[], statusTimer=null;
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+
+  function api(body,ms){
+    return fetch(FN,{method:'POST',headers:{
+      'Content-Type':'application/json','Authorization':'Bearer '+ANON,'apikey':ANON,'x-desk-key':KEY
+    },body:JSON.stringify(body),signal:(AbortSignal&&AbortSignal.timeout)?AbortSignal.timeout(ms||45000):undefined})
+    .then(function(r){ return r.json().then(function(j){ j.__http=r.status; return j; }); });
+  }
+
+  function banner(kind,html){ var b=$('banner'); if(!kind){ b.className=''; b.style.display='none'; return; } b.className=kind; b.innerHTML=html; }
+
+  // ---------- status ----------
+  function chip(cls,dot,html){ return '<span class="chip '+cls+'"><span class="dot" style="background:'+dot+'"></span>'+html+'</span>'; }
+  function fmtN(x){ if(x==null) return '—'; x=Number(x); return x>=1e6?(x/1e6).toFixed(2)+'M':x.toLocaleString(); }
+  function renderStatus(s){
+    var gOpen=!!s.gate_open, org=s.org||'?';
+    $('chips').innerHTML =
+      chip(org==='instance_b'?'good':'warn', org==='instance_b'?'var(--good)':'var(--warn)','org <b>'+esc(org)+'</b>') +
+      chip(gOpen?'good':'crit', gOpen?'var(--good)':'var(--crit)','governor <b>'+(gOpen?'OPEN':'CLOSED')+'</b>') +
+      chip('', 'var(--accent)','MTD <b>$'+Number(s.mtd||0).toFixed(2)+'</b> / $'+Number(s.cap||0).toFixed(0)) +
+      chip('', 'var(--accent)','today <b>$'+Number(s.today||0).toFixed(2)+'</b>');
+    var t=[['companies',s.companies,''],['observations',s.observations,'bitemporal ledger'],['switches',s.switches,'peo_switch_ledger'],['live plays',s.plays_live,fmtN(s.plays_hot)+' hot now']];
+    $('tiles').innerHTML=t.map(function(x){ return '<div class="tile"><div class="l">'+x[0]+'</div><div class="v">'+fmtN(x[1])+'</div><div class="s">'+esc(x[2])+'</div></div>'; }).join('');
+    if(!gOpen) banner('warn','<b>AI questions are gated:</b> Anthropic governor closed for org “'+esc(org)+'” ($'+Number(s.mtd||0).toFixed(2)+' MTD vs $'+Number(s.cap||0).toFixed(0)+' cap). Vault the instance-B key as secret <b>anthropic_api_key_b</b> (Supabase → Settings → Vault) and this flips to instance_b with fresh headroom. Browse / SQL / History work regardless.');
+    else banner(null);
+  }
+  function loadStatus(){ api({mode:'status'},20000).then(function(j){ if(j.status) renderStatus(j.status); }).catch(function(){}); }
+
+  // ---------- table rendering ----------
+  var NOSUM=/(^|_)(id|ein|year|month|day|zip|decile|score|confidence|pct|percent|share|rate|ratio|lat|lng|version|seq)$/i;
+  function isNumCol(rows,c){ var n=0,t=0; for(var i=0;i<rows.length&&i<50;i++){ var v=rows[i][c]; if(v==null) continue; t++; if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(v)&&String(v).trim()!=='')) n++; } return t>0&&n/t>=0.8; }
+  function cellFmt(v){
+    if(v==null) return {h:'∅',cls:'null',raw:''};
+    if(typeof v==='boolean') return {h:v?'✓':'—',cls:'',raw:v};
+    if(typeof v==='number') return {h:v.toLocaleString(undefined,{maximumFractionDigits:4}),cls:'num',raw:v};
+    if(typeof v==='object') { var j=JSON.stringify(v); return {h:esc(j.length>120?j.slice(0,120)+'…':j),cls:'',raw:j,title:j.slice(0,800)}; }
+    var s=String(v);
+    var m=s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}/);
+    if(m) return {h:m[2]==='00:00'&&/T00:00:00(\.0+)?Z?$/.test(s)?m[1]:m[1]+' '+m[2],cls:'num',raw:s};
+    if(/^-?\d+(\.\d+)?$/.test(s.trim())&&s.trim().length<18) return {h:Number(s).toLocaleString(undefined,{maximumFractionDigits:4}),cls:'num',raw:Number(s)};
+    return {h:esc(s.length>160?s.slice(0,160)+'…':s),cls:'',raw:s,title:s.length>160?s.slice(0,800):null};
+  }
+  function renderResult(res){
+    lastRes=res;
+    $('result').style.display='block';
+    $('r-title').textContent=res.title||'Result';
+    $('r-summary').textContent=res.summary||'';
+    var mc=(res.model_chain||[]).map(function(m){return m.model.indexOf('haiku')>=0?'haiku':(m.model.indexOf('sonnet')>=0?'sonnet':m.model);}).join(' → ');
+    $('r-meta').innerHTML='<b>'+res.row_count+'</b> rows · '+(res.elapsed_ms||0)+' ms'+(mc?' · <b>'+esc(mc)+'</b>':'')+(res.cost_usd!=null?' · $'+Number(res.cost_usd).toFixed(4):'');
+    $('r-trunc').textContent=res.truncated?'capped at '+res.row_count+' rows — add a filter or GROUP BY for the rest':'';
+    $('r-sql').textContent=res.sql||'';
+    drawTable(res.columns||[],res.rows||[],null,null);
+    $('result').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  function drawTable(cols,rows,sortC,sortDir){
+    var numCols={}; cols.forEach(function(c){ numCols[c]=isNumCol(rows,c); });
+    if(sortC){ rows=rows.slice().sort(function(a,b){ var x=a[sortC],y=b[sortC]; if(x==null)return 1; if(y==null)return -1;
+      if(numCols[sortC]){ x=Number(x); y=Number(y);} else { x=String(x); y=String(y);} return (x<y?-1:x>y?1:0)*(sortDir==='desc'?-1:1); }); }
+    var h='<thead><tr>'+cols.map(function(c){ return '<th class="'+(numCols[c]?'num':'')+'" data-c="'+esc(c)+'">'+esc(c)+(sortC===c?' <span class="arr">'+(sortDir==='desc'?'▼':'▲')+'</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
+    for(var i=0;i<rows.length;i++){ h+='<tr>'+cols.map(function(c){ var f=cellFmt(rows[i][c]); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; }
+    h+='</tbody>';
+    if(rows.length>1){
+      var sums={},any=false;
+      cols.forEach(function(c){ if(numCols[c]&&!NOSUM.test(c)){ var s=0,seen=false; rows.forEach(function(r){ var v=r[c]; if(v!=null&&v!==''&&!isNaN(v)){ s+=Number(v); seen=true; } }); if(seen){ sums[c]=s; any=true; } } });
+      if(any){ h+='<tfoot><tr>'+cols.map(function(c,i){ if(i===0&&sums[c]==null) return '<td>Σ</td>'; return sums[c]!=null?'<td class="num">'+sums[c].toLocaleString(undefined,{maximumFractionDigits:2})+'</td>':'<td></td>'; }).join('')+'</tr></tfoot>'; }
+    }
+    var tb=$('r-table'); tb.innerHTML=h;
+    tb.querySelector('thead').onclick=function(e){ var th=e.target.closest('th'); if(!th) return; var c=th.getAttribute('data-c');
+      var dir=(sortC===c&&sortDir!=='desc')?'desc':'asc'; drawTable(cols,lastRes.rows,c,dir); };
+  }
+
+  // ---------- actions ----------
+  function busy(btn,on){ btn.disabled=on; btn.dataset.t=btn.dataset.t||btn.textContent; btn.innerHTML=on?'<span class="spin"></span> working':btn.dataset.t; }
+  function handleCommon(j){
+    if(j.__http===401){ sdel('peo_dash_key'); KEY=''; showGate('key rejected — re-enter.'); return true; }
+    if(j.error==='governor_closed'){ banner('warn','<b>Governor closed</b> — '+esc(j.detail||'')); return true; }
+    if(j.error){ banner('crit','<b>'+esc(j.error)+'</b> — '+esc(j.detail||'')); return true; }
+    return false;
+  }
+  function netFail(){ banner('crit','Can’t reach the API from this surface. Open the published copy instead: <a style="color:var(--accent)" href="'+PAGES+'">'+PAGES+'</a>'); }
+
+  function ask(){
+    var q=$('q').value.trim(); if(!q) return;
+    var body={mode:'ask',question:q,tier:$('tierSonnet').checked?'sonnet':'auto'};
+    if($('followup').checked&&last.q&&last.sql) body.context={prev_question:last.q,prev_sql:last.sql};
+    busy($('askBtn'),true); banner(null);
+    api(body,90000).then(function(j){ busy($('askBtn'),false);
+      if(j.refused){ banner('warn','<b>Can’t answer:</b> '+esc(j.refused)); return; }
+      if(handleCommon(j)) return;
+      last={q:q,sql:j.sql}; $('followup').checked=true;
+      renderResult(j); loadStatus();
+    }).catch(function(){ busy($('askBtn'),false); netFail(); });
+  }
+  function runSql(){
+    var s=$('sqlIn').value.trim(); if(!s) return;
+    busy($('runSqlBtn'),true); banner(null);
+    api({mode:'sql',sql:s},45000).then(function(j){ busy($('runSqlBtn'),false);
+      if(handleCommon(j)) return; last={q:'(manual SQL)',sql:j.sql}; renderResult(j);
+    }).catch(function(){ busy($('runSqlBtn'),false); netFail(); });
+  }
+  function sample(){
+    var t=$('tblSelect').value; if(!t) return;
+    busy($('sampleBtn'),true); banner(null);
+    api({mode:'sample',table:t},45000).then(function(j){ busy($('sampleBtn'),false);
+      if(handleCommon(j)) return; renderResult(j);
+    }).catch(function(){ busy($('sampleBtn'),false); netFail(); });
+  }
+  function loadTables(){
+    api({mode:'tables'},30000).then(function(j){ if(j.tables){ tables=j.tables; drawTables(); } }).catch(function(){});
+  }
+  function drawTables(){
+    var f=$('tblFilter').value.trim().toLowerCase();
+    var opts=tables.filter(function(t){ return !f||t.name.indexOf(f)>=0; }).slice(0,400)
+      .map(function(t){ return '<option value="'+esc(t.name)+'">'+esc(t.name)+(t.approx_rows!=null?' · ~'+fmtN(t.approx_rows):'')+(t.kind==='v'||t.kind==='m'?' · view':'')+'</option>'; }).join('');
+    $('tblSelect').innerHTML=opts||'<option value="">(no match)</option>';
+  }
+  function loadHistory(){
+    api({mode:'history',limit:25},30000).then(function(j){
+      var h=(j.history||[]).map(function(r){ var d=r.detail||{}; var q=d.question||d.source||'(sql)';
+        return '<div class="hist" data-sql="'+esc(d.sql||'')+'" data-q="'+esc(d.question||'')+'"><div class="q">'+(r.ok?'':'<span style="color:var(--crit)">✕</span> ')+esc(q)+'</div><div class="m">'+esc(String(r.started_at).replace('T',' ').slice(0,16))+' · '+(d.rows!=null?d.rows+' rows · ':'')+(d.cost_usd?'$'+Number(d.cost_usd).toFixed(4):'')+'</div></div>'; }).join('');
+      $('histList').innerHTML=h||'<div class="mini">nothing yet — ask something.</div>';
+      Array.prototype.forEach.call(document.querySelectorAll('.hist'),function(el){
+        el.onclick=function(){ var s=el.getAttribute('data-sql'); if(!s) return; $('sqlIn').value=s; switchTab('sql'); runSql(); };
+      });
+    }).catch(function(){});
+  }
+  function csv(){
+    if(!lastRes) return;
+    var cols=lastRes.columns, rows=lastRes.rows;
+    var out=[cols.join(',')];
+    rows.forEach(function(r){ out.push(cols.map(function(c){ var v=r[c]; if(v==null) return ''; if(typeof v==='object') v=JSON.stringify(v); v=String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(',')); });
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([out.join('\n')],{type:'text/csv'}));
+    a.download=(lastRes.title||'result').toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,60)+'.csv';
+    a.click();
+  }
+
+  // ---------- tabs / gate / boot ----------
+  function switchTab(name){
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs button'),function(b){ b.classList.toggle('on',b.getAttribute('data-tab')===name); });
+    Array.prototype.forEach.call(document.querySelectorAll('section.tab'),function(s){ s.classList.toggle('on',s.id==='tab-'+name); });
+    if(name==='browse'&&!tables.length) loadTables();
+    if(name==='history') loadHistory();
+  }
+  function showGate(msg){ $('keygate').classList.add('on'); $('keyMsg').textContent=msg||''; $('keyIn').focus(); }
+  function tryKey(){
+    var k=$('keyIn').value.trim(); if(!k) return;
+    KEY=k; $('keyMsg').innerHTML='<span class="spin"></span>';
+    api({mode:'status'},20000).then(function(j){
+      if(j.__http===401){ $('keyMsg').textContent='bad key.'; KEY=''; return; }
+      if(j.status){ sset('peo_dash_key',k); $('keygate').classList.remove('on'); boot(j.status); }
+      else $('keyMsg').textContent=(j.detail||j.error||'unexpected response');
+    }).catch(function(){ $('keyMsg').textContent='network blocked here — open the Pages copy.'; });
+  }
+  var EXAMPLES=[
+    'Top 20 PEOs by client companies',
+    'PEO switches detected in the last 90 days',
+    'Companies by state — totals',
+    'FL master policy book by carrier, with total clients',
+    'Hot plays right now by angle type',
+    'Which companies left a PEO this year and where did they go?'
+  ];
+  function boot(status){
+    if(status) renderStatus(status); else loadStatus();
+    if(statusTimer) clearInterval(statusTimer);
+    statusTimer=setInterval(loadStatus,60000);
+    $('examples').innerHTML=EXAMPLES.map(function(e){ return '<button>'+esc(e)+'</button>'; }).join('');
+    Array.prototype.forEach.call($('examples').children,function(b){ b.onclick=function(){ $('q').value=b.textContent; ask(); }; });
+  }
+
+  $('askBtn').onclick=ask;
+  $('q').addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(); } });
+  $('runSqlBtn').onclick=runSql;
+  $('sqlIn').addEventListener('keydown',function(e){ if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); runSql(); } });
+  $('sampleBtn').onclick=sample;
+  $('tblFilter').addEventListener('input',drawTables);
+  $('csvBtn').onclick=csv;
+  $('refineBtn').onclick=function(){ switchTab('ask'); $('followup').checked=true; $('q').focus(); };
+  $('keyBtn').onclick=tryKey;
+  $('keyIn').addEventListener('keydown',function(e){ if(e.key==='Enter') tryKey(); });
+  Array.prototype.forEach.call(document.querySelectorAll('.tabs button'),function(b){ b.onclick=function(){ switchTab(b.getAttribute('data-tab')); }; });
+
+  if(KEY){ api({mode:'status'},20000).then(function(j){ if(j.__http===401){ sdel('peo_dash_key'); KEY=''; showGate(); } else { $('keygate').classList.remove('on'); boot(j.status); } }).catch(function(){ boot(null); netFail(); }); }
+  else showGate();
+})();
+</script>
+</body>
+</html>
