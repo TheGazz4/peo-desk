@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.2 · 2026-08-18</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.3 · 2026-08-18</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -134,6 +134,7 @@
     <input type="text" id="coQ" placeholder="type a company name and hit Enter — e.g. ACME ROOFING" style="max-width:460px">
     <button class="btn" id="coBtn">Find company</button>
     <span class="mini">search the 219k-company universe → click a row for the full company card</span>
+    <button class="btn ghost" id="rbaBtn" style="margin-left:auto" title="Result-back audit (RBA): samples company cards at random and traces what is displayed back to primary sources. Surfaces findings only — nothing is auto-fixed.">Run data audit</button>
   </div>
   <div class="pulls" id="pulls"></div>
 </section>
@@ -664,6 +665,19 @@
   $('fcMain')&&($('fcMain').onclick=function(){ setFcView('main'); });
   $('fcSize')&&($('fcSize').onclick=function(){ setFcView('size'); });
   $('kpiReload').onclick=runPeoKpis;
+  $('rbaBtn').onclick=function(){
+    var b=$('rbaBtn'); if(b.disabled) return; b.disabled=true; var old=b.textContent; b.textContent='Auditing…';
+    banner('');
+    api({mode:'rba',cards:150},140000).then(function(j){
+      b.disabled=false; b.textContent=old;
+      if(j&&j.rows){
+        var s=j.summary||{};
+        renderResult({title:j.title||'Result-back audit',
+          summary:'Sampled '+(s.cards_sampled!=null?s.cards_sampled:'?')+' cards · defect rate '+(s.defect_rate_pct!=null?s.defect_rate_pct+'%':'—')+' · '+(s.findings_new||0)+' new · '+(s.findings_cleared||0)+' cleared · all OPEN findings below (worklist — nothing auto-fixed)',
+          columns:j.columns,rows:j.rows,row_count:j.row_count,elapsed_ms:j.elapsed_ms});
+      } else { banner('crit','Audit failed: '+esc(String((j&&(j.detail||j.error))||'no response'))); }
+    }).catch(function(e){ b.disabled=false; b.textContent=old; banner('crit','Audit failed: '+esc(String((e&&e.message)||e))); });
+  };
   $('coBtn').onclick=coSearch;
   $('coQ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); coSearch(); } });
   $('googleBtn').onclick=function(){ location.href=SB+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(location.origin+location.pathname); };
