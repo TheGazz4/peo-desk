@@ -103,7 +103,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.0 · 2026-08-18</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.1 · 2026-08-18</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -117,6 +117,7 @@
   <button data-tab="ask">Ask AI</button>
   <button data-tab="browse">Browse</button>
   <button data-tab="sql">SQL</button>
+  <button data-tab="forecast">Forecast</button>
   <button data-tab="history">History</button>
   <a class="desklink" href="index.html">← Command Desk</a>
   <a class="desklink" href="#" id="logoutLink">sign out</a>
@@ -165,6 +166,11 @@
   <div class="blurb" style="margin-bottom:6px">exact SQL, executed read-only (single SELECT, 20s timeout, 500-row cap).</div>
   <textarea id="sqlIn" class="sqlbox" placeholder="select state, count(*) as companies from companies group by 1 order by 2 desc limit 20"></textarea>
   <div class="row"><button class="btn" id="runSqlBtn">Run read-only</button><span class="mini">Ctrl/Cmd+Enter runs</span></div>
+</section>
+
+<section class="tab" id="tab-forecast">
+  <div class="blurb" style="margin-bottom:6px">the prediction desk — frozen vintages closing the 5500 gap. &#39;25 est = roster units (scored vs actuals as filings land Aug–Oct); &#39;26 YTD = fast-clock nowcast off public WSE anchors; backtest rows carry real error vs known actuals. hover any header for definitions.</div>
+  <div class="row" style="margin-top:0"><span class="seg"><button id="fcMain" class="on">Forecasts</button><button id="fcSize">Client size</button></span><button class="btn" id="fcReload">Reload</button><span class="mini" id="fcNote">frozen vintages — never retro-edited; accuracy column fills as 5500 actuals mature</span></div>
 </section>
 
 <section class="tab" id="tab-history">
@@ -334,6 +340,11 @@
     var gn=$('peoGrainNote'); if(gn) gn.textContent=(g==='family')?'612 family profiles, ranked by current clients (capped at 500 rows)':'written PEO brands — merged names (Paychex PEO) roll their families together; health stays family-grain where ambiguous';
     runPeoProfiles(); }
   function runPeoProfiles(){ runPull(peoGrain==='brand'?PEO_PROFILES_BRAND:PEO_PROFILES,-1); }
+  var FC_TAB=["Client forecasts '25/'26","ESTIMATE — frozen-vintage predictions: '25 est in roster units (scored vs actuals when filings complete), '26 YTD off public WSE anchors. Bands + method + receipts every row","select * from dash_peo_forecast"];
+  var SIZE_TAB=["Client size by PEO","NOW — who plays down-market vs up-market: size distribution, Implied WSE/Client, Est Total WSEs, ownership","select * from dash_peo_client_size"];
+  var fcView='main';
+  function runForecastTab(){ runPull(fcView==='size'?SIZE_TAB:FC_TAB,-1); }
+  function setFcView(v){ fcView=v; var a=$('fcMain'),b=$('fcSize'); if(a){a.className=(v==='main')?'on':'';} if(b){b.className=(v==='size')?'on':'';} runForecastTab(); }
   var PEO_KPIS=['PEO KPI board','our visibility into each book (clients + est. WSE %), filed Total WSE with YOY, switch wins/losses observed by the mesh, book-size priors — live computation, weekly snapshots in peo_kpi_snapshots',"select * from dash_peo_kpis order by filed_total_wse desc nulls last"];
   function runPeoKpis(){ runPull(PEO_KPIS,-1); }
 
@@ -556,6 +567,7 @@
     if(name==='history') loadHistory();
     if(name==='peos') runPeoProfiles();
     if(name==='kpi') runPeoKpis();
+    if(name==='forecast') runForecastTab();
   }
   function checkGoogle(){
     fetch(SB+'/auth/v1/settings',{headers:{'apikey':ANON}}).then(function(r){return r.json();}).then(function(j){
@@ -631,6 +643,9 @@
   $('peoReload').onclick=runPeoProfiles;
   $('grainFam')&&($('grainFam').onclick=function(){ setPeoGrain('family'); });
   $('grainBrand')&&($('grainBrand').onclick=function(){ setPeoGrain('brand'); });
+  $('fcReload')&&($('fcReload').onclick=runForecastTab);
+  $('fcMain')&&($('fcMain').onclick=function(){ setFcView('main'); });
+  $('fcSize')&&($('fcSize').onclick=function(){ setFcView('size'); });
   $('kpiReload').onclick=runPeoKpis;
   $('coBtn').onclick=coSearch;
   $('coQ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); coSearch(); } });
