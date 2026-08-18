@@ -103,7 +103,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v3.6 · 2026-08-18</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v3.7 · 2026-08-18</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -402,7 +402,7 @@
   function cellFmt(v,col){
     if(v==null) return {h:'∅',cls:'null',raw:'',title:'no observed value yet for this field — the platform records only source-attested facts and never guesses'};
     if(typeof v==='boolean') return {h:v?'✓':'—',cls:'',raw:v};
-    if(col&&/_yoy_pct$/i.test(col)&&v!==''&&!isNaN(v)){ var yp=Number(v); // Gazz law: YOY green up / red down, with %
+    if(col&&(/_yoy_pct$/i.test(col)||/^clients \d{2}\/\d{2}$/i.test(col))&&v!==''&&!isNaN(v)){ var yp=Number(v); // Gazz law: YOY green up / red down, with %
       var yh=yp>0?'<span class="up">▲ '+yp.toLocaleString(undefined,{maximumFractionDigits:1})+'%</span>'
             :yp<0?'<span class="dn">▼ '+Math.abs(yp).toLocaleString(undefined,{maximumFractionDigits:1})+'%</span>'
             :'<span class="flat">0%</span>';
