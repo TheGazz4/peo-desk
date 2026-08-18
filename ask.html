@@ -73,6 +73,8 @@
   tbody.clickable tr{cursor:pointer}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   td.null{color:var(--base)}
+  .up{color:var(--good);font-weight:600;white-space:nowrap} .dn{color:var(--crit);font-weight:600;white-space:nowrap} .flat{color:var(--muted);white-space:nowrap}
+  th.gl{cursor:help;text-decoration:underline dotted rgba(236,241,244,.28);text-underline-offset:3px}
   tfoot td{padding:7px 10px;border-top:2px solid var(--base);background:var(--surface2);font-weight:700;font-variant-numeric:tabular-nums}
   details{margin-top:8px} summary{cursor:pointer;color:var(--muted);font-size:12px}
   pre.sql{background:var(--surface);border:1px solid var(--grid);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;color:var(--ink2)}
@@ -312,7 +314,7 @@
       j.title=p[0]; j.summary=p[1]; last={q:p[0],sql:j.sql}; renderResult(j);
     }).catch(function(){ netFail(); });
   }
-  var PEO_PROFILES=['PEO profiles','NOW — canonical customer-facing names; live IRS CPEO status (absence = not certified); SchA health-funding signal; pct_attested = filing-grade share of current clients',"select * from dash_peo_profiles"];
+  var PEO_PROFILES=['PEO profiles','NOW + valid-time — client counts with 5500-roster YOY, insured lives (medical SchA) with YOY, top health carriers by lives, IRS CPEO status, SchA funding signal on every row; hover any header for what it means',"select * from dash_peo_profiles"];
   function runPeoProfiles(){ runPull(PEO_PROFILES,-1); }
 
   // ---------- company search + card ----------
@@ -335,8 +337,17 @@
   }
   var FRIENDLY_KEYS={legal_name:'Legal name',dba_name:'DBA',ein:'EIN',city:'City',state:'State',hq_state:'HQ state',operating_states:'Operating states',naics:'NAICS',headcount_est:'Headcount est.',revenue_range:'Revenue range',domain:'Domain',peo_current:'On a PEO now',peo_name:'PEO (as written)',peo_family_slug:'PEO family',peo_brand_slug:'PEO brand',peo_original:'Original PEO',peo_prior_family_slug:'Prior PEO',came_from:'Came from',peo_switch_as_of:'Switched as of',current_peo_tenure_yrs:'Current PEO tenure (yrs)',peo_current_since:'With current PEO since',peo_current_since_basis:'Tenure basis',attribution_class:'Attribution class',industry:'Industry',wc_carrier:'WC carrier',wc_renewal_month:'WC renewal month',wc_coverage_status:'WC status',wc_policy_expiration:'WC policy expires',health_renewal_month:'Health renewal month',operating_status:'Operating status',is_client:'Is our client',latest_intel_at:'Latest intel'};
   function showCard(on){ $('r-card').style.display=on?'block':'none'; $('r-wrap').style.display=on?'none':'block'; $('r-actions').style.display=on?'none':'flex'; $('r-sqlbox').style.display=on?'none':'block'; }
+  // column glossary — DB-resident (dash_column_glossary), fetched once through the governed sql door
+  var GLOSS={};
+  function glossTitle(c){ var g=GLOSS[c]; return g?' title="'+esc(g)+'"':''; }
+  function loadGloss(){
+    api({mode:'sql',sql:'select col_key, blurb from dash_column_glossary',quiet:true},20000).then(function(j){
+      if(j&&j.rows&&j.rows.length){ j.rows.forEach(function(r){ if(r.col_key) GLOSS[String(r.col_key)]=String(r.blurb||''); });
+        if(lastRes) drawTable(lastRes.columns,lastRes.rows,null,null); }
+    }).catch(function(){});
+  }
   function tableHTML(cols,rows){
-    var h='<div class="tablewrap mini"><table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
+    var h='<div class="tablewrap mini"><table><thead><tr>'+cols.map(function(c){return '<th'+(GLOSS[c]?' class="gl"':'')+glossTitle(c)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
     rows.forEach(function(r){ h+='<tr>'+cols.map(function(c){ var f=cellFmt(r[c],c); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; });
     return h+'</tbody></table></div>';
   }
@@ -373,6 +384,11 @@
   function cellFmt(v,col){
     if(v==null) return {h:'∅',cls:'null',raw:'',title:'no observed value yet for this field — the platform records only source-attested facts and never guesses'};
     if(typeof v==='boolean') return {h:v?'✓':'—',cls:'',raw:v};
+    if(col&&/_yoy_pct$/i.test(col)&&v!==''&&!isNaN(v)){ var yp=Number(v); // Gazz law: YOY green up / red down, with %
+      var yh=yp>0?'<span class="up">▲ '+yp.toLocaleString(undefined,{maximumFractionDigits:1})+'%</span>'
+            :yp<0?'<span class="dn">▼ '+Math.abs(yp).toLocaleString(undefined,{maximumFractionDigits:1})+'%</span>'
+            :'<span class="flat">0%</span>';
+      return {h:yh,cls:'num',raw:yp}; }
     if(isYearish(col,v)) return {h:String(Number(v)),cls:'num',raw:Number(v)}; // years never get thousands separators
     if(typeof v==='number') return {h:v.toLocaleString(undefined,{maximumFractionDigits:4}),cls:'num',raw:v};
     if(Array.isArray(v)) { var a=v.join(', '); return {h:esc(a.length>160?a.slice(0,160)+'…':a),cls:'',raw:a,title:a.length>160?a.slice(0,800):null}; }
@@ -406,7 +422,7 @@
       if(numCols[sortC]){ x=Number(x); y=Number(y);} else { x=String(x); y=String(y);} return (x<y?-1:x>y?1:0)*(sortDir==='desc'?-1:1); }); }
     displayedRows=rows;
     var clickable=cols.indexOf('company_id')>=0 || (cols.indexOf('id')>=0 && (cols.indexOf('legal_name')>=0||cols.indexOf('dba_name')>=0));
-    var h='<thead><tr>'+cols.map(function(c){ return '<th class="'+(numCols[c]?'num':'')+'" data-c="'+esc(c)+'">'+esc(c)+(sortC===c?' <span class="arr">'+(sortDir==='desc'?'▼':'▲')+'</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody'+(clickable?' class="clickable" title="click a row for the company card"':'')+'>';
+    var h='<thead><tr>'+cols.map(function(c){ return '<th class="'+(numCols[c]?'num':'')+(GLOSS[c]?' gl':'')+'" data-c="'+esc(c)+'"'+glossTitle(c)+'>'+esc(c)+(sortC===c?' <span class="arr">'+(sortDir==='desc'?'▼':'▲')+'</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody'+(clickable?' class="clickable" title="click a row for the company card"':'')+'>';
     for(var i=0;i<rows.length;i++){ h+='<tr data-i="'+i+'">'+cols.map(function(c){ var f=cellFmt(rows[i][c],c); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; }
     h+='</tbody>';
     if(rows.length>1){
@@ -577,6 +593,7 @@
     if(status) renderStatus(status); else loadStatus();
     if(statusTimer) clearInterval(statusTimer);
     statusTimer=setInterval(loadStatus,60000);
+    loadGloss();
     renderPulls();
     $('examples').innerHTML=EXAMPLES.map(function(e){ return '<button>'+esc(e)+'</button>'; }).join('');
     Array.prototype.forEach.call($('examples').children,function(b){ b.onclick=function(){ $('q').value=b.textContent; ask(); }; });
