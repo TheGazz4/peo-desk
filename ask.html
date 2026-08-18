@@ -314,7 +314,7 @@
       j.title=p[0]; j.summary=p[1]; last={q:p[0],sql:j.sql}; renderResult(j);
     }).catch(function(){ netFail(); });
   }
-  var PEO_PROFILES=['PEO profiles','NOW + valid-time — client counts with 5500-roster YOY, insured lives (medical SchA) with YOY, top health carriers by lives, IRS CPEO status, SchA funding signal on every row; hover any header for what it means',"select * from dash_peo_profiles"];
+  var PEO_PROFILES=['PEO profiles','NOW + valid-time — client counts with 5500-roster YOY; health funding called 3-state (fully insured / partially self-funded / self-funded) from the H&W 5500 with receipts; insured lives with YOY; carrier strings lead with the total then % shares; hover any header for what it means',"select * from dash_peo_profiles"];
   function runPeoProfiles(){ runPull(PEO_PROFILES,-1); }
 
   // ---------- company search + card ----------
