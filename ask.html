@@ -33,6 +33,9 @@
   .tabs{display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--grid);margin:14px 0 12px;flex-wrap:wrap}
   .tabs button{background:none;border:none;color:var(--ink2);font:inherit;font-size:13px;padding:7px 12px;cursor:pointer;border-bottom:2px solid transparent}
   .tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+  .seg{display:inline-flex;border:1px solid rgba(236,241,244,.16);border-radius:8px;overflow:hidden;margin-right:10px}
+  .seg button{padding:6px 12px;border-bottom:none;font-size:12.5px}
+  .seg button.on{background:var(--accent);color:#08111e;font-weight:600}
   .tabs .desklink{margin-left:auto;color:var(--muted);font-size:12px;text-decoration:none}
   .tabs .desklink+.desklink{margin-left:12px}
   .tabs .desklink:hover{color:var(--ink2)}
@@ -100,7 +103,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English.</div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v3.6 · 2026-08-18</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -129,8 +132,8 @@
 </section>
 
 <section class="tab" id="tab-peos">
-  <div class="blurb" style="margin-bottom:6px">every PEO profile — NOW snapshot. customer_facing follows your brand rulings; cpeo is name-matched to the latest IRS roster (entity grain — no match = not certified); health_funding is a Schedule A signal; pct_attested = filing-grade share of the current-client count.</div>
-  <div class="row" style="margin-top:0"><button class="btn" id="peoReload">Reload profiles</button><span class="mini">612 profiles, ranked by current clients (capped at 500 rows — filter or sort to reach the tail)</span></div>
+  <div class="blurb" style="margin-bottom:6px">every PEO — same calcs at either grain. <b>PEO family</b> = the canonical group (ADP entities roll up); <b>Specific PEO</b> = the written brand (Vensure members stand alone; fold-ruled names like Paychex PEO merge their families). health_funding is the 3-state call from the H&amp;W 5500; hover any header for what it means.</div>
+  <div class="row" style="margin-top:0"><span class="seg"><button id="grainFam" class="on">PEO family</button><button id="grainBrand">Specific PEO</button></span><button class="btn" id="peoReload">Reload</button><span class="mini" id="peoGrainNote">612 family profiles, ranked by current clients (capped at 500 rows)</span></div>
 </section>
 
 <section class="tab" id="tab-kpi">
@@ -321,7 +324,14 @@
     }).catch(function(){ netFail(); });
   }
   var PEO_PROFILES=['PEO profiles','NOW + valid-time — client counts with 5500-roster YOY; health funding called 3-state (fully insured / partially self-funded / self-funded) from the H&W 5500 with receipts; insured lives with YOY; carrier strings lead with the total then % shares; hover any header for what it means',"select * from dash_peo_profiles"];
-  function runPeoProfiles(){ runPull(PEO_PROFILES,-1); }
+  var PEO_PROFILES_BRAND=['PEO profiles — by specific PEO','NOW + valid-time — the written brand: clients, YOY, attested, WC carrier shares, brand-entity CPEO. Health inherits the family plan only where unambiguous (H&W 5500s are filed at family grain) — otherwise the row points to the PEO family view.',"select * from dash_peo_profiles_by_brand"];
+  var peoGrain='family';
+  function setPeoGrain(g){ peoGrain=g;
+    var gf=$('grainFam'),gb=$('grainBrand');
+    if(gf){ gf.className=(g==='family')?'on':''; } if(gb){ gb.className=(g==='brand')?'on':''; }
+    var gn=$('peoGrainNote'); if(gn) gn.textContent=(g==='family')?'612 family profiles, ranked by current clients (capped at 500 rows)':'written PEO brands — merged names (Paychex PEO) roll their families together; health stays family-grain where ambiguous';
+    runPeoProfiles(); }
+  function runPeoProfiles(){ runPull(peoGrain==='brand'?PEO_PROFILES_BRAND:PEO_PROFILES,-1); }
   var PEO_KPIS=['PEO KPI board','our visibility into each book (clients + est. WSE %), filed Total WSE with YOY, switch wins/losses observed by the mesh, book-size priors — live computation, weekly snapshots in peo_kpi_snapshots',"select * from dash_peo_kpis order by filed_total_wse desc nulls last"];
   function runPeoKpis(){ runPull(PEO_KPIS,-1); }
 
@@ -543,6 +553,7 @@
     if(name==='browse'&&!tables.length) loadTables();
     if(name==='history') loadHistory();
     if(name==='peos') runPeoProfiles();
+    if(name==='kpi') runPeoKpis();
   }
   function checkGoogle(){
     fetch(SB+'/auth/v1/settings',{headers:{'apikey':ANON}}).then(function(r){return r.json();}).then(function(j){
@@ -616,6 +627,8 @@
   $('csvBtn').onclick=csv;
   $('refineBtn').onclick=function(){ switchTab('ask'); $('followup').checked=true; $('q').focus(); };
   $('peoReload').onclick=runPeoProfiles;
+  $('grainFam')&&($('grainFam').onclick=function(){ setPeoGrain('family'); });
+  $('grainBrand')&&($('grainBrand').onclick=function(){ setPeoGrain('brand'); });
   $('kpiReload').onclick=runPeoKpis;
   $('coBtn').onclick=coSearch;
   $('coQ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); coSearch(); } });
