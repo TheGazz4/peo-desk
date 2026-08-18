@@ -110,6 +110,7 @@
 <nav class="tabs">
   <button data-tab="pull" class="on">Pull</button>
   <button data-tab="peos">PEOs</button>
+  <button data-tab="kpi">KPI</button>
   <button data-tab="ask">Ask AI</button>
   <button data-tab="browse">Browse</button>
   <button data-tab="sql">SQL</button>
@@ -130,6 +131,11 @@
 <section class="tab" id="tab-peos">
   <div class="blurb" style="margin-bottom:6px">every PEO profile — NOW snapshot. customer_facing follows your brand rulings; cpeo is name-matched to the latest IRS roster (entity grain — no match = not certified); health_funding is a Schedule A signal; pct_attested = filing-grade share of the current-client count.</div>
   <div class="row" style="margin-top:0"><button class="btn" id="peoReload">Reload profiles</button><span class="mini">612 profiles, ranked by current clients (capped at 500 rows — filter or sort to reach the tail)</span></div>
+</section>
+
+<section class="tab" id="tab-kpi">
+  <div class="blurb" style="margin-bottom:6px">market scoreboard — OUR attribution vs each PEO's FILED numbers. Total WSE Count from 10-Ks/5500s (basis-labeled), visibility = share of their book we see, switch W/L from the mesh cohort, book-size priors. Snapshots accrue weekly for trends.</div>
+  <div class="row" style="margin-top:0"><button class="btn" id="kpiReload">Load KPI board</button><span class="mini">41 families with filed denominators — ranked by Total WSE; hover headers for definitions</span></div>
 </section>
 
 <section class="tab" id="tab-ask">
@@ -316,6 +322,8 @@
   }
   var PEO_PROFILES=['PEO profiles','NOW + valid-time — client counts with 5500-roster YOY; health funding called 3-state (fully insured / partially self-funded / self-funded) from the H&W 5500 with receipts; insured lives with YOY; carrier strings lead with the total then % shares; hover any header for what it means',"select * from dash_peo_profiles"];
   function runPeoProfiles(){ runPull(PEO_PROFILES,-1); }
+  var PEO_KPIS=['PEO KPI board','our visibility into each book (clients + est. WSE %), filed Total WSE with YOY, switch wins/losses observed by the mesh, book-size priors — live computation, weekly snapshots in peo_kpi_snapshots',"select * from dash_peo_kpis order by filed_total_wse desc nulls last"];
+  function runPeoKpis(){ runPull(PEO_KPIS,-1); }
 
   // ---------- company search + card ----------
   function coSearch(){
@@ -608,6 +616,7 @@
   $('csvBtn').onclick=csv;
   $('refineBtn').onclick=function(){ switchTab('ask'); $('followup').checked=true; $('q').focus(); };
   $('peoReload').onclick=runPeoProfiles;
+  $('kpiReload').onclick=runPeoKpis;
   $('coBtn').onclick=coSearch;
   $('coQ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); coSearch(); } });
   $('googleBtn').onclick=function(){ location.href=SB+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(location.origin+location.pathname); };
