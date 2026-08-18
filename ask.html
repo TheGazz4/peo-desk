@@ -103,7 +103,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v3.9 · 2026-08-18</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.0 · 2026-08-18</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -303,7 +303,8 @@
     ['Book by PEO family','NOW — clients + live avg/median current tenure per family (pct_tenure_known = coverage; floors are left-censored)',"select * from dash_peo_book_by_family"],
     ['Book by specific PEO','NOW — same book, brand grain per your rulings: ADP entities fold to one, Vensure members stand alone',"select * from dash_peo_book_by_brand"],
     ['Longest current tenures','WAS→NOW — companies longest on their current PEO (live years from the valid-time anchor; basis + came_from shown). Click a row for the card',"select * from dash_company_tenure"],
-    ["Client forecasts '25/'26",'ESTIMATE — frozen-vintage predictions closing the 5500 gap: \'25 est (roster units, scored vs actuals when filings complete Aug–Oct) + \'26 YTD nowcast off public WSE anchors. Bands + method + receipts on every row',"select * from dash_peo_forecast"]
+    ["Client forecasts '25/'26",'ESTIMATE — frozen-vintage predictions closing the 5500 gap: \'25 est (roster units, scored vs actuals when filings complete Aug–Oct) + \'26 YTD nowcast off public WSE anchors. Bands + method + receipts on every row',"select * from dash_peo_forecast"],
+    ["Client size by PEO",'NOW — who plays down-market vs up-market: mean/median/p25/p75 employees per client from our estimates (coverage shown), Implied WSE/Client for the majors (public WSE ÷ our book) and the calibration factor between them',"select * from dash_peo_client_size"]
   ];
   function markViewing(i){
     Array.prototype.forEach.call(document.querySelectorAll('.pull'),function(el){
