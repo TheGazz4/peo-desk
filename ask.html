@@ -288,7 +288,10 @@
     ['PEO ratings','NOW — as last graded; graded column shows freshness',"select * from dash_peo_ratings"],
     ['Switch flow matrix','TO-DATE with a NOW lens — all detections beside the last 12 months (by valid time); canonical names',"select * from dash_switch_flow_matrix"],
     ['PEO avg client tenure','WAS — observed years on the PEO across 5500 filing years 2020→latest (valid time). Censored both ends: still_active% keep running (true tenure is longer); left_censored% started at/before 2020',"select * from dash_peo_tenure_5500"],
-    ['Longest-running relationships','WAS→NOW — contiguous 5500 filing-year runs (2020→latest), still filing as of the latest mature year; stack-ranked by years running. Starts may predate 2020',"select * from dash_longest_running_5500"]
+    ['Longest-running relationships','WAS→NOW — contiguous 5500 filing-year runs (2020→latest), still filing as of the latest mature year; stack-ranked by years running. Starts may predate 2020',"select * from dash_longest_running_5500"],
+    ['Book by PEO family','NOW — clients + live avg/median current tenure per family (pct_tenure_known = coverage; floors are left-censored)',"select * from dash_peo_book_by_family"],
+    ['Book by specific PEO','NOW — same book, brand grain per your rulings: ADP entities fold to one, Vensure members stand alone',"select * from dash_peo_book_by_brand"],
+    ['Longest current tenures','WAS→NOW — companies longest on their current PEO (live years from the valid-time anchor; basis + came_from shown). Click a row for the card',"select * from dash_company_tenure"]
   ];
   function markViewing(i){
     Array.prototype.forEach.call(document.querySelectorAll('.pull'),function(el){
@@ -330,7 +333,7 @@
       renderCompany(j);
     }).catch(function(){ netFail(); });
   }
-  var FRIENDLY_KEYS={legal_name:'Legal name',dba_name:'DBA',ein:'EIN',city:'City',state:'State',hq_state:'HQ state',operating_states:'Operating states',naics:'NAICS',headcount_est:'Headcount est.',revenue_range:'Revenue range',domain:'Domain',peo_current:'On a PEO now',peo_name:'PEO (as written)',peo_family_slug:'PEO family',peo_brand_slug:'PEO brand',peo_original:'Original PEO',peo_prior_family_slug:'Prior PEO',peo_switch_as_of:'Switched as of',attribution_class:'Attribution class',wc_carrier:'WC carrier',wc_renewal_month:'WC renewal month',wc_coverage_status:'WC status',wc_policy_expiration:'WC policy expires',health_renewal_month:'Health renewal month',operating_status:'Operating status',is_client:'Is our client',latest_intel_at:'Latest intel'};
+  var FRIENDLY_KEYS={legal_name:'Legal name',dba_name:'DBA',ein:'EIN',city:'City',state:'State',hq_state:'HQ state',operating_states:'Operating states',naics:'NAICS',headcount_est:'Headcount est.',revenue_range:'Revenue range',domain:'Domain',peo_current:'On a PEO now',peo_name:'PEO (as written)',peo_family_slug:'PEO family',peo_brand_slug:'PEO brand',peo_original:'Original PEO',peo_prior_family_slug:'Prior PEO',came_from:'Came from',peo_switch_as_of:'Switched as of',current_peo_tenure_yrs:'Current PEO tenure (yrs)',peo_current_since:'With current PEO since',peo_current_since_basis:'Tenure basis',attribution_class:'Attribution class',industry:'Industry',wc_carrier:'WC carrier',wc_renewal_month:'WC renewal month',wc_coverage_status:'WC status',wc_policy_expiration:'WC policy expires',health_renewal_month:'Health renewal month',operating_status:'Operating status',is_client:'Is our client',latest_intel_at:'Latest intel'};
   function showCard(on){ $('r-card').style.display=on?'block':'none'; $('r-wrap').style.display=on?'none':'block'; $('r-actions').style.display=on?'none':'flex'; $('r-sqlbox').style.display=on?'none':'block'; }
   function tableHTML(cols,rows){
     var h='<div class="tablewrap mini"><table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
@@ -362,7 +365,7 @@
   }
 
   // ---------- table rendering ----------
-  var NOSUM=/(^|_)(id|ein|year|month|day|zip|decile|score|confidence|pct|percent|share|rate|ratio|lat|lng|version|seq)$/i;
+  var NOSUM=/(^|_)(id|ein|year|month|day|zip|decile|score|confidence|pct|percent|share|rate|ratio|lat|lng|version|seq|yrs|tenure)$/i;
   var UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function isNumCol(rows,c){ var n=0,t=0; for(var i=0;i<rows.length&&i<50;i++){ var v=rows[i][c]; if(v==null) continue; t++; if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(v)&&String(v).trim()!=='')) n++; } return t>0&&n/t>=0.8; }
   var YEARCOL=/(^|_)(year|yr)s?($|_)/i;
