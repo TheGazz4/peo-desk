@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.5 · 2026-08-19</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.6 · 2026-08-19</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -306,18 +306,25 @@
     else banner(null);
   }
   function loadStatus(){ api({mode:'status'},20000).then(function(j){ if(j.status) renderStatus(j.status); loadSwitchTile(); }).catch(function(){}); }
-  // v4.5: Switch Intelligence tile — live scorecard on the header row, click-through to Switchboard (XIV.2: reasons one click away; XIV.5: cut date shown)
+  // v4.6: Switch Intelligence tile set — four live tiles from v_model_scorecard + v_switch_intelligence (quiet sql mode); click-through to Switchboard (XIV.2/XIV.5)
   function loadSwitchTile(){
-    api({mode:'switchboard',limit:1,workable:false},30000).then(function(j){
-      var sc=(j.scorecard&&j.scorecard[0])||null; if(!sc) return;
-      var html='<div class="l">switch intelligence</div><div class="v">'+Number(sc.n_issued).toLocaleString()+'</div><div class="s">scored · model #'+sc.model_id+' · cut '+esc(String(sc.as_of_cut))+' · outcomes '+sc.switches_observed+' · open Switchboard →</div>';
-      var el=document.getElementById('swTile');
-      if(el){ el.innerHTML=html; return; }
-      var d=document.createElement('div'); d.className='tile'; d.id='swTile'; d.style.cursor='pointer';
-      d.title='12-month switch scores from the live model — click to open the Switchboard';
-      d.innerHTML=html;
-      d.onclick=function(){ var b=document.querySelector('.tabs button[data-tab="switchboard"]'); if(b) b.click(); window.scrollTo({top:0,behavior:'smooth'}); };
-      $('tiles').appendChild(d);
+    var Q="select s.model_id, s.as_of_cut, s.n_issued, s.switches_observed, f.hot_band, f.attested, f.top_pct, f.top_mult from v_model_scorecard s cross join (select count(*) filter (where months_to_renewal between 4 and 6) hot_band, count(*) filter (where renewal_basis_class='per_company_attested') attested, round(max(score)*100,1) top_pct, round(max(base_rate_multiple),1) top_mult from v_switch_intelligence) f limit 1";
+    api({mode:'sql',sql:Q,label:'switch tiles',quiet:true},30000).then(function(j){
+      var r=(j.rows&&j.rows[0])||null; if(!r) return;
+      function swT(id,label,val,sub){
+        var el=document.getElementById(id);
+        var html='<div class="l">'+label+'</div><div class="v">'+val+'</div><div class="s">'+sub+'</div>';
+        if(el){ el.innerHTML=html; return; }
+        var d=document.createElement('div'); d.className='tile'; d.id=id; d.style.cursor='pointer';
+        d.title='live from the switch model — click to open the Switchboard';
+        d.innerHTML=html;
+        d.onclick=function(){ var b=document.querySelector('.tabs button[data-tab="switchboard"]'); if(b) b.click(); window.scrollTo({top:0,behavior:'smooth'}); };
+        $('tiles').appendChild(d);
+      }
+      swT('swT1','switch intelligence',Number(r.n_issued).toLocaleString(),'scored · model #'+r.model_id+' · cut '+esc(String(r.as_of_cut)));
+      swT('swT2','hot band · 4–6 mo',Number(r.hot_band).toLocaleString(),'in the shopping window — work first');
+      swT('swT3','attested timing',Number(r.attested).toLocaleString(),'regulator-attested x-dates · rest inferred');
+      swT('swT4','top signal',(r.top_pct==null?'—':r.top_pct+'%'),(r.top_mult==null?'':r.top_mult+'× base rate')+' · outcomes '+r.switches_observed+' · graded weekly');
     }).catch(function(){});
   }
 
