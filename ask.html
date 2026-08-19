@@ -325,7 +325,49 @@
       swT('swT2','hot band · 4–6 mo',Number(r.hot_band).toLocaleString(),'in the shopping window — work first');
       swT('swT3','attested timing',Number(r.attested).toLocaleString(),'regulator-attested x-dates · rest inferred');
       swT('swT4','top signal',(r.top_pct==null?'—':r.top_pct+'%'),(r.top_mult==null?'':r.top_mult+'× base rate')+' · outcomes '+r.switches_observed+' · graded weekly');
+      loadMasterCalTile();
     }).catch(function(){});
+  }
+  // v4.7: Master policy renewal calendar tile + overlay — desk_master_policy_calendar (EIN-attributed Schedule A; benefit_source_precedence_law)
+  function loadMasterCalTile(){
+    var m=new Date().getMonth()+1;
+    var Q="select count(distinct family_slug) fams, count(distinct carrier_name) cars from desk_master_policy_calendar where renewal_month="+m;
+    api({mode:'sql',sql:Q,label:'master cal tile',quiet:true},30000).then(function(j){
+      var r=(j.rows&&j.rows[0])||null; if(!r) return;
+      var html='<div class="l">master renewals · this month</div><div class="v">'+Number(r.fams).toLocaleString()+'</div><div class="s">PEO master policies renewing · '+r.cars+' carriers · tap for calendar</div>';
+      var el=document.getElementById('mcT1');
+      if(el){ el.innerHTML=html; return; }
+      var d=document.createElement('div'); d.className='tile'; d.id='mcT1'; d.style.cursor='pointer';
+      d.title='Schedule A master policy renewal calendar — by PEO and carrier';
+      d.innerHTML=html; d.onclick=openMasterCal; $('tiles').appendChild(d);
+    }).catch(function(){});
+  }
+  function openMasterCal(){
+    var ov=document.getElementById('mcOverlay');
+    if(!ov){
+      ov=document.createElement('div'); ov.id='mcOverlay';
+      ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:99;overflow:auto;padding:18px';
+      ov.innerHTML='<div style="max-width:860px;margin:0 auto;background:#12151c;border:1px solid #2a2f3a;border-radius:12px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>Master policy renewal calendar</b><span><select id="mcMonth" style="background:#1a1f29;color:#eee;border:1px solid #2a2f3a;border-radius:6px;padding:4px"></select> <button id="mcClose" style="background:#1a1f29;color:#eee;border:1px solid #2a2f3a;border-radius:6px;padding:4px 10px">close</button></span></div><div style="color:#9aa4b2;font-size:12px;margin-bottom:8px">EIN-attributed Schedule A policy anniversaries, latest welfare filing per family. Instrument dates — never client health months (benefit_source_precedence_law).</div><div id="mcBody">loading…</div></div>';
+      document.body.appendChild(ov);
+      var sel=ov.querySelector('#mcMonth'); var nm=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      for(var i=1;i<=12;i++){ var o=document.createElement('option'); o.value=i; o.textContent=nm[i-1]; sel.appendChild(o); }
+      sel.value=String(new Date().getMonth()+1);
+      sel.onchange=function(){ renderMasterCal(parseInt(sel.value,10)); };
+      ov.querySelector('#mcClose').onclick=function(){ ov.style.display='none'; };
+    }
+    ov.style.display='block';
+    renderMasterCal(parseInt(document.getElementById('mcMonth').value,10));
+  }
+  function renderMasterCal(m){
+    var body=document.getElementById('mcBody'); if(body) body.innerHTML='loading…';
+    var Q="select family_slug, renewal_anniv, string_agg(distinct carrier_name, ' · ' order by carrier_name) carriers, sum(coalesce(persons_covered_eoy,0)) covered from desk_master_policy_calendar where renewal_month="+m+" group by family_slug, renewal_anniv order by covered desc";
+    api({mode:'sql',sql:Q,label:'master calendar',quiet:true},30000).then(function(j){
+      var rows=j.rows||[]; var body=document.getElementById('mcBody');
+      if(!rows.length){ body.innerHTML='<i>no federally-visible master policies renew this month</i>'; return; }
+      var h='<table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="color:#9aa4b2;text-align:left"><th style="padding:4px">PEO</th><th>anniv</th><th>carriers (Schedule A)</th><th style="text-align:right">covered</th></tr>';
+      rows.forEach(function(r){ h+='<tr style="border-top:1px solid #232833"><td style="padding:6px 4px"><b>'+esc(String(r.family_slug))+'</b></td><td>'+esc(String(r.renewal_anniv))+'</td><td style="color:#c6cede">'+esc(String(r.carriers))+'</td><td style="text-align:right">'+Number(r.covered).toLocaleString()+'</td></tr>'; });
+      body.innerHTML=h+'</table>';
+    }).catch(function(){ var b=document.getElementById('mcBody'); if(b) b.innerHTML='<i>load failed</i>'; });
   }
 
   // ---------- quick pulls ----------
