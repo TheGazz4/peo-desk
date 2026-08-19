@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.6 · 2026-08-19</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.7 · 2026-08-19</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -134,7 +134,7 @@
   <div class="row" style="margin-top:0">
     <input type="text" id="coQ" placeholder="type a company name and hit Enter — e.g. ACME ROOFING" style="max-width:460px">
     <button class="btn" id="coBtn">Find company</button>
-    <span class="mini">search the 219k-company universe → click a row for the full company card</span>
+    <span class="mini" id="coUniverse">search the company universe → click a row for the full company card</span>
     <button class="btn ghost" id="rbaBtn" style="margin-left:auto" title="Result-back audit (RBA): samples company cards at random and traces what is displayed back to primary sources. Surfaces findings only — nothing is auto-fixed.">Run data audit</button>
   </div>
   <div class="pulls" id="pulls"></div>
@@ -302,6 +302,7 @@
       chip('', 'var(--accent)','today <b>$'+Number(s.today||0).toFixed(2)+'</b>');
     var t=[['companies',s.companies,'resolved universe · to date'],['observations',s.observations,'bitemporal ledger · to date'],['switches detected',s.switches,'to date'],['plays in feed',s.plays_live,fmtN(s.plays_hot)+' hot right now']];
     $('tiles').innerHTML=t.map(function(x){ return '<div class="tile"><div class="l">'+x[0]+'</div><div class="v">'+fmtN(x[1])+'</div><div class="s">'+esc(x[2])+'</div></div>'; }).join('');
+    if(s.companies!=null&&$('coUniverse')) $('coUniverse').textContent='search the '+fmtN(s.companies)+'-company universe → click a row for the full company card';
     if(!gOpen) banner('warn','<b>Only the Ask-AI tab is gated</b> (Anthropic cap: $'+Number(s.mtd||0).toFixed(2)+' / $'+Number(s.cap||0).toFixed(0)+' on org “'+esc(org)+'”). Everything on the Pull, Browse, SQL and History tabs works free right now. To unlock Ask-AI: Supabase → Settings → Vault → add secret <b>anthropic_api_key_b</b> with your instance-B API key.');
     else banner(null);
   }
