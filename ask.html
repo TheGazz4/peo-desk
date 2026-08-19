@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.7 · 2026-08-19</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.9 · 2026-08-19</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -119,6 +119,7 @@
 <nav class="tabs">
   <button data-tab="pull" class="on">Pull</button>
   <button data-tab="switchboard">Switchboard</button>
+  <button data-tab="renewal">Renewal Intel</button>
   <button data-tab="peos">PEOs</button>
   <button data-tab="kpi">KPI</button>
   <button data-tab="ask">Ask AI</button>
@@ -149,6 +150,18 @@
   </div>
   <div id="swCard" class="mini" style="margin-top:8px"></div>
   <div class="tablewrap" id="swWrap" style="margin-top:8px;display:none"><table id="swTable"></table></div>
+</section>
+
+<section class="tab" id="tab-renewal">
+  <div class="blurb" style="margin-bottom:6px">the timing-truth scoreboard — client-level health renewal months earned by evidence (KNOWN/LIKELY per mandate §5), never defaulted. Blank is honest. Brand instrument dates (WC books, master policy filings) are education, never client months. Every figure is a live view (v_ri_*), nothing hardcoded.</div>
+  <div class="row" style="margin-top:0"><button class="btn" id="riReload">Load scoreboard</button><button class="btn ghost" id="riCalBtn" title="the brand-level health master policy calendar (existing pull — the instrument layer this tab must never be confused with)">Health master calendar</button><span class="mini" id="riNote"></span></div>
+  <div id="riHead" class="mini" style="margin-top:8px"></div>
+  <div id="riBars" style="margin-top:8px"></div>
+  <div style="margin-top:10px"><div class="mini" style="margin-bottom:4px"><b>THE PEO LENS</b> — how much of each book we hold the timing code on (sorted by book size; modeled-only = legacy brand-inherited layer, shown for contrast, never counted as profiled)</div><div class="tablewrap"><table id="riLens"></table></div></div>
+  <div style="margin-top:10px"><div class="mini" style="margin-bottom:4px"><b>TOP-20 REGIME DOSSIERS</b> — chip = regime standing (ratified / hypothesis / unknown); n/9 = mandated section completeness; click a family for the full dossier</div><div class="tablewrap"><table id="riGrid"></table></div></div>
+  <div id="riEdu" class="mini" style="margin-top:10px"></div>
+  <div id="riFresh" class="mini" style="margin-top:4px"></div>
+  <div id="riDossier" style="display:none;margin-top:10px;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:12px;max-height:480px;overflow:auto"><div class="row" style="margin-top:0"><b id="riDosTitle"></b><button class="btn ghost" id="riDosClose" style="margin-left:auto">Close</button></div><pre id="riDosBody" style="white-space:pre-wrap;font-size:12px;line-height:1.5"></pre></div>
 </section>
 
 <section class="tab" id="tab-peos">
@@ -306,7 +319,7 @@
     if(!gOpen) banner('warn','<b>Only the Ask-AI tab is gated</b> (Anthropic cap: $'+Number(s.mtd||0).toFixed(2)+' / $'+Number(s.cap||0).toFixed(0)+' on org “'+esc(org)+'”). Everything on the Pull, Browse, SQL and History tabs works free right now. To unlock Ask-AI: Supabase → Settings → Vault → add secret <b>anthropic_api_key_b</b> with your instance-B API key.');
     else banner(null);
   }
-  function loadStatus(){ api({mode:'status'},20000).then(function(j){ if(j.status) renderStatus(j.status); loadSwitchTile(); }).catch(function(){}); }
+  function loadStatus(){ api({mode:'status'},20000).then(function(j){ if(j.status) renderStatus(j.status); loadSwitchTile(); loadRenewalTile(); }).catch(function(){}); }
   // v4.6: Switch Intelligence tile set — four live tiles from v_model_scorecard + v_switch_intelligence (quiet sql mode); click-through to Switchboard (XIV.2/XIV.5)
   function loadSwitchTile(){
     var Q="select s.model_id, s.as_of_cut, s.n_issued, s.switches_observed, f.hot_band, f.attested, f.top_pct, f.top_mult from v_model_scorecard s cross join (select count(*) filter (where months_to_renewal between 4 and 6) hot_band, count(*) filter (where renewal_basis_class='per_company_attested') attested, round(max(score)*100,1) top_pct, round(max(base_rate_multiple),1) top_mult from v_switch_intelligence) f limit 1";
@@ -330,10 +343,72 @@
   }
 
 
+  // ---------- renewal intelligence (RI mandate §6.5): thin reader over v_ri_* — DB does all math ----------
+  function loadRenewalTile(){
+    var Q="select timing_truth_pct, month_populated, month_known, month_likely, scored_book_companies, open_season_now, carrier_populated from v_ri_coverage_tile";
+    api({mode:'sql',sql:Q,label:'renewal coverage tile',quiet:true},30000).then(function(j){
+      var r=(j.rows&&j.rows[0])||null; if(!r) return;
+      var el=document.getElementById('riT1');
+      var html='<div class="l">renewal coverage</div><div class="v">'+(r.timing_truth_pct==null?'0':r.timing_truth_pct)+'%</div><div class="s">'+fmtN(r.month_populated)+' months held (K '+r.month_known+' / L '+r.month_likely+') · '+fmtN(r.open_season_now)+' in open season</div>';
+      if(el){ el.innerHTML=html; return; }
+      var d=document.createElement('div'); d.className='tile'; d.id='riT1'; d.style.cursor='pointer';
+      d.title='timing truth: % of the scored book carrying an evidence-earned health renewal month (KNOWN+LIKELY only — blank is honest). Click for the full Renewal Intelligence scoreboard.';
+      d.innerHTML=html;
+      d.onclick=function(){ var b=document.querySelector('.tabs button[data-tab="renewal"]'); if(b) b.click(); window.scrollTo({top:0,behavior:'smooth'}); };
+      $('tiles').appendChild(d);
+    }).catch(function(){});
+  }
+  function loadRenewal(){
+    var b=$('riReload'); if(b){ b.disabled=true; b.textContent='Loading…'; }
+    api({mode:'renewal_intelligence'},45000).then(function(j){
+      if(b){ b.disabled=false; b.textContent='Load scoreboard'; }
+      if(handleCommon(j)) return;
+      var h=j.headline||{};
+      $('riHead').innerHTML='<b>timing truth '+(h.timing_truth_pct==null?'0':h.timing_truth_pct)+'%</b> of the scored book — '+fmtN(h.month_populated)+' of '+fmtN(h.scored_book_companies)+' companies carry an evidence-earned month (KNOWN '+fmtN(h.month_known)+' / LIKELY '+fmtN(h.month_likely)+' · cut '+esc(String(h.scored_book_cut||''))+') · per-tier accuracy: '+((h.known_accuracy_pct==null&&h.likely_accuracy_pct==null)?'<i>honestly empty — grading begins when observed reality (transitions, WS4 re-confirmations) arrives against populated months</i>':(String(h.known_accuracy_pct)+'% KNOWN / '+String(h.likely_accuracy_pct)+'% LIKELY'));
+      var bars=(j.tier_bars||[]).map(function(tb){
+        var tot=Number(tb.total)||1;
+        function seg(n,color,label){ var w=Math.max(0,100*Number(n||0)/tot); return '<span title="'+label+': '+fmtN(n)+'" style="display:inline-block;height:10px;width:'+w.toFixed(2)+'%;background:'+color+'"></span>'; }
+        return '<div style="margin:4px 0"><span class="mini" style="display:inline-block;width:180px">'+esc(String(tb.field))+'</span><span style="display:inline-block;width:40%;min-width:160px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;vertical-align:middle;font-size:0">'+seg(tb.known,'var(--good)','KNOWN')+seg(tb.likely,'var(--accent)','LIKELY')+seg(tb.modeled_only,'#8a6d3b','modeled-only (legacy)')+'</span><span class="mini" style="margin-left:8px" title="'+esc(String(tb.note||''))+'">K '+fmtN(tb.known)+' · L '+fmtN(tb.likely)+' · modeled '+fmtN(tb.modeled_only)+' · unknown '+fmtN(tb.unknown)+'</span></div>';
+      }).join('');
+      $('riBars').innerHTML=bars;
+      var lh='<thead><tr><th>PEO</th><th class="num">current clients</th><th class="num" title="% of the book with an evidence-earned month (KNOWN+LIKELY)">% month profiled</th><th class="num" title="% with client-level carrier attribution at KNOWN/LIKELY">% carrier known</th><th class="num" title="legacy brand-inherited months — context only, never counted as profiled">modeled-only</th></tr></thead><tbody>';
+      (j.peo_lens||[]).forEach(function(r){ lh+='<tr><td>'+esc(r.peo||r.family_slug||'')+'</td><td class="num">'+fmtN(r.current_clients)+'</td><td class="num"><b>'+(r.pct_month_profiled==null?'0':r.pct_month_profiled)+'%</b> ('+fmtN(r.month_profiled_n)+')</td><td class="num">'+(r.pct_carrier_known==null?'0':r.pct_carrier_known)+'%</td><td class="num">'+fmtN(r.modeled_only_n)+'</td></tr>'; });
+      $('riLens').innerHTML=lh+'</tbody>';
+      var gh='<thead><tr><th>family</th><th>regime</th><th class="ctr">sections</th><th class="num">current clients</th><th class="num">WS1 anchors</th><th class="ctr">version</th></tr></thead><tbody>';
+      (j.top20||[]).forEach(function(r){
+        var chipColor=r.regime_chip==='ratified'?'var(--good)':(r.regime_chip==='hypothesis'?'var(--accent)':'var(--ink2)');
+        gh+='<tr><td><a href="#" class="riDos" data-f="'+esc(String(r.family_key))+'" style="color:var(--accent);text-decoration:none">'+esc(r.family_display||r.family_key)+'</a></td><td><span style="color:'+chipColor+'">●</span> '+esc(String(r.regime_chip||''))+'</td><td class="ctr">'+r.sections_complete+'/9</td><td class="num">'+fmtN(r.current_clients)+'</td><td class="num">'+fmtN(r.ws1_anchors)+'</td><td class="ctr">v'+r.version+'</td></tr>';
+      });
+      $('riGrid').innerHTML=gh+'</tbody>';
+      Array.prototype.forEach.call($('riGrid').querySelectorAll('.riDos'),function(a){ a.onclick=function(e){ e.preventDefault(); riOpenDossier(a.getAttribute('data-f')); }; });
+      var ed=j.education||{};
+      $('riEdu').innerHTML='<b>education coverage (whole registry, live):</b> '+fmtN(ed.families_all)+' families · '+fmtN(ed.welfare_visible)+' welfare-visible · '+fmtN(ed.calendared)+' calendared (EIN-attributed Schedule A anniversaries) · '+fmtN(ed.harvest_only_remainder)+' harvest-only remainder · dossier families: '+ed.dossier_educated+' educated / '+ed.dossier_partial+' partial / '+ed.dossier_uneducated+' uneducated';
+      var f=j.freshness||{};
+      $('riFresh').innerHTML='<b>freshness &amp; momentum:</b> '+fmtN(f.open_season_now)+' in open season now · median evidence age '+(f.median_evidence_age_days==null?'—':Math.round(f.median_evidence_age_days)+'d')+' · '+(f.pct_evidence_within_90d==null?'—':f.pct_evidence_within_90d+'%')+' fresh ≤90d · net upgraded last 7d: '+fmtN(f.net_upgraded_7d)+' <span class="mini">(zero momentum = harvest discipline slipped)</span>';
+      $('riNote').textContent='Population Law live: KNOWN/LIKELY or blank — never defaulted.';
+    }).catch(function(){ if(b){ b.disabled=false; b.textContent='Load scoreboard'; } netFail(); });
+  }
+  function riOpenDossier(f){
+    f=String(f||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+    if(!f) return;
+    var Q0="select family_display, version, created_at::date::text as asof, length(dossier_md) as len from peo_regime_dossiers where family_key='"+f+"' order by version desc limit 1";
+    api({mode:'sql',sql:Q0,label:'dossier meta',quiet:true},30000).then(function(j){
+      var m=(j.rows&&j.rows[0])||null; if(!m){ banner('warn','no dossier for '+esc(f)); return; }
+      var len=Number(m.len)||0, got='', off=1;
+      function step(){
+        if(off>len){ $('riDosTitle').textContent=m.family_display+' — regime dossier v'+m.version+' ('+m.asof+')'; $('riDosBody').textContent=got; $('riDossier').style.display='block'; $('riDossier').scrollIntoView({behavior:'smooth'}); return; }
+        var Q="select substr(dossier_md,"+off+",3500) as c from peo_regime_dossiers where family_key='"+f+"' and version="+m.version;
+        api({mode:'sql',sql:Q,label:'dossier chunk',quiet:true},30000).then(function(j2){ var c=(j2.rows&&j2.rows[0]&&j2.rows[0].c)||''; got+=c; off+=3500; step(); }).catch(function(){ netFail(); });
+      }
+      step();
+    }).catch(function(){ netFail(); });
+  }
+
   // ---------- quick pulls ----------
   var PULLS=[
     ['Health master renewal calendar','WHEN each PEO BRAND renews its own medical master policies, and with which carriers — brand instrument dates, not client renewal months (benefit_source_precedence_law). Medical Schedule A only, EIN-attributed, latest welfare filing.',"select month_label as month, peo, renews_on, carriers_ct as carriers, medical_carriers, covered_lives from dash_health_master_calendar order by renewal_month, covered_lives desc"],
     ['Health masters renewing next 90 days','The brands whose medical masters renew soon — carrier changes and rate actions surface here first (§2.6 disruption watch).',"select month_label as month, peo, renews_on, medical_carriers, covered_lives from dash_health_master_calendar where renewal_month in (extract(month from now())::int, extract(month from now()+interval '1 month')::int, extract(month from now()+interval '2 months')::int) order by renewal_month, covered_lives desc"],
+    ['Renewal timing truth — the PEO lens','Per PEO book: % of THEIR current clients whose health renewal month we hold at KNOWN/LIKELY tier, and % with client-level carrier attribution — simultaneously the progress report and the targeting map (mandate §6.5). modeled_only = legacy brand-inherited months, context only.',"select peo, current_clients, pct_month_profiled, month_profiled_n, pct_carrier_known, carrier_known_n, modeled_only_n from v_ri_peo_lens order by current_clients desc"],
     ['Latest PEO switches','TO-DATE feed ordered by WHEN IT HAPPENED (evidence_as_of, valid time); detected_at = when we learned',"select * from dash_latest_switches"],
     ['Top PEOs by clients — current book','NOW — companies attributed today (knowledge-as-of); canonical names; folded brands aggregate per your rulings',"select * from dash_top_peos_current"],
     ['Companies by state','NOW — the resolved universe today; Σ row = total',"select * from dash_companies_by_state"],
@@ -665,6 +740,7 @@
     if(name==='browse'&&!tables.length) loadTables();
     if(name==='history') loadHistory();
     if(name==='switchboard') loadSwitchboard();
+    if(name==='renewal') loadRenewal();
     if(name==='peos') runPeoProfiles();
     if(name==='kpi') runPeoKpis();
     if(name==='forecast') runForecastTab();
@@ -741,6 +817,8 @@
   $('csvBtn').onclick=csv;
   $('refineBtn').onclick=function(){ switchTab('ask'); $('followup').checked=true; $('q').focus(); };
   $('peoReload').onclick=runPeoProfiles;
+  if($('riCalBtn')) $('riCalBtn').onclick=function(){ var p=null; for(var i=0;i<PULLS.length;i++){ if(PULLS[i][0]==='Health master renewal calendar'){ p=PULLS[i]; break; } } if(p) runPull(p,-1); };
+  if($('riDosClose')) $('riDosClose').onclick=function(){ $('riDossier').style.display='none'; };
   $('grainFam')&&($('grainFam').onclick=function(){ setPeoGrain('family'); });
   $('grainBrand')&&($('grainBrand').onclick=function(){ setPeoGrain('brand'); });
   $('fcReload')&&($('fcReload').onclick=runForecastTab);
