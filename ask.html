@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.4 · 2026-08-19</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.5 · 2026-08-19</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -305,7 +305,21 @@
     if(!gOpen) banner('warn','<b>Only the Ask-AI tab is gated</b> (Anthropic cap: $'+Number(s.mtd||0).toFixed(2)+' / $'+Number(s.cap||0).toFixed(0)+' on org “'+esc(org)+'”). Everything on the Pull, Browse, SQL and History tabs works free right now. To unlock Ask-AI: Supabase → Settings → Vault → add secret <b>anthropic_api_key_b</b> with your instance-B API key.');
     else banner(null);
   }
-  function loadStatus(){ api({mode:'status'},20000).then(function(j){ if(j.status) renderStatus(j.status); }).catch(function(){}); }
+  function loadStatus(){ api({mode:'status'},20000).then(function(j){ if(j.status) renderStatus(j.status); loadSwitchTile(); }).catch(function(){}); }
+  // v4.5: Switch Intelligence tile — live scorecard on the header row, click-through to Switchboard (XIV.2: reasons one click away; XIV.5: cut date shown)
+  function loadSwitchTile(){
+    api({mode:'switchboard',limit:1,workable:false},30000).then(function(j){
+      var sc=(j.scorecard&&j.scorecard[0])||null; if(!sc) return;
+      var html='<div class="l">switch intelligence</div><div class="v">'+Number(sc.n_issued).toLocaleString()+'</div><div class="s">scored · model #'+sc.model_id+' · cut '+esc(String(sc.as_of_cut))+' · outcomes '+sc.switches_observed+' · open Switchboard →</div>';
+      var el=document.getElementById('swTile');
+      if(el){ el.innerHTML=html; return; }
+      var d=document.createElement('div'); d.className='tile'; d.id='swTile'; d.style.cursor='pointer';
+      d.title='12-month switch scores from the live model — click to open the Switchboard';
+      d.innerHTML=html;
+      d.onclick=function(){ var b=document.querySelector('.tabs button[data-tab="switchboard"]'); if(b) b.click(); window.scrollTo({top:0,behavior:'smooth'}); };
+      $('tiles').appendChild(d);
+    }).catch(function(){});
+  }
 
   // ---------- quick pulls ----------
   var PULLS=[
