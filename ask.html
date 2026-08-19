@@ -325,75 +325,14 @@
       swT('swT2','hot band · 4–6 mo',Number(r.hot_band).toLocaleString(),'in the shopping window — work first');
       swT('swT3','attested timing',Number(r.attested).toLocaleString(),'regulator-attested x-dates · rest inferred');
       swT('swT4','top signal',(r.top_pct==null?'—':r.top_pct+'%'),(r.top_mult==null?'':r.top_mult+'× base rate')+' · outcomes '+r.switches_observed+' · graded weekly');
-      loadMasterCalTile();
     }).catch(function(){});
   }
-  // v4.8: HEALTH master renewal calendar — PEO BRAND instrument dates (medical Schedule A only, never client months) — year-grid + month detail
-  function loadMasterCalTile(){
-    var m=new Date().getMonth()+1;
-    var Q="select count(distinct family_slug) fams from desk_master_policy_calendar where medical and renewal_month="+m;
-    api({mode:'sql',sql:Q,label:'health master tile',quiet:true},30000).then(function(j){
-      var r=(j.rows&&j.rows[0])||null; if(!r) return;
-      var nm=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      var html='<div class="l">health master renewals</div><div class="v">'+Number(r.fams).toLocaleString()+'</div><div class="s">PEO brands · '+nm[m-1]+' · brand instrument dates, not clients · tap for calendar</div>';
-      var el=document.getElementById('mcT1');
-      if(el){ el.innerHTML=html; return; }
-      var d=document.createElement('div'); d.className='tile'; d.id='mcT1'; d.style.cursor='pointer';
-      d.title='Health master policy renewal calendar — PEO brands and their medical carriers';
-      d.innerHTML=html; d.onclick=openMasterCal; $('tiles').appendChild(d);
-    }).catch(function(){});
-  }
-  function openMasterCal(){
-    var ov=document.getElementById('mcOverlay');
-    if(ov){ ov.style.display='block'; buildMasterYear(); return; }
-    ov=document.createElement('div'); ov.id='mcOverlay';
-    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99;overflow:auto;padding:14px';
-    ov.innerHTML='<div style="max-width:920px;margin:0 auto;background:#12151c;border:1px solid #2a2f3a;border-radius:14px;padding:16px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:15px">Health master renewal calendar</b>'
-      +'<button id="mcClose" style="background:#1a1f29;color:#eee;border:1px solid #2a2f3a;border-radius:6px;padding:4px 12px">close</button></div>'
-      +'<div style="color:#9aa4b2;font-size:12px;margin-bottom:10px">PEO <b>brand</b> master policies — medical Schedule A contracts, EIN-attributed, latest welfare filing. These are the brand&#39;s own instrument dates, <b>not</b> client renewal months (benefit_source_precedence_law).</div>'
-      +'<div id="mcGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px"></div>'
-      +'<div id="mcDetail" style="margin-top:12px"></div></div>';
-    document.body.appendChild(ov);
-    ov.querySelector('#mcClose').onclick=function(){ ov.style.display='none'; };
-    buildMasterYear();
-  }
-  function buildMasterYear(){
-    var Q="select renewal_month, family_slug, count(distinct carrier_name) meds from desk_master_policy_calendar where medical group by 1,2 order by 1, meds desc";
-    api({mode:'sql',sql:Q,label:'health master year',quiet:true},30000).then(function(j){
-      var rows=j.rows||[]; var byM={}; rows.forEach(function(r){ (byM[r.renewal_month]=byM[r.renewal_month]||[]).push(r); });
-      var nm=['January','February','March','April','May','June','July','August','September','October','November','December'];
-      var cur=new Date().getMonth()+1; var g=document.getElementById('mcGrid'); g.innerHTML='';
-      for(var m=1;m<=12;m++){
-        var list=byM[m]||[]; var cell=document.createElement('div');
-        cell.style.cssText='background:#161a22;border:1px solid '+(m===cur?'#2dd4a7':'#232833')+';border-radius:10px;padding:10px;cursor:pointer;min-height:74px';
-        var chips=list.slice(0,6).map(function(r){ return '<span style="display:inline-block;background:#1f2530;border:1px solid #2a3140;border-radius:999px;padding:1px 8px;margin:2px 3px 0 0;font-size:11px;color:#d7dde8">'+esc(String(r.family_slug))+'</span>'; }).join('');
-        if(list.length>6) chips+='<span style="font-size:11px;color:#9aa4b2"> +'+(list.length-6)+' more</span>';
-        cell.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:4px"><b style="font-size:13px;color:'+(m===cur?'#2dd4a7':'#e8ecf3')+'">'+nm[m-1]+'</b><span style="font-size:12px;color:#9aa4b2">'+list.length+' brand'+(list.length===1?'':'s')+'</span></div>'+(list.length?chips:'<span style="font-size:11px;color:#5b6470">—</span>');
-        (function(mm){ cell.onclick=function(){ renderMonthDetail(mm); }; })(m);
-        g.appendChild(cell);
-      }
-      renderMonthDetail(cur);
-    }).catch(function(){ var g=document.getElementById('mcGrid'); if(g) g.innerHTML='<i>load failed</i>'; });
-  }
-  function renderMonthDetail(m){
-    var nm=['January','February','March','April','May','June','July','August','September','October','November','December'];
-    var d=document.getElementById('mcDetail'); if(d) d.innerHTML='<div style="color:#9aa4b2">loading '+nm[m-1]+'…</div>';
-    var Q="select family_slug, renewal_anniv, string_agg(distinct carrier_name,' · ' order by carrier_name) carriers, sum(coalesce(persons_covered_eoy,0)) covered from desk_master_policy_calendar where medical and renewal_month="+m+" group by 1,2 order by covered desc";
-    api({mode:'sql',sql:Q,label:'health master month',quiet:true},30000).then(function(j){
-      var rows=j.rows||[]; if(!rows.length){ d.innerHTML='<div style="color:#9aa4b2">No federally-visible health masters renew in '+nm[m-1]+'.</div>'; return; }
-      var h='<div style="border-top:1px solid #232833;padding-top:10px"><b style="font-size:14px">'+nm[m-1]+' — '+rows.length+' brand'+(rows.length===1?'':'s')+'</b>';
-      rows.forEach(function(r){
-        h+='<div style="background:#161a22;border:1px solid #232833;border-radius:10px;padding:10px;margin-top:8px">'
-          +'<div style="display:flex;justify-content:space-between"><b style="color:#e8ecf3">'+esc(String(r.family_slug))+'</b><span style="color:#9aa4b2;font-size:12px">renews '+esc(String(r.renewal_anniv))+' · '+Number(r.covered).toLocaleString()+' covered</span></div>'
-          +'<div style="color:#aeb8c6;font-size:12px;margin-top:4px">'+esc(String(r.carriers))+'</div></div>';
-      });
-      d.innerHTML=h+'</div>';
-    }).catch(function(){ if(d) d.innerHTML='<i>load failed</i>'; });
-  }
+
 
   // ---------- quick pulls ----------
   var PULLS=[
+    ['Health master renewal calendar','WHEN each PEO BRAND renews its own medical master policies, and with which carriers — brand instrument dates, not client renewal months (benefit_source_precedence_law). Medical Schedule A only, EIN-attributed, latest welfare filing.',"select month_label as month, peo, renews_on, carriers_ct as carriers, medical_carriers, covered_lives from dash_health_master_calendar order by renewal_month, covered_lives desc"],
+    ['Health masters renewing next 90 days','The brands whose medical masters renew soon — carrier changes and rate actions surface here first (§2.6 disruption watch).',"select month_label as month, peo, renews_on, medical_carriers, covered_lives from dash_health_master_calendar where renewal_month in (extract(month from now())::int, extract(month from now()+interval '1 month')::int, extract(month from now()+interval '2 months')::int) order by renewal_month, covered_lives desc"],
     ['Latest PEO switches','TO-DATE feed ordered by WHEN IT HAPPENED (evidence_as_of, valid time); detected_at = when we learned',"select * from dash_latest_switches"],
     ['Top PEOs by clients — current book','NOW — companies attributed today (knowledge-as-of); canonical names; folded brands aggregate per your rulings',"select * from dash_top_peos_current"],
     ['Companies by state','NOW — the resolved universe today; Σ row = total',"select * from dash_companies_by_state"],
