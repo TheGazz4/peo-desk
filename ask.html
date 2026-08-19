@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.3 · 2026-08-18</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.4 · 2026-08-19</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -118,6 +118,7 @@
 
 <nav class="tabs">
   <button data-tab="pull" class="on">Pull</button>
+  <button data-tab="switchboard">Switchboard</button>
   <button data-tab="peos">PEOs</button>
   <button data-tab="kpi">KPI</button>
   <button data-tab="ask">Ask AI</button>
@@ -137,6 +138,17 @@
     <button class="btn ghost" id="rbaBtn" style="margin-left:auto" title="Result-back audit (RBA): samples company cards at random and traces what is displayed back to primary sources. Surfaces findings only — nothing is auto-fixed.">Run data audit</button>
   </div>
   <div class="pulls" id="pulls"></div>
+</section>
+
+<section class="tab" id="tab-switchboard">
+  <div class="blurb" style="margin-bottom:6px">the ranked list — every VERIFIED company scored by the live model (renewal-proximity, the only signal that survived backtest), reasons on every row, graded as outcomes arrive. Work top-down; log what happens — booked/closed/fizzled flow back through the gate and grade the model.</div>
+  <div class="row" style="margin-top:0">
+    <button class="btn" id="swReload">Load queue</button>
+    <label class="ck"><input type="checkbox" id="swWorkable" checked> workable only <span class="mini">(hide closed/dismissed)</span></label>
+    <span class="mini" id="swNote"></span>
+  </div>
+  <div id="swCard" class="mini" style="margin-top:8px"></div>
+  <div class="tablewrap" id="swWrap" style="margin-top:8px;display:none"><table id="swTable"></table></div>
 </section>
 
 <section class="tab" id="tab-peos">
@@ -354,6 +366,50 @@
   function setFcView(v){ fcView=v; var a=$('fcMain'),b=$('fcSize'); if(a){a.className=(v==='main')?'on':'';} if(b){b.className=(v==='size')?'on':'';} runForecastTab(); }
   var PEO_KPIS=['PEO KPI board','our visibility into each book (clients + est. WSE %), filed Total WSE with YOY, switch wins/losses observed by the mesh, book-size priors — live computation, weekly snapshots in peo_kpi_snapshots',"select * from dash_peo_kpis order by filed_total_wse desc nulls last"];
   function runPeoKpis(){ runPull(PEO_KPIS,-1); }
+
+  // ---------- switchboard (step5): ranked queue + gated outcome logging ----------
+  var SW_STAGES=['contacted','meeting_booked','proposal_sent','closed_won','closed_lost','fizzled','dismissed'];
+  var swRows=[];
+  function swReasons(rc){ try{ return (rc||[]).map(function(r){return r.text||r.code||'';}).filter(Boolean).join(' · '); }catch(e){ return ''; } }
+  function loadSwitchboard(){
+    var b=$('swReload'); if(b){ b.disabled=true; b.textContent='Loading…'; }
+    api({mode:'switchboard',limit:150,workable:$('swWorkable').checked},45000).then(function(j){
+      if(b){ b.disabled=false; b.textContent='Load queue'; }
+      if(handleCommon(j)) return;
+      var sc=(j.scorecard&&j.scorecard[0])||null;
+      $('swCard').innerHTML = sc ? ('model <b>#'+sc.model_id+'</b> ('+esc(String(sc.model_kind))+') · cut <b>'+esc(String(sc.as_of_cut))+'</b> · issued <b>'+Number(sc.n_issued).toLocaleString()+'</b> · outcomes so far <b>'+sc.switches_observed+'</b> ('+sc.observed_rate_pct+'%) · top-decile lift <b>'+(sc.top_decile_lift==null?'—':sc.top_decile_lift)+'</b>'+(sc.funnel?' · funnel '+esc(JSON.stringify(sc.funnel)):'')) : 'no active production issuance yet';
+      swRows=j.rows||[];
+      var h='<thead><tr><th>#</th><th>company</th><th>state</th><th>current PEO</th><th class="num" title="12-month switch probability from the live model — renewal-band rates, honest by construction">switch %</th><th class="num" title="vs the book base rate">× base</th><th title="months to WC renewal + how we know the date (derivation class; ⚠ = PEO plan anniversary, display only, never a score input)">renewal</th><th>why (reason codes)</th><th class="ctr">angles</th><th class="ctr">contact</th><th>funnel</th><th>log outcome</th></tr></thead><tbody>';
+      swRows.forEach(function(r,i){
+        var ren=(r.months_to_renewal!=null?('~'+r.months_to_renewal+' mo'+(r.renewal_month?' ('+r.renewal_month+')':'')):(r.renewal_month?r.renewal_month:''))+(r.renewal_basis_class&&r.renewal_basis_class!=='none'?' · '+String(r.renewal_basis_class).replace(/_/g,' '):'');
+        if(r.renewal_is_inherited_anniversary) ren+=' ⚠ plan anniversary';
+        h+='<tr data-i="'+i+'"><td class="num">'+(i+1)+'</td>'
+          +'<td><a href="#" class="swCo" data-cid="'+esc(String(r.company_id))+'" style="color:var(--accent);text-decoration:none">'+esc(r.legal_name||'')+'</a></td>'
+          +'<td class="ctr">'+esc(r.state||'')+'</td><td>'+esc(r.current_peo||'')+'</td>'
+          +'<td class="num"><b>'+r.switch_pct+'%</b></td><td class="num">'+(r.base_rate_multiple!=null?r.base_rate_multiple+'×':'')+'</td>'
+          +'<td>'+esc(ren)+'</td><td style="max-width:340px;white-space:normal">'+esc(swReasons(r.reason_codes))+'</td>'
+          +'<td class="ctr">'+(r.live_angles||0)+'</td><td class="ctr">'+(r.has_contact?'✓':'—')+'</td>'
+          +'<td class="swFunnel">'+(r.funnel_stage?esc(String(r.funnel_stage).replace(/_/g,' '))+(r.funnel_stage_at?' <span class="mini">'+esc(r.funnel_stage_at)+'</span>':''):'')+'</td>'
+          +'<td style="white-space:nowrap"><select class="swStage" style="width:auto;padding:4px 6px;font-size:11.5px">'+SW_STAGES.map(function(s){return '<option value="'+s+'">'+s.replace(/_/g,' ')+'</option>';}).join('')+'</select> <input type="text" class="swReason" placeholder="reason" style="width:90px;padding:4px 6px;font-size:11.5px;display:none"> <button class="btn ghost swLog" style="padding:4px 10px;font-size:11.5px">Log</button></td></tr>';
+      });
+      h+='</tbody>';
+      var tb=$('swTable'); tb.innerHTML=h; $('swWrap').style.display='block';
+      $('swNote').textContent=j.row_count+' rows · ranked by score · strict per-company renewal anchors only';
+      Array.prototype.forEach.call(tb.querySelectorAll('.swCo'),function(a){ a.onclick=function(e){ e.preventDefault(); openCard(a.getAttribute('data-cid')); }; });
+      Array.prototype.forEach.call(tb.querySelectorAll('.swStage'),function(sel){ sel.onchange=function(){ var tr=sel.closest('tr'); var ri=tr.querySelector('.swReason'); ri.style.display=(sel.value==='dismissed'||sel.value==='fizzled')?'inline-block':'none'; }; });
+      Array.prototype.forEach.call(tb.querySelectorAll('.swLog'),function(btn){ btn.onclick=function(){
+        var tr=btn.closest('tr'); var i=Number(tr.getAttribute('data-i')); var r=swRows[i]; if(!r) return;
+        var stage=tr.querySelector('.swStage').value; var reason=tr.querySelector('.swReason').value.trim();
+        if(stage==='dismissed'&&!reason){ banner('warn','dismissed needs a reason — the gate refuses without one (structural, not a suggestion).'); return; }
+        btn.disabled=true; btn.textContent='…';
+        api({mode:'record_outcome',prediction_id:r.prediction_id,stage:stage,reason:reason||undefined},30000).then(function(j2){
+          btn.disabled=false; btn.textContent='Log';
+          if(j2&&j2.ok){ banner('warn','<b>logged through the gate:</b> '+esc(stage.replace(/_/g,' '))+' → '+esc(r.legal_name||'')+' (reconciled; the scorecard regrades as outcomes accrue).'); tr.querySelector('.swFunnel').textContent=stage.replace(/_/g,' '); }
+          else banner('crit','<b>gate refused:</b> '+esc(String((j2&&(j2.detail||j2.error))||'no response')));
+        }).catch(function(){ btn.disabled=false; btn.textContent='Log'; netFail(); });
+      }; });
+    }).catch(function(){ if(b){ b.disabled=false; b.textContent='Load queue'; } netFail(); });
+  }
 
   // ---------- company search + card ----------
   function coSearch(){
@@ -583,6 +639,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('section.tab'),function(s){ s.classList.toggle('on',s.id==='tab-'+name); });
     if(name==='browse'&&!tables.length) loadTables();
     if(name==='history') loadHistory();
+    if(name==='switchboard') loadSwitchboard();
     if(name==='peos') runPeoProfiles();
     if(name==='kpi') runPeoKpis();
     if(name==='forecast') runForecastTab();
@@ -678,6 +735,8 @@
       } else { banner('crit','Audit failed: '+esc(String((j&&(j.detail||j.error))||'no response'))); }
     }).catch(function(e){ b.disabled=false; b.textContent=old; banner('crit','Audit failed: '+esc(String((e&&e.message)||e))); });
   };
+  $('swReload')&&($('swReload').onclick=loadSwitchboard);
+  $('swWorkable')&&($('swWorkable').onchange=loadSwitchboard);
   $('coBtn').onclick=coSearch;
   $('coQ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); coSearch(); } });
   $('googleBtn').onclick=function(){ location.href=SB+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(location.origin+location.pathname); };
