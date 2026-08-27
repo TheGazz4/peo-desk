@@ -4,7 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.6 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.7 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.7 (claim 111 — Gazz brainless-UI + tracking round): CONTINUOUS RENDER TRACKING — a rAF pump
+     redraws every frame during pan/zoom (350ms settle + idle seal), so pins move commensurate with
+     the map (owner's screenshot showed marks lagging the tiles mid-interaction). Panel restructured
+     for a brainless read: "Renewal heat  Off | Health | WC" (the confusing PEO-as-a-color choice is
+     gone — Off = brand colors); "Headquarters: PEO HQ pins (logos)" with chips slightly LARGER
+     (24/32px); "Administrative beacons ◆" now its OWN toggle, DEFAULT OFF (owner: option to see
+     them, not standard display — URL b=1); Operators seg → one "Multi-state clients only" checkbox;
+     Pin placement tucked under a collapsed "More options". TriNet stays purple (owner retracted
+     green). DATA: 0580/0581 — PEO Spectrum (competitor broker, 4 slugs incl. the Omaha beacon)
+     denylisted out of pins/beacons/catalog/historical + branding/logo stripped; coordinate sanity
+     fence excludes pins >9°/11° (lat/lng; AK 14/25) from their state centroid — killed the 28
+     Pacific-ocean strays; snapshots purged + rewarmed.
+     v3.6 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.6 (claim 108 — owner: "the clusters are obnoxious. find a better way"): DONUT CLUSTERS REMOVED.
      Unified dot-density rendering — every client is always its own mark: z<6.5 batched color dots
      (metros read as organic color fields; share visible spatially, zero abstraction, no grey rings),
@@ -197,7 +210,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.6 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.7 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -210,18 +223,21 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
       <div class="sec">
         <h2>View by</h2>
         <div class="seg"><button id="g-family" class="on">Family brand</button><button id="g-brand">PEO specific</button></div>
-        <h2 style="margin-top:10px">Pin placement</h2>
-        <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
-        <h2 style="margin-top:10px" title="Multi-state = observed operating in 2+ states in our footprint data">Operators</h2>
-        <div class="seg"><button id="ms-all" class="on">All clients</button><button id="ms-multi" title="Only clients observed operating in 2+ states">Multi-state</button></div>
-        <h2 style="margin-top:10px" title="Renewal heat colors every pin by how soon its renewal month comes up — health/benefits renewal is the primary trigger; WC is secondary">Color by</h2>
-        <div class="seg"><button id="lens-peo" class="on">PEO</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health renewal</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC renewal</button></div>
-        <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
-        <label class="chk" title="Show each PEO's actual logo as the pin at its headquarters (★ fallback while a logo is missing)"><input type="checkbox" id="hqlogo-on" checked> HQ logo pins</label>
+        <h2 style="margin-top:10px" title="Colors every pin by how soon its renewal month comes up — health/benefits is the trigger event that matters; WC is secondary. Off = each PEO's brand color.">Renewal heat</h2>
+        <div class="seg"><button id="lens-peo" class="on">Off</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC</button></div>
+        <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">Headquarters</h2>
+        <label class="chk"><input type="checkbox" id="hqlogo-on" checked> PEO HQ pins (logos)</label>
+        <label class="chk" title="Administrative offices ◆ and unverified HQ candidates ✩ — extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Administrative beacons ◆</label>
+        <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events from our ledgers — every ring pin carries its own source and as-of date. Default off.">Historical</h2>
           <label class="chk"><input type="checkbox" id="hist-on"> Former clients — departures ◯</label>
         </div>
+        <details id="moreopts" style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">More options</summary>
+          <h2 style="margin-top:8px">Pin placement</h2>
+          <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
+        </details>
       </div>
       <div class="sec">
         <h2>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
@@ -289,7 +305,7 @@ var S={
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
   sel:{family:null,brand:null}, states:{},
-  beaconsOn:true, beacons:[],
+  beaconsOn:false, beacons:[],
   pinData:{},            // ST -> {fams,brds,mxA,myA,mxZ,myZ,n,detail:{ids,names,cities,street}|null}
   liteLoaded:0, detLoaded:0, toLoad:0,
   map:null, logoCache:{}, hover:null, rev:0
@@ -473,8 +489,13 @@ window.initMap=function(){
   S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
     disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
     mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
-  S.map.addListener('center_changed',scheduleDraw);
-  S.map.addListener('zoom_changed',function(){ scheduleDraw(); });
+  // v3.7: continuous render tracking — during any pan/zoom interaction a rAF pump redraws EVERY
+  // frame (reading live center/zoom), so pins move commensurate with the map instead of lagging
+  // behind the tile animation. Pump self-stops 350ms after the last movement event; idle seals it.
+  S.map.addListener('center_changed',movePump);
+  S.map.addListener('zoom_changed',movePump);
+  S.map.addListener('bounds_changed',movePump);
+  S.map.addListener('drag',movePump);
   S.map.addListener('idle',function(){ scheduleDraw(); writeUrl(); scheduleViewLegend(); });
   var mapDiv=$('map');
   mapDiv.addEventListener('mousemove',onMove);
@@ -495,6 +516,15 @@ function loadGmaps(){
 var cvs=$('pincanvas'), ctx=cvs.getContext('2d'), spriteCache={}, drawScheduled=false;
 var hits=[];                 // rebuilt each draw: {x,y,r,kind:'pin'|'beacon'|'hist', ...}
 function scheduleDraw(){ if(drawScheduled) return; drawScheduled=true; requestAnimationFrame(function(){ drawScheduled=false; draw(); }); }
+var _pumpLast=0,_pumpOn=false;
+function movePump(){
+  _pumpLast=performance.now();
+  if(_pumpOn) return; _pumpOn=true;
+  requestAnimationFrame(function frame(){
+    draw();
+    if(performance.now()-_pumpLast<350){ requestAnimationFrame(frame); } else { _pumpOn=false; }
+  });
+}
 function pinScale(z){ return z<5.5?0.6:(z<8?0.75:(z<11?0.9:1.0)); }
 function sprite(kind,hex,ps){
   var key=kind+'|'+hex+'|'+ps;
@@ -626,13 +656,13 @@ function draw(){
       if(b.state && S.states[b.state]===false) continue;
       if(sel[b.family_slug]===false) continue;
       var isHq=b.kind==='hq';
-      if(isHq){ if(!(S.hqLogos||S.beaconsOn)) continue; }
-      else { if(!S.beaconsOn||z<6) continue; }
+      if(isHq){ if(!S.hqLogos) continue; }                       // "PEO HQ pins (logos)" governs headquarters
+      else { if(!S.beaconsOn||z<6) continue; }                   // admin ◆ + candidates ✩: opt-in, z≥6 only
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
-      if(bx<-20||bx>W+20||by<-20||by>H+20) continue;
-      if(isHq&&S.hqLogos&&b.has_logo){
+      if(bx<-22||bx>W+22||by<-22||by>H+22) continue;
+      if(isHq&&b.has_logo){
         var im=beaconLogo(b.family_slug);
-        if(im){ var chs=z<6?20:27; drawLogoChip(bx,by,im,chs); hits.push({x:bx,y:by,r:chs*0.58,kind:'beacon',b:b}); continue; }
+        if(im){ var chs=z<6?24:32; drawLogoChip(bx,by,im,chs); hits.push({x:bx,y:by,r:chs*0.58,kind:'beacon',b:b}); continue; }
       }
       var col=b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER;
       var kind=b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star');
@@ -900,8 +930,7 @@ function setPlacement(pm){
   $('pm-addr').className=pm==='address'?'on':''; $('pm-zip').className=pm==='zip'?'on':'';
   bump(); scheduleDraw(); writeUrl();
 }
-$('ms-all').onclick=function(){ setMsOnly(false) };
-$('ms-multi').onclick=function(){ setMsOnly(true) };
+$('ms-only').onchange=function(){ setMsOnly($('ms-only').checked); };
 $('lens-peo').onclick=function(){ setLens('peo') };
 $('lens-hea').onclick=function(){ setLens('health') };
 $('lens-wc').onclick=function(){ setLens('wc') };
@@ -925,7 +954,7 @@ function renderLensLegend(){
 function setMsOnly(v){
   if(S.msOnly===v) return;
   S.msOnly=v;
-  $('ms-all').className=v?'':'on'; $('ms-multi').className=v?'on':'';
+  $('ms-only').checked=v;
   bump(); scheduleDraw(); updateStats(); writeUrl();
 }
 // ---- panel collapse (desktop hide / mobile drawer) ----
@@ -1012,7 +1041,7 @@ function writeUrl(){
     if(on.length<=40) p.set('on',on.join(',')); else if(off.length<=40) p.set('off',off.join(','));
     var stOff=Object.keys(S.states).filter(function(s){return !S.states[s]});
     if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
-    if(!S.beaconsOn) p.set('b','0');
+    if(S.beaconsOn) p.set('b','1');
     if(S.placement==='zip') p.set('pm','zip');
     if(!S.hqLogos) p.set('hl','0');
     if(S.msOnly) p.set('ms','1');
@@ -1030,10 +1059,10 @@ function readUrl(){
     if(p.get('on')){ Object.keys(sel).forEach(function(k){sel[k]=false}); p.get('on').split(',').forEach(function(s){ sel[s]=true; }); }
     else if(p.get('off')){ p.get('off').split(',').forEach(function(s){ sel[s]=false; }); }
     if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
-    if(p.get('b')==='0'){ S.beaconsOn=false; $('beacons-on').checked=false; }
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
     if(p.get('hl')==='0'){ S.hqLogos=false; $('hqlogo-on').checked=false; }
-    if(p.get('ms')==='1'){ S.msOnly=true; $('ms-all').className=''; $('ms-multi').className='on'; }
+    if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
+    if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
     else if(lz==='wc'){ S.lens='wc'; syncLensButtons(); renderLensLegend(); }
