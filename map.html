@@ -4,7 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.5 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.6 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.6 (claim 108 — owner: "the clusters are obnoxious. find a better way"): DONUT CLUSTERS REMOVED.
+     Unified dot-density rendering — every client is always its own mark: z<6.5 batched color dots
+     (metros read as organic color fields; share visible spatially, zero abstraction, no grey rings),
+     6.5≤z<9.5 round dot markers, z≥9.5 classic teardrop pins. Beacons decluttered: admin ◆ and
+     candidate ✩ only from z≥6, stars scale down zoomed out. NEW "HQ logo pins" toggle (owner ask):
+     each PEO's actual logo rendered as a white chip at its HQ (★ fallback), lazy-loaded from
+     mode=logo. Owner color rulings live (0577): TriNet #5b2e90 purple, Engage #b8860b dark golden —
+     root causes were favicon-extraction picking near-black for TriNet and engage's registry row
+     holding CORNERSTONEPEO.COM's favicon (wrong company; de-poisoned, refetch queued). THIS VIEW
+     legend refreshes when loading completes (was stuck at "no clients in this view"). Pins seg +
+     cluster_mode URL/filter_spec retired (cm param ignored).
+     v3.5 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.5 (claim 105): HISTORICAL LAYER — "Former clients (departures)" toggle, DEFAULT OFF, gated by the
      server-side map_feature_flags.historical_layer row (monetize later = flip that row; toggle only renders
      when the flag is on). Own clean channel: v_map_pins_historical (switch ledger + departure ledger events;
@@ -185,7 +197,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.5 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.6 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -198,8 +210,6 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
       <div class="sec">
         <h2>View by</h2>
         <div class="seg"><button id="g-family" class="on">Family brand</button><button id="g-brand">PEO specific</button></div>
-        <h2 style="margin-top:10px">Pins</h2>
-        <div class="seg"><button id="cm-cluster" class="on">Clusters</button><button id="cm-all">All pins</button></div>
         <h2 style="margin-top:10px">Pin placement</h2>
         <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
         <h2 style="margin-top:10px" title="Multi-state = observed operating in 2+ states in our footprint data">Operators</h2>
@@ -207,6 +217,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <h2 style="margin-top:10px" title="Renewal heat colors every pin by how soon its renewal month comes up — health/benefits renewal is the primary trigger; WC is secondary">Color by</h2>
         <div class="seg"><button id="lens-peo" class="on">PEO</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health renewal</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC renewal</button></div>
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
+        <label class="chk" title="Show each PEO's actual logo as the pin at its headquarters (★ fallback while a logo is missing)"><input type="checkbox" id="hqlogo-on" checked> HQ logo pins</label>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events from our ledgers — every ring pin carries its own source and as-of date. Default off.">Historical</h2>
           <label class="chk"><input type="checkbox" id="hist-on"> Former clients — departures ◯</label>
@@ -273,7 +284,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 
 // ------------------------- state -------------------------
 var S={
-  grain:'family', placement:'address', clusterMode:'cluster', msOnly:false, panelOpen:true,
+  grain:'family', placement:'address', msOnly:false, panelOpen:true, hqLogos:true, logoImgs:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null,
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -452,7 +463,7 @@ function loadHist(){
 function progress(){
   $('loading').style.display='block';
   $('loading').textContent='pins '+S.liteLoaded+'/'+S.toLoad+' · details '+S.detLoaded+'/'+S.toLoad;
-  if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad) $('loading').style.display='none';
+  if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad){ $('loading').style.display='none'; try{ computeViewLegend(); }catch(_){ } }
 }
 
 // ------------------------- google map -------------------------
@@ -482,8 +493,7 @@ function loadGmaps(){
 
 // ------------------------- renderer v3 (container-fixed canvas; no google panes) -------------------------
 var cvs=$('pincanvas'), ctx=cvs.getContext('2d'), spriteCache={}, drawScheduled=false;
-var hits=[];                 // rebuilt each draw: {x,y,r,kind:'pin'|'cluster'|'beacon', ...}
-var clusterCache={key:'',clusters:[],loose:[]};
+var hits=[];                 // rebuilt each draw: {x,y,r,kind:'pin'|'beacon'|'hist', ...}
 function scheduleDraw(){ if(drawScheduled) return; drawScheduled=true; requestAnimationFrame(function(){ drawScheduled=false; draw(); }); }
 function pinScale(z){ return z<5.5?0.6:(z<8?0.75:(z<11?0.9:1.0)); }
 function sprite(kind,hex,ps){
@@ -494,8 +504,9 @@ function sprite(kind,hex,ps){
   var c=document.createElement('canvas');
   if(kind==='pin'){ w=15*ps; h=21*ps; ax=7.5*ps; ay=20*ps; }
   else if(kind==='ring'){ w=13*ps; h=13*ps; ax=6.5*ps; ay=6.5*ps; }
-  else if(kind==='star'||kind==='starh'){ w=30; h=30; ax=15; ay=15; }
-  else { w=24; h=24; ax=12; ay=12; }
+  else if(kind==='dot'){ w=8; h=8; ax=4; ay=4; }
+  else if(kind==='star'||kind==='starh'){ w=30*ps; h=30*ps; ax=15*ps; ay=15*ps; }
+  else { w=24*ps; h=24*ps; ax=12*ps; ay=12*ps; }
   c.width=Math.ceil(w*dpr); c.height=Math.ceil(h*dpr);
   var x=c.getContext('2d'); x.scale(dpr,dpr);
   if(kind==='pin'){
@@ -508,13 +519,18 @@ function sprite(kind,hex,ps){
     x.beginPath(); x.arc(6.5,6.5,4.6,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.35)'; x.fill();
     x.beginPath(); x.arc(6.5,6.5,4.6,0,Math.PI*2); x.lineWidth=2; x.strokeStyle=hex; x.stroke();
     x.beginPath(); x.arc(6.5,6.5,1.15,0,Math.PI*2); x.fillStyle=hex; x.fill();
+  } else if(kind==='dot'){
+    x.beginPath(); x.arc(4,4,3.3,0,Math.PI*2); x.fillStyle=hex; x.fill();
+    x.lineWidth=0.75; x.strokeStyle='rgba(70,63,56,.45)'; x.stroke();
   } else if(kind==='star'||kind==='starh'){
+    x.scale(ps,ps);
     x.translate(15,15); x.beginPath();
     for(var i=0;i<10;i++){ var r=(i%2===0)?13:5.6, a=-Math.PI/2+i*Math.PI/5; x[i===0?'moveTo':'lineTo'](Math.cos(a)*r,Math.sin(a)*r); }
     x.closePath();
     x.fillStyle=hex; x.globalAlpha=kind==='starh'?0.6:1; x.fill(); x.globalAlpha=1;
     x.lineWidth=1.6; x.strokeStyle=kind==='starh'?hex:'#463f38'; x.stroke();
   } else {
+    x.scale(ps,ps);
     x.translate(12,12); x.beginPath(); x.moveTo(0,-10); x.lineTo(9,0); x.lineTo(0,10); x.lineTo(-9,0); x.closePath();
     x.fillStyle=hex; x.fill(); x.lineWidth=1.6; x.strokeStyle='#463f38'; x.stroke();
   }
@@ -529,47 +545,7 @@ var RMB_LABELS=['','unverified','reasoned','verified'];
 function renLens(){ return S.lens==='health'||S.lens==='wc'; }
 function lensMonth(d,i){ var dd=d.detail; if(!dd) return 0; return S.lens==='health'?((dd.hrm&&dd.hrm[i])||0):((dd.rm&&dd.rm[i])||0); }
 function urgClass(rm){ if(!rm) return 4; var mu=((rm-1)-(new Date().getMonth())+12)%12; return mu<=1?0:(mu<=3?1:(mu<=5?2:3)); }
-function keyFor(d,i,slug){ return renLens() ? ('urg:'+urgClass(lensMonth(d,i))) : slug; }
-function slugColor(s){ return (s&&s.indexOf('urg:')===0)?URG_COLORS[+s.slice(4)]:(S.colors[S.grain][s]||OTHER); }
-function slugLabel(s){ return (s&&s.indexOf('urg:')===0)?URG_LABELS[+s.slice(4)]:dispOf(s); }
 function pinColorAt(d,i,slug){ return renLens() ? URG_COLORS[urgClass(lensMonth(d,i))] : (S.colors[S.grain][slug]||OTHER); }
-function clusterOn(z,visCount){ return S.clusterMode==='cluster' && z<12.5 && (visCount>3||renLens()); }
-function rebuildClusters(z){
-  var scale=256*Math.pow(2,Math.round(z*2)/2);
-  var cell=72/scale;
-  var sel=selMap();
-  var cells={}; var loose=[];
-  for(var st in S.pinData){
-    if(S.states[st]===false) continue;
-    var d=S.pinData[st];
-    var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
-    var slugArr=(S.grain==='brand')?d.brds:d.fams;
-    var IDX=(S.grain==='brand')?d.bis:d.fis;
-    var vis=[]; for(var k=0;k<slugArr.length;k++){ vis[k]=sel[slugArr[k]]!==false; }
-    for(var i=0;i<d.n;i++){
-      if(!vis[IDX[i]]) continue;
-      if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
-      var key=Math.floor(MX[i]/cell)+'_'+Math.floor(MY[i]/cell);
-      var e=cells[key];
-      if(!e){ e=cells[key]={n:0,sx:0,sy:0,slugs:{},members:[]}; }
-      e.n++; e.sx+=MX[i]; e.sy+=MY[i];
-      var sl=keyFor(d,i,slugArr[IDX[i]]); e.slugs[sl]=(e.slugs[sl]||0)+1;
-      if(e.members.length<7) e.members.push([st,i]);
-    }
-  }
-  var clusters=[];
-  for(var ck in cells){
-    var e=cells[ck];
-    if(e.n>=6){
-      var top=Object.keys(e.slugs).map(function(s){return [s,e.slugs[s]]}).sort(function(a,b){return b[1]-a[1]});
-      clusters.push({mx:e.sx/e.n,my:e.sy/e.n,n:e.n,top:top});
-    } else {
-      for(var m=0;m<e.members.length&&m<e.n;m++) loose.push(e.members[m]);
-    }
-  }
-  clusterCache={key:clusterKey(z),clusters:clusters,loose:loose};
-}
-function clusterKey(z){ return Math.round(z*2)/2+'|'+S.grain+'|'+S.placement+'|'+S.rev; }
 function draw(){
   if(!S.map) return;
   var wrap=$('mapwrap'); var W=wrap.clientWidth, H=wrap.clientHeight;
@@ -582,48 +558,42 @@ function draw(){
   var sel=selMap(); var visCount=0; catRows().forEach(function(r){ if(sel[r.slug]!==false) visCount++; });
   hits=[];
   var ps=pinScale(z);
-  if(clusterOn(z,visCount)){
-    if(clusterCache.key!==clusterKey(z)) rebuildClusters(z);
-    // loose pins first
-    var loose=clusterCache.loose;
-    for(var li=0;li<loose.length;li++){
-      var st=loose[li][0], i=loose[li][1]; var d=S.pinData[st]; if(!d||S.states[st]===false) continue;
-      var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
-      var sx=(MX[i]-cx)*scale+W/2, sy=(MY[i]-cy)*scale+H/2;
-      if(sx<-16||sx>W+16||sy<-24||sy>H+8) continue;
-      var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
-      var sl=slugArr[IDX[i]];
-      var sp=sprite('pin',pinColorAt(d,i,sl),ps);
-      ctx.drawImage(sp.img,0,0,sp.img.width,sp.img.height,sx-sp.ax,sy-sp.ay,sp.w,sp.h);
-      hits.push({x:sx,y:sy-8*ps,r:11,kind:'pin',st:st,i:i});
-    }
-    // donut clusters
-    var cl=clusterCache.clusters;
-    for(var c2=0;c2<cl.length;c2++){
-      var K=cl[c2];
-      var sx2=(K.mx-cx)*scale+W/2, sy2=(K.my-cy)*scale+H/2;
-      var r=Math.min(34,12+10*Math.log(K.n/5)/Math.LN10);
-      if(sx2<-r-10||sx2>W+r+10||sy2<-r-10||sy2>H+r+10) continue;
-      drawDonut(sx2,sy2,r,K);
-      hits.push({x:sx2,y:sy2,r:r+4,kind:'cluster',cl:K});
-    }
-  } else {
-    for(var st2 in S.pinData){
-      if(S.states[st2]===false) continue;
-      var d2=S.pinData[st2];
-      var MX2=(S.placement==='zip')?d2.mxZ:d2.mxA, MY2=(S.placement==='zip')?d2.myZ:d2.myA;
-      var slugArr2=(S.grain==='brand')?d2.brds:d2.fams; var IDX2=(S.grain==='brand')?d2.bis:d2.fis;
-      var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=sel[slugArr2[k2]]!==false; }
-      for(var i2=0;i2<d2.n;i2++){
-        if(!vis2[IDX2[i2]]) continue;
-        if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
-        var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
-        if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
+  // v3.6 unified rendering — donut clusters are GONE (owner: "obnoxious").
+  // z < 6.5: dot-density — every client is a small square dot in its true color, batched per color
+  //          (metros read as organic color fields; market share is visible spatially, no abstraction).
+  // 6.5 ≤ z < 9.5: round dot sprites (a touch larger, antialiased).
+  // z ≥ 9.5: classic teardrop pins (what Gazz asked for up close). Always one mark per client.
+  var dotMode = z<9.5;
+  var dsz = z<5 ? 2 : (z<6.5 ? 2.6 : 0);   // fillRect size; 0 = use dot sprite
+  var buckets = dsz ? {} : null;
+  for(var st2 in S.pinData){
+    if(S.states[st2]===false) continue;
+    var d2=S.pinData[st2];
+    var MX2=(S.placement==='zip')?d2.mxZ:d2.mxA, MY2=(S.placement==='zip')?d2.myZ:d2.myA;
+    var slugArr2=(S.grain==='brand')?d2.brds:d2.fams; var IDX2=(S.grain==='brand')?d2.bis:d2.fis;
+    var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=sel[slugArr2[k2]]!==false; }
+    for(var i2=0;i2<d2.n;i2++){
+      if(!vis2[IDX2[i2]]) continue;
+      if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
+      var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
+      if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
+      if(dotMode){
+        var col=pinColorAt(d2,i2,slugArr2[IDX2[i2]]);
+        if(dsz){ var bk=buckets[col]||(buckets[col]=[]); bk.push(sx3,sy3); }
+        else { var spD=sprite('dot',col,1); ctx.drawImage(spD.img,0,0,spD.img.width,spD.img.height,sx3-spD.ax,sy3-spD.ay,spD.w,spD.h); }
+        if(hits.length<80000) hits.push({x:sx3,y:sy3,r:6,kind:'pin',st:st2,i:i2});
+      } else {
         var sp2=sprite('pin',pinColorAt(d2,i2,slugArr2[IDX2[i2]]),ps);
         ctx.drawImage(sp2.img,0,0,sp2.img.width,sp2.img.height,sx3-sp2.ax,sy3-sp2.ay,sp2.w,sp2.h);
         if(hits.length<80000) hits.push({x:sx3,y:sy3-8*ps,r:11,kind:'pin',st:st2,i:i2});
       }
     }
+  }
+  if(buckets){
+    ctx.globalAlpha=0.95;
+    var off=dsz/2;
+    for(var colK in buckets){ var arr=buckets[colK]; ctx.fillStyle=colK; for(var jj=0;jj<arr.length;jj+=2) ctx.fillRect(arr[jj]-off,arr[jj+1]-off,dsz,dsz); }
+    ctx.globalAlpha=1;
   }
   // historical ring pins (never clustered; family color = the PEO they LEFT; drawn under beacons)
   if(S.hist&&S.histData){
@@ -647,39 +617,58 @@ function draw(){
     ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
     ctx.beginPath(); ctx.fillStyle='rgba(99,144,238,.07)'; ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.fill();
   }
-  // beacons on top
-  if(S.beaconsOn){
+  // beacons on top (v3.6: zoom-decluttered — admin ◆ / candidate ✩ only from z≥6, smaller stars when
+  // zoomed out; "HQ logo pins" renders the PEO's actual logo as a white chip at its HQ, ★ fallback)
+  if(S.beaconsOn||S.hqLogos){
+    var bps=z<6?0.7:1;
     for(var b2=0;b2<S.beacons.length;b2++){
       var b=S.beacons[b2];
       if(b.state && S.states[b.state]===false) continue;
       if(sel[b.family_slug]===false) continue;
+      var isHq=b.kind==='hq';
+      if(isHq){ if(!(S.hqLogos||S.beaconsOn)) continue; }
+      else { if(!S.beaconsOn||z<6) continue; }
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
       if(bx<-20||bx>W+20||by<-20||by>H+20) continue;
+      if(isHq&&S.hqLogos&&b.has_logo){
+        var im=beaconLogo(b.family_slug);
+        if(im){ var chs=z<6?20:27; drawLogoChip(bx,by,im,chs); hits.push({x:bx,y:by,r:chs*0.58,kind:'beacon',b:b}); continue; }
+      }
       var col=b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER;
       var kind=b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star');
-      var sp3=sprite(kind,col,1);
+      var sp3=sprite(kind,col,bps);
       ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,bx-sp3.ax,by-sp3.ay,sp3.w,sp3.h);
-      hits.push({x:bx,y:by,r:14,kind:'beacon',b:b});
+      hits.push({x:bx,y:by,r:14*bps,kind:'beacon',b:b});
     }
   }
 }
-function drawDonut(x,y,r,K){
-  var total=K.n; var start=-Math.PI/2;
-  var topList=K.top.slice(0,6);
-  var shown=0; topList.forEach(function(t){shown+=t[1]});
-  var rest=total-shown;
-  ctx.lineWidth=Math.max(7,r*0.42);
-  function seg(frac,col){
-    var end=start+frac*Math.PI*2;
-    ctx.beginPath(); ctx.strokeStyle=col; ctx.arc(x,y,r,start,end); ctx.stroke();
-    start=end;
-  }
-  topList.forEach(function(t){ seg(t[1]/total,slugColor(t[0])); });
-  if(rest>0) seg(rest/total,OTHER);
-  ctx.beginPath(); ctx.fillStyle='rgba(255,255,255,.9)'; ctx.arc(x,y,Math.max(3,r-ctx.lineWidth/1.6),0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.lineWidth=1; ctx.strokeStyle='rgba(70,63,56,.55)'; ctx.arc(x,y,r+ctx.lineWidth,0,Math.PI*2); ctx.stroke();
+// HQ logo chips: decoded-image cache fed by mode=logo data URIs (same source as the hover tooltip)
+function beaconLogo(slug){
+  var im=S.logoImgs[slug];
+  if(im!==undefined) return im;   // Image when ready, null while pending/failed
+  S.logoImgs[slug]=null;
+  api({mode:'logo',slug:slug}).then(function(r){
+    if(r&&r.data_uri){
+      S.logoCache[slug]=r.data_uri;
+      var img=new Image();
+      img.onload=function(){ S.logoImgs[slug]=img; scheduleDraw(); };
+      img.src=r.data_uri;
+    }
+  }).catch(function(){});
+  return null;
 }
-
+function drawLogoChip(x,y,im,s){
+  var r=Math.max(4,s*0.24), h=s/2;
+  ctx.beginPath();
+  ctx.moveTo(x-h+r,y-h); ctx.arcTo(x+h,y-h,x+h,y+h,r); ctx.arcTo(x+h,y+h,x-h,y+h,r);
+  ctx.arcTo(x-h,y+h,x-h,y-h,r); ctx.arcTo(x-h,y-h,x+h,y-h,r); ctx.closePath();
+  ctx.fillStyle='#ffffff'; ctx.fill();
+  ctx.lineWidth=1.25; ctx.strokeStyle='#463f38'; ctx.stroke();
+  var pad=s*0.14, avail=s-2*pad;
+  var f=Math.min(avail/(im.width||1), avail/(im.height||1));
+  var dw=(im.width||avail)*f, dh=(im.height||avail)*f;
+  try{ ctx.drawImage(im,x-dw/2,y-dh/2,dw,dh); }catch(_){ }
+}
 // ------------------------- hover / click -------------------------
 function mapXY(e){ var r=$('mapwrap').getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
 function pick(e){
@@ -687,7 +676,7 @@ function pick(e){
   for(var i=hits.length-1;i>=0;i--){
     var h=hits[i]; var dx=h.x-p[0], dy=h.y-p[1]; var dd=dx*dx+dy*dy;
     var rr=h.r*h.r;
-    if(dd<=rr){ var score=dd-(h.kind==='beacon'?400:(h.kind==='cluster'?200:0)); if(score<bd){ bd=score; best=h; } }
+    if(dd<=rr){ var score=dd-(h.kind==='beacon'?400:0); if(score<bd){ bd=score; best=h; } }
   }
   return best;
 }
@@ -782,7 +771,6 @@ function onMove(e){
     if(!h){ if(S.hover){S.hover=null;closeTip();} return; }
     S.hover=h;
     if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }
-    if(h.kind==='cluster'){ tipCluster(h.cl,e); return; }
     if(h.kind==='hist'){ tipHist(h.i,e); return; }
     var d=S.pinData[h.st];
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
@@ -827,25 +815,12 @@ function onClick(e){
     if(cid) api({mode:'company',id:cid}).then(function(r){ if(r.company) openCard(r.company,hsl2,r.history); });
     return;
   }
-  if(h.kind==='cluster'){
-    var lat=invLat(h.cl.my), lng=invLng(h.cl.mx);
-    S.map.panTo({lat:lat,lng:lng}); S.map.setZoom(Math.min(16,S.map.getZoom()+2));
-    return;
-  }
   if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }   // tap-friendly: click/tap a star shows the logo tooltip
   var d=S.pinData[h.st]; if(!d||!d.detail) return;
   var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
   var slug=slugArr[IDX[h.i]];
   var id=d.detail.ids[h.i];
   if(id) api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slug,r.history); });
-}
-function tipCluster(K,ev){
-  var rows=K.top.slice(0,5).map(function(t){
-    var pct=Math.round(100*t[1]/K.n);
-    return '<span style="color:'+slugColor(t[0])+'">●</span> '+esc(slugLabel(t[0]))+' <span class="mut">'+t[1].toLocaleString()+' · '+pct+'%</span>'+
-      '<div class="bar" style="width:'+Math.max(6,pct)+'%;background:'+slugColor(t[0])+'"></div>';
-  }).join('');
-  tipShow('<b>'+K.n.toLocaleString()+' clients here</b><br>'+rows+'<span class="mut">click to zoom in</span>',ev);
 }
 function tipBeacon(b,ev){
   var kinds={hq:'Headquarters',administrative:'Administrative beacon',hq_candidate:'HQ (candidate)'};
@@ -902,6 +877,7 @@ $('peo-search').addEventListener('input',buildPeoPanel);
 $('peo-all').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=true}); afterSel(); };
 $('peo-none').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=false}); afterSel(); };
 $('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
+$('hqlogo-on').onchange=function(){ S.hqLogos=$('hqlogo-on').checked; scheduleDraw(); writeUrl(); };
 $('hist-on').onchange=function(){
   S.hist=$('hist-on').checked;
   if(S.hist) loadHist();
@@ -924,8 +900,6 @@ function setPlacement(pm){
   $('pm-addr').className=pm==='address'?'on':''; $('pm-zip').className=pm==='zip'?'on':'';
   bump(); scheduleDraw(); writeUrl();
 }
-$('cm-cluster').onclick=function(){ setClusterMode('cluster') };
-$('cm-all').onclick=function(){ setClusterMode('all') };
 $('ms-all').onclick=function(){ setMsOnly(false) };
 $('ms-multi').onclick=function(){ setMsOnly(true) };
 $('lens-peo').onclick=function(){ setLens('peo') };
@@ -968,12 +942,6 @@ window.addEventListener('resize',applyPanel);
 document.addEventListener('click',function(e){
   if(isMobile()&&S.panelOpen&&!$('panel').contains(e.target)&&e.target!==$('panel-toggle')) { S.panelOpen=false; applyPanel(); }
 });
-function setClusterMode(cm){
-  if(S.clusterMode===cm) return;
-  S.clusterMode=cm;
-  $('cm-cluster').className=cm==='cluster'?'on':''; $('cm-all').className=cm==='all'?'on':'';
-  bump(); scheduleDraw(); writeUrl();
-}
 function updateStats(){
   var sel=selMap(); var nSel=0;
   catRows().forEach(function(r){ if(sel[r.slug]!==false) nSel++; });
@@ -1046,7 +1014,7 @@ function writeUrl(){
     if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
     if(!S.beaconsOn) p.set('b','0');
     if(S.placement==='zip') p.set('pm','zip');
-    if(S.clusterMode==='all') p.set('cm','all');
+    if(!S.hqLogos) p.set('hl','0');
     if(S.msOnly) p.set('ms','1');
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.hist) p.set('hist','1');
@@ -1064,7 +1032,7 @@ function readUrl(){
     if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
     if(p.get('b')==='0'){ S.beaconsOn=false; $('beacons-on').checked=false; }
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
-    if(p.get('cm')==='all'){ S.clusterMode='all'; $('cm-cluster').className=''; $('cm-all').className='on'; }
+    if(p.get('hl')==='0'){ S.hqLogos=false; $('hqlogo-on').checked=false; }
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-all').className=''; $('ms-multi').className='on'; }
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
@@ -1170,7 +1138,7 @@ $('ai-q').addEventListener('keydown',function(e){ if(e.key==='Enter') aiAsk(this
 $('ai-desc').onclick=function(){ aiAsk('Describe this view for me.'); };
 function viewContext(){
   var stOn=Object.keys(S.states).filter(function(s){return S.states[s]});
-  return { grain:S.grain, placement:S.placement, cluster_mode:S.clusterMode, lens:S.lens,
+  return { grain:S.grain, placement:S.placement, lens:S.lens,
     states_on: stOn.length<=15?stOn:stOn.length+' states',
     zoom: S.map?Math.round(S.map.getZoom()*10)/10:null,
     center: S.map?{lat:Math.round(S.map.getCenter().lat()*100)/100,lng:Math.round(S.map.getCenter().lng()*100)/100}:null,
@@ -1195,7 +1163,6 @@ function applyFilterSpec(fs){
   if(!fs||typeof fs!=='object') return;
   if(fs.grain==='family'||fs.grain==='brand') switchGrain(fs.grain);
   if(fs.placement==='address'||fs.placement==='zip') setPlacement(fs.placement);
-  if(fs.cluster_mode==='cluster'||fs.cluster_mode==='all') setClusterMode(fs.cluster_mode);
   if(fs.states==='all'){ Object.keys(S.states).forEach(function(s){S.states[s]=true}); buildStatePanel(); }
   else if(Array.isArray(fs.states)&&fs.states.length){
     Object.keys(S.states).forEach(function(s){S.states[s]=false});
