@@ -4,27 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v1.1 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
-     v1.1 (Gazz): standard Google basemap (dark styling removed) + classic teardrop PINS everywhere; stars stay on HQs.
-     Palette re-validated on light surface #f2efe9: ALL PASS, contrast WARN relieved by dark pin strokes + hover labels.
-     Data: map-data edge fn (v_map_* views only). Auth: desk key (localStorage 'desk_key', shared with ask.html) or GoTrue login made on ask.html.
-     Palette: platform tokens (Gazz-ratified). Colors come ONLY from map_color_registry via catalog — never invented here. -->
+<!-- map v2.0 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v2.0 (Gazz directives): ONE PIN PER CLIENT at every zoom (canvas layer, ~160K pins, no clusters, no numbers);
+     every PEO colored by its LOGO color (map_family_colors: logo-first, unique-assigned fallback);
+     HQ stars hover shows the PEO's LOGO; hover on a client pin = company / PEO / city only;
+     standard Google basemap. Street-precision pins arrive continuously from the Census drain lane.
+     Pin placement toggle (Gazz): Actual address (best precision) vs ZIP area (everything at ZIP centers).
+     Data: map-data edge fn v1.2 (pins_bulk gzip columnar). Auth: desk key (localStorage 'desk_key') or GoTrue login. -->
 <style>
 :root{
   --bg:#070b0f; --surface:#0d141b; --surface2:#131c25; --ink:#ecf1f4; --ink2:#aebac3; --muted:#71808b;
-  --grid:#223039; --border:#2e3e4a; --accent:#6390ee; --accent-h:#4470c8; --good:#43a566; --crit:#de6b5f;
-  --warn:#e0985c; --hl:#9781ea; --other:#71808b; --ring:rgba(255,255,255,.08);
+  --grid:#223039; --border:#2e3e4a; --accent:#6390ee; --accent-h:#4470c8; --other:#71808b; --ring:rgba(255,255,255,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-  background-image:radial-gradient(1100px 700px at 6% -8%, rgba(22,52,58,.45) 0%, transparent 60%);}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
 #app{display:flex;flex-direction:column;height:100%}
 header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
-header h1{font-size:16px;font-weight:650;letter-spacing:.2px}
+header h1{font-size:16px;font-weight:650}
 header .stamp{color:var(--muted);font-size:11px}
 header a{color:var(--accent);text-decoration:none;font-size:12px}
-header a:hover{color:var(--accent-h)}
 .spacer{flex:1}
 #stats{font-size:12px;color:var(--ink2);white-space:nowrap}
 #main{display:flex;flex:1;min-height:0}
@@ -35,7 +34,7 @@ header a:hover{color:var(--accent-h)}
 .seg button{flex:1;background:none;border:0;color:var(--ink2);padding:7px 0;font-size:12.5px;cursor:pointer}
 .seg button.on{background:var(--accent);color:#0b1220;font-weight:650}
 .btnrow{display:flex;gap:6px;margin-top:8px}
-.btnrow button, .ghost{background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:6px;padding:4px 9px;font-size:11.5px;cursor:pointer}
+.btnrow button,.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:6px;padding:4px 9px;font-size:11.5px;cursor:pointer}
 .btnrow button:hover,.ghost:hover{border-color:var(--accent);color:var(--ink)}
 #peo-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12.5px;margin-bottom:8px}
 #peo-list{overflow-y:auto;flex:1;padding:4px 6px}
@@ -52,14 +51,16 @@ header a:hover{color:var(--accent-h)}
 .st{font-size:10.5px;text-align:center;padding:4px 0;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);cursor:pointer;user-select:none}
 .st.on{background:rgba(99,144,238,.16);border-color:var(--accent);color:var(--ink)}
 .st.off{opacity:.35}
+.mapwrap{position:relative;flex:1;display:flex;min-width:0}
 #map{flex:1;min-width:0}
 .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);cursor:pointer;padding:3px 0;user-select:none}
 .chk input{accent-color:var(--accent)}
 #tip{position:fixed;z-index:50;pointer-events:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-  padding:8px 10px;font-size:12px;color:var(--ink2);max-width:290px;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
+  padding:8px 10px;font-size:12px;color:var(--ink2);max-width:300px;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
 #tip b{color:var(--ink);font-size:12.5px}
-#tip .pe{font-weight:650}
 #tip .mut{color:var(--muted);font-size:11px}
+#tip .logo{background:#fff;border-radius:6px;padding:5px;display:inline-block;margin-bottom:6px}
+#tip .logo img{display:block;width:56px;height:56px;object-fit:contain}
 #card{position:absolute;top:12px;right:12px;z-index:40;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;
   box-shadow:0 10px 34px rgba(0,0,0,.55);display:none;max-height:calc(100% - 24px);overflow-y:auto}
 #card .hd{display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-bottom:1px solid var(--grid)}
@@ -71,6 +72,11 @@ header a:hover{color:var(--accent-h)}
 #card .kv .v{color:var(--ink2);text-align:right}
 #card .note{margin-top:8px;padding:7px 9px;border-radius:7px;background:rgba(224,152,92,.12);color:#f0c9a6;font-size:11.5px}
 #card .lk{display:block;margin-top:10px;color:var(--accent);font-size:12.5px;text-decoration:none}
+#sharepanel{position:absolute;bottom:24px;right:12px;z-index:35;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:46%;overflow-y:auto}
+#sharepanel .hd{padding:10px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink)}
+#sharepanel table{width:100%;border-collapse:collapse;font-size:12px}
+#sharepanel td{padding:4px 12px;color:var(--ink2);border-bottom:1px solid var(--grid)}
+#sharepanel td.r{text-align:right;color:var(--muted)}
 #gate{position:fixed;inset:0;background:rgba(7,11,15,.92);z-index:100;display:flex;align-items:center;justify-content:center}
 #gate .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px;width:340px}
 #gate h2{font-size:15px;margin-bottom:6px}
@@ -80,18 +86,13 @@ header a:hover{color:var(--accent-h)}
 #gate .err{color:#f2ada4;font-size:12px;margin-top:8px;display:none}
 #loading{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:30;background:var(--surface2);border:1px solid var(--border);
   border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
-#sharepanel{position:absolute;bottom:24px;right:12px;z-index:35;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:46%;overflow-y:auto}
-#sharepanel .hd{padding:10px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink)}
-#sharepanel table{width:100%;border-collapse:collapse;font-size:12px}
-#sharepanel td{padding:4px 12px;color:var(--ink2);border-bottom:1px solid var(--grid)}
-#sharepanel td.r{text-align:right;color:var(--muted)}
-.mapwrap{position:relative;flex:1;display:flex;min-width:0}
+#pincanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:2}
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <h1>PEO Coverage Map</h1><span class="stamp" id="stamp">map v1.1 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v2.0 · 2026-08-27</span>
     <span class="spacer"></span>
     <span id="stats">loading…</span>
     <a href="ask.html">← AI Data Desk</a>
@@ -102,17 +103,20 @@ header a:hover{color:var(--accent-h)}
       <div class="sec">
         <h2>View by</h2>
         <div class="seg"><button id="g-family" class="on">Family brand</button><button id="g-brand">PEO specific</button></div>
-        <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ + administrative beacons</label>
+        <h2 style="margin-top:10px">Pin placement</h2>
+        <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
       </div>
       <div class="sec">
         <h2>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
         <div id="states"></div>
         <div class="btnrow"><button id="st-all">All</button><button id="st-none">None</button></div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:6px">double-click a state for its market share</div>
       </div>
       <div class="sec" style="flex:1;display:flex;flex-direction:column;min-height:120px;border-bottom:0">
         <h2>PEOs <span id="peo-count" style="color:var(--muted);font-weight:400"></span></h2>
         <input id="peo-search" placeholder="Search PEOs…">
-        <div class="btnrow" style="margin:0 0 6px"><button id="peo-all">All</button><button id="peo-none">None</button><button id="peo-top">Top 10</button></div>
+        <div class="btnrow" style="margin:0 0 6px"><button id="peo-all">All</button><button id="peo-none">None</button></div>
         <div id="peo-list"></div>
       </div>
     </div>
@@ -139,7 +143,7 @@ header a:hover{color:var(--accent-h)}
 // ------------------------- config -------------------------
 var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-data';
 var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
-var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE'; // browser key, referrer-restricted to thegazz4.github.io
+var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE'; // referrer-restricted browser key
 var OTHER='#71808b';
 var $=function(id){return document.getElementById(id)};
 var STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'D.C.',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',PR:'Puerto Rico',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',VI:'Virgin Islands',GU:'Guam'};
@@ -147,18 +151,23 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 
 // ------------------------- state -------------------------
 var S={
-  grain:'family',          // 'family' | 'brand'
-  catalog:null,            // {families, brands, states, other_hex}
-  colors:{},               // slug -> hex for current grain
-  displays:{},             // slug -> display for current grain
-  sel:{},                  // slug -> true (selected PEOs, current grain)
-  states:{},               // ST -> true (on)
-  beaconsOn:true,
-  beacons:[],
-  stateAgg:null,           // {totals, top} for grain
-  zipCache:{},             // grain|ST -> rows
-  map:null, markers:[], beaconMarkers:[], zoomTier:'', lastFetchSeq:0
+  grain:'family',
+  placement:'address',             // 'address' (best precision) | 'zip' (ZIP centers)
+  catalog:null,
+  colors:{family:{},brand:{}},     // slug -> color_hex per grain
+  displays:{family:{},brand:{}},
+  sel:{family:null,brand:null},    // slug -> bool per grain (lazy init all-on)
+  states:{},                       // ST -> bool
+  beaconsOn:true, beacons:[], beaconMarkers:[],
+  pinData:{},                      // ST -> {fams,brds,pins:[[lat,lng,fi,bi,id,name,city,street]], mx:Float64Array, my:Float64Array}
+  loadQueue:[], loaded:0, toLoad:0,
+  map:null, overlay:null, logoCache:{},
+  hover:null
 };
+function selMap(){ if(!S.sel[S.grain]){ var m={}; catRows().forEach(function(r){m[r.slug]=true}); m['unattributed']=true; S.sel[S.grain]=m; } return S.sel[S.grain]; }
+function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
+function colorOf(slug){ return S.colors[S.grain][slug]||OTHER; }
+function dispOf(slug){ return S.displays[S.grain][slug]||slug; }
 
 // ------------------------- api -------------------------
 function deskKey(){ try{return localStorage.getItem('desk_key')||''}catch(e){return ''} }
@@ -170,8 +179,6 @@ function api(params){
     return r.json();
   });
 }
-
-// ------------------------- gate -------------------------
 function showGate(bad){ $('gate').style.display='flex'; $('gate-err').style.display=bad&&deskKey()?'block':'none'; }
 $('gate-go').onclick=function(){
   var v=$('gate-key').value.trim(); if(!v) return;
@@ -185,31 +192,234 @@ $('gate-key').addEventListener('keydown',function(e){ if(e.key==='Enter') $('gat
 var booted=false;
 function boot(){
   if(booted) return; booted=true;
-  Promise.all([api({mode:'catalog'}),api({mode:'beacons'}),api({mode:'state_agg',grain:S.grain})])
-  .then(function(rs){
-    S.catalog=rs[0]; S.beacons=rs[1].beacons||[]; S.stateAgg=rs[2];
-    (S.catalog.states||[]).forEach(function(r){ if(r.state) S.states[r.state]=true; });
-    applyGrain(S.grain,true);
+  Promise.all([api({mode:'catalog'}),api({mode:'beacons'})]).then(function(rs){
+    S.catalog=rs[0]; S.beacons=rs[1].beacons||[];
+    ['families','brands'].forEach(function(k){
+      var g=k==='families'?'family':'brand';
+      (S.catalog[k]||[]).forEach(function(r){ S.colors[g][r.slug]=r.color_hex||null; S.displays[g][r.slug]=r.display||r.slug; });
+    });
+    (S.catalog.states||[]).forEach(function(r){ if(r.state && !(r.state in S.states)) S.states[r.state]=true; });
     readUrl();
-    buildStatePanel(); buildPeoPanel(); drawBeacons(); scheduleRender(); updateStats();
+    buildStatePanel(); buildPeoPanel(); drawBeacons(); updateStats();
+    startPinLoads();
   }).catch(function(e){ if(String(e.message)!=='auth') console.error(e); });
 }
 
-function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
-function applyGrain(g,init){
-  S.grain=g; S.colors={}; S.displays={};
-  catRows().forEach(function(r){ S.colors[r.slug]=r.hex||null; S.displays[r.slug]=r.display||r.slug; });
-  if(init||!Object.keys(S.sel).length){ S.sel={}; catRows().forEach(function(r){ S.sel[r.slug]=true; }); }
-  $('g-family').className=g==='family'?'on':''; $('g-brand').className=g==='brand'?'on':'';
+// ------------------------- bulk pin loading (progressive, biggest states first) -------------------------
+function startPinLoads(){
+  var order=(S.catalog.states||[]).map(function(r){return r.state}).filter(Boolean);
+  S.loadQueue=order.slice(); S.toLoad=order.length; S.loaded=0;
+  for(var i=0;i<3;i++) nextLoad();
 }
-$('g-family').onclick=function(){ switchGrain('family') };
-$('g-brand').onclick=function(){ switchGrain('brand') };
-function switchGrain(g){
-  if(S.grain===g) return;
-  S.zipCache={}; S.stateAgg=null; S.sel={};
-  applyGrain(g,true); buildPeoPanel();
-  api({mode:'state_agg',grain:g}).then(function(r){ S.stateAgg=r; scheduleRender(); });
-  drawBeacons(); scheduleRender(); updateStats(); writeUrl();
+function nextLoad(){
+  var st=S.loadQueue.shift(); if(!st){ if(S.loaded>=S.toLoad) loadingDone(); return; }
+  api({mode:'pins_bulk',state:st}).then(function(r){
+    var n=r.n||0, pins=r.pins||[];
+    function merc(lat,lng,mx,my,i){
+      mx[i]=(lng+180)/360;
+      var s=Math.sin(lat*Math.PI/180); s=Math.max(-0.9999,Math.min(0.9999,s));
+      my[i]=0.5-Math.log((1+s)/(1-s))/(4*Math.PI);
+    }
+    var mxA=new Float64Array(n), myA=new Float64Array(n);   // address mode: best precision (jitter only zip-precision pins)
+    var mxZ=new Float64Array(n), myZ=new Float64Array(n);   // zip mode: everything at its ZIP center (always jittered)
+    for(var i=0;i<n;i++){
+      var p=pins[i]; var j=jit(p[4]);
+      var aLat=p[0], aLng=p[1];
+      if(!p[7]){ aLat+=j[0]; aLng+=j[1]; }
+      merc(aLat,aLng,mxA,myA,i);
+      var zLat=(p[7]&&p[8]!=null)?p[8]:p[0];
+      var zLng=(p[7]&&p[9]!=null)?p[9]:p[1];
+      merc(zLat+j[0],zLng+j[1],mxZ,myZ,i);
+    }
+    S.pinData[st]={fams:r.fams||[],brds:r.brds||[],pins:pins,mxA:mxA,myA:myA,mxZ:mxZ,myZ:myZ};
+    S.loaded++;
+    $('loading').style.display='block';
+    $('loading').textContent='loading pins… '+S.loaded+'/'+S.toLoad+' states';
+    if(S.overlay) S.overlay.redraw();
+    nextLoad();
+  }).catch(function(){ S.loaded++; nextLoad(); });
+}
+function loadingDone(){ $('loading').style.display='none'; if(S.overlay) S.overlay.redraw(); }
+function jit(id){
+  var h=0; for(var i=0;i<id.length;i++){ h=(h*31+id.charCodeAt(i))>>>0; }
+  var ang=(h%360)*Math.PI/180, rad=0.0008+((h>>>9)%1000)/1000*0.0035;
+  return [Math.sin(ang)*rad, Math.cos(ang)*rad*1.25];
+}
+
+// ------------------------- google map + canvas pin layer -------------------------
+window.initMap=function(){
+  var z=isFinite(S._urlZ)?S._urlZ:4.6;
+  var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
+  S.map=new google.maps.Map($('map'),{center:c,zoom:z,
+    disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
+    mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
+  makeOverlay(); drawBeacons();
+  S.map.addListener('idle',function(){ writeUrl(); });
+  var mapDiv=$('map');
+  mapDiv.addEventListener('mousemove',onMove);
+  mapDiv.addEventListener('mouseleave',function(){ if(S.hover&&S.hover.kind==='pin'){S.hover=null;closeTip();} });
+  mapDiv.addEventListener('click',onClick);
+};
+function loadGmaps(){
+  var s=document.createElement('script');
+  s.src='https://maps.googleapis.com/maps/api/js?key='+GMAPS_KEY+'&v=weekly&loading=async&callback=initMap';
+  s.async=true; document.head.appendChild(s);
+}
+
+var cvs=null, ctx=null, spriteCache={}, hitPts=null, hitN=0, drawScheduled=false;
+function makeOverlay(){
+  function PinLayer(){ this.setMap(S.map); }
+  PinLayer.prototype=new google.maps.OverlayView();
+  PinLayer.prototype.onAdd=function(){
+    cvs=document.createElement('canvas'); cvs.id='pincanvas';
+    this.getPanes().overlayLayer.appendChild(cvs);
+    ctx=cvs.getContext('2d');
+  };
+  PinLayer.prototype.onRemove=function(){ if(cvs&&cvs.parentNode) cvs.parentNode.removeChild(cvs); cvs=null; };
+  PinLayer.prototype.draw=function(){ scheduleDraw(); };
+  PinLayer.prototype.redraw=function(){ scheduleDraw(); };
+  S.overlay=new PinLayer();
+}
+function scheduleDraw(){ if(drawScheduled) return; drawScheduled=true; requestAnimationFrame(function(){ drawScheduled=false; drawPins(); }); }
+
+function pinScale(z){ return z<5.5?0.55:(z<8?0.72:(z<11?0.88:1.0)); }
+function sprite(hex,ps){
+  var key=hex+'|'+ps;
+  if(spriteCache[key]) return spriteCache[key];
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  var w=Math.ceil(15*ps), h=Math.ceil(21*ps);
+  var c=document.createElement('canvas'); c.width=w*dpr; c.height=h*dpr;
+  var x=c.getContext('2d'); x.scale(dpr*ps,dpr*ps);
+  x.beginPath();
+  x.arc(7.5,6.6,5.7,Math.PI*0.82,Math.PI*0.18);   // head
+  x.lineTo(7.5,20);                                 // tail tip
+  x.closePath();
+  x.fillStyle=hex; x.fill();
+  x.lineWidth=1.25; x.strokeStyle='#463f38'; x.stroke();
+  x.beginPath(); x.arc(7.5,6.6,2.05,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.92)'; x.fill();
+  var o={img:c,w:w,h:h,ax:7.5*ps,ay:20*ps};
+  spriteCache[key]=o; return o;
+}
+function drawPins(){
+  if(!cvs||!S.map) return;
+  var proj=S.overlay.getProjection(); if(!proj) return;
+  var div=$('map'); var W=div.clientWidth, H=div.clientHeight;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  if(cvs.width!==W*dpr||cvs.height!==H*dpr){ cvs.width=W*dpr; cvs.height=H*dpr; cvs.style.width=W+'px'; cvs.style.height=H+'px'; }
+  // pin the canvas to the current viewport within the overlay pane
+  var b=S.map.getBounds(); if(!b) return;
+  var sw=proj.fromLatLngToDivPixel(b.getSouthWest()), ne=proj.fromLatLngToDivPixel(b.getNorthEast());
+  cvs.style.transform='translate('+Math.round(sw.x)+'px,'+Math.round(ne.y)+'px)';
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+
+  var z=S.map.getZoom(); var scale=256*Math.pow(2,z);
+  var ctr=S.map.getCenter();
+  var cx=(ctr.lng()+180)/360;
+  var s0=Math.sin(ctr.lat()*Math.PI/180); s0=Math.max(-0.9999,Math.min(0.9999,s0));
+  var cy=0.5-Math.log((1+s0)/(1-s0))/(4*Math.PI);
+  var ps=pinScale(z);
+  var sel=selMap();
+  hitPts={x:new Float32Array(60000),y:new Float32Array(60000),st:[],ix:new Int32Array(60000)}; hitN=0;
+  var drawn=0;
+  for(var st in S.pinData){
+    if(S.states[st]===false) continue;
+    var d=S.pinData[st];
+    var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams;
+    var idxCol=(S.grain==='brand')?3:2;
+    var visSlug=[]; for(var k=0;k<slugArr.length;k++){ visSlug[k]=sel[slugArr[k]]!==false && sel[slugArr[k]]!==undefined ? sel[slugArr[k]] : (sel[slugArr[k]]===undefined); }
+    // sel map contains all catalog slugs; unknown slugs default visible
+    for(var i=0;i<d.pins.length;i++){
+      var si=d.pins[i][idxCol];
+      if(visSlug[si]===false) continue;
+      var sx=(MX[i]-cx)*scale+W/2, sy=(MY[i]-cy)*scale+H/2;
+      if(sx<-16||sx>W+16||sy<-24||sy>H+8) continue;
+      var col=S.colors[S.grain][slugArr[si]]||OTHER;
+      var sp=sprite(col,ps);
+      ctx.drawImage(sp.img,0,0,sp.img.width,sp.img.height,sx-sp.ax,sy-sp.ay,sp.w,sp.h);
+      if(hitN<60000){ hitPts.x[hitN]=sx; hitPts.y[hitN]=sy; hitPts.st[hitN]=st; hitPts.ix[hitN]=i; hitN++; }
+      drawn++;
+    }
+  }
+  S._canvasOffset=[Math.round(sw.x),Math.round(ne.y)];
+  S._lastDrawn=drawn;
+}
+// map div-relative mouse position -> canvas space (canvas is translated to viewport already; use client offsets)
+function mapXY(e){
+  var r=$('map').getBoundingClientRect();
+  return [e.clientX-r.left, e.clientY-r.top];
+}
+function pickPin(e){
+  if(!hitPts||!hitN) return null;
+  var p=mapXY(e); var mxp=p[0], myp=p[1];
+  var best=-1, bd=144;
+  for(var i=0;i<hitN;i++){
+    var dx=hitPts.x[i]-mxp, dy=(hitPts.y[i]-8)-myp;  // aim near pin head
+    var dd=dx*dx+dy*dy;
+    if(dd<bd){ bd=dd; best=i; }
+  }
+  if(best<0) return null;
+  return {st:hitPts.st[best], i:hitPts.ix[best]};
+}
+var hoverRaf=false;
+function onMove(e){
+  if(hoverRaf) return; hoverRaf=true;
+  requestAnimationFrame(function(){
+    hoverRaf=false;
+    if(S._beaconTipActive) return;
+    var hit=pickPin(e);
+    if(!hit){ if(S.hover&&S.hover.kind==='pin'){S.hover=null;closeTip();} return; }
+    var d=S.pinData[hit.st]; var p=d.pins[hit.i];
+    var slug=(S.grain==='brand')?d.brds[p[3]]:d.fams[p[2]];
+    S.hover={kind:'pin',st:hit.st,i:hit.i};
+    tipShow('<b>'+esc(p[5])+'</b><br>'+
+      '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
+      esc((p[6]||'')+', '+hit.st)+'<br>'+
+      '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(p[7]?'exact address':'ZIP area — exact location coming'))+' · click for details</span>',e);
+  });
+}
+function onClick(e){
+  var hit=pickPin(e); if(!hit) return;
+  var d=S.pinData[hit.st]; var p=d.pins[hit.i];
+  var slug=(S.grain==='brand')?d.brds[p[3]]:d.fams[p[2]];
+  api({mode:'company',id:p[4]}).then(function(r){ if(r.company) openCard(r.company,slug); });
+}
+
+// ------------------------- beacons (google markers above canvas) -------------------------
+function beaconIcon(kind,col){
+  if(kind==='administrative') return {path:'M 0,-11 L 9,0 L 0,11 L -9,0 Z',fillColor:col,fillOpacity:.95,strokeColor:'#463f38',strokeWeight:1.6,scale:1.15};
+  var star='M 0,-13 L 3.6,-4.2 L 13,-3.6 L 5.8,2.6 L 8,12 L 0,6.8 L -8,12 L -5.8,2.6 L -13,-3.6 L -3.6,-4.2 Z';
+  return {path:star,fillColor:col,fillOpacity:kind==='hq_candidate'?.6:1,strokeColor:kind==='hq_candidate'?col:'#463f38',strokeWeight:1.6,scale:1.25};
+}
+function drawBeacons(){
+  S.beaconMarkers.forEach(function(m){m.setMap(null)}); S.beaconMarkers=[];
+  if(!S.map||!S.beaconsOn) return;
+  var sel=selMap();
+  S.beacons.forEach(function(b){
+    if(b.kind==='po_box'||b.kind==='zip_beacon') return;
+    if(b.state && S.states[b.state]===false) return;
+    if(sel[b.family_slug]===false) return;
+    var col=b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER;
+    var m=new google.maps.Marker({position:{lat:Number(b.lat),lng:Number(b.lng)},map:S.map,icon:beaconIcon(b.kind,col),zIndex:9999});
+    m.addListener('mouseover',function(ev){ S._beaconTipActive=true; tipBeacon(b,ev.domEvent); });
+    m.addListener('mouseout',function(){ S._beaconTipActive=false; closeTip(); });
+    S.beaconMarkers.push(m);
+  });
+}
+function tipBeacon(b,ev){
+  var kinds={hq:'Headquarters',administrative:'Administrative beacon',hq_candidate:'HQ (candidate)'};
+  var logoHtml='';
+  var cached=S.logoCache[b.family_slug];
+  if(cached){ logoHtml='<span class="logo"><img src="'+cached+'" alt=""></span><br>'; }
+  tipShow(logoHtml+'<b>'+esc(b.peo_display||b.family_slug)+'</b><br>'+esc(kinds[b.kind]||b.kind)+'<br>'+
+    esc((b.city||'')+', '+(b.state||''))+'<br><span class="mut">'+esc(b.geo_precision==='zip'?'ZIP-level placement':'city-level placement')+'</span>',ev);
+  if(!cached && b.has_logo && S.logoCache[b.family_slug]!==''){
+    S.logoCache[b.family_slug]='';
+    api({mode:'logo',slug:b.family_slug}).then(function(r){
+      if(r&&r.data_uri){ S.logoCache[b.family_slug]=r.data_uri;
+        if(S._beaconTipActive) tipBeacon(b,ev); }
+    }).catch(function(){});
+  }
 }
 
 // ------------------------- panels -------------------------
@@ -219,305 +429,78 @@ function buildStatePanel(){
   var sts=Object.keys(S.states).sort();
   sts.forEach(function(st){
     var d=document.createElement('div'); d.className='st '+(S.states[st]?'on':'off'); d.textContent=st;
-    d.title=(STATE_NAMES[st]||st)+' — '+(byN[st]||0).toLocaleString()+' clients';
-    d.onclick=function(){ S.states[st]=!S.states[st]; d.className='st '+(S.states[st]?'on':'off'); scheduleRender(); updateStats(); writeUrl(); };
+    d.title=(STATE_NAMES[st]||st);
+    d.onclick=function(){ S.states[st]=!S.states[st]; d.className='st '+(S.states[st]?'on':'off'); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); };
+    d.ondblclick=function(){ openSharePanel(st); };
     host.appendChild(d);
   });
   $('st-count').textContent='('+sts.length+')';
-  $('st-all').onclick=function(){ sts.forEach(function(s){S.states[s]=true}); buildStatePanel(); scheduleRender(); updateStats(); writeUrl(); };
-  $('st-none').onclick=function(){ sts.forEach(function(s){S.states[s]=false}); buildStatePanel(); scheduleRender(); updateStats(); writeUrl(); };
+  $('st-all').onclick=function(){ sts.forEach(function(s){S.states[s]=true}); buildStatePanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); };
+  $('st-none').onclick=function(){ sts.forEach(function(s){S.states[s]=false}); buildStatePanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); };
 }
-
 function buildPeoPanel(){
   var host=$('peo-list'); host.innerHTML='';
   var q=($('peo-search').value||'').toLowerCase();
-  var rows=catRows();
+  var rows=catRows(); var sel=selMap();
   $('peo-count').textContent='('+rows.length+')';
   rows.forEach(function(r){
     if(q && String(r.display||r.slug).toLowerCase().indexOf(q)<0) return;
-    var on=!!S.sel[r.slug];
+    var on=sel[r.slug]!==false;
     var d=document.createElement('div'); d.className='peo-row '+(on?'on':'off');
-    var sw=document.createElement('span'); sw.className='sw'; sw.style.background=r.hex||OTHER;
-    var nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.display||r.slug; nm.title=(r.display||r.slug)+' · slug: '+r.slug;
+    var sw=document.createElement('span'); sw.className='sw'; sw.style.background=r.color_hex||OTHER;
+    var nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.display||r.slug; nm.title=(r.display||r.slug)+' · slug: '+r.slug+(r.color_basis?' · color: '+r.color_basis:'');
     var ct=document.createElement('span'); ct.className='ct'; ct.textContent=Number(r.n_clients).toLocaleString();
     var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
-    so.onclick=function(e){ e.stopPropagation(); Object.keys(S.sel).forEach(function(k){S.sel[k]=false}); S.sel[r.slug]=true; buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
-    d.onclick=function(){ S.sel[r.slug]=!S.sel[r.slug]; buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
+    so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
+    d.onclick=function(){ sel[r.slug]=sel[r.slug]===false?true:false; afterSel(); };
     d.appendChild(sw); d.appendChild(nm); d.appendChild(ct); d.appendChild(so);
     host.appendChild(d);
   });
 }
+function afterSel(){ buildPeoPanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); }
 $('peo-search').addEventListener('input',buildPeoPanel);
-$('peo-all').onclick=function(){ catRows().forEach(function(r){S.sel[r.slug]=true}); buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
-$('peo-none').onclick=function(){ catRows().forEach(function(r){S.sel[r.slug]=false}); buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
-$('peo-top').onclick=function(){ catRows().forEach(function(r){S.sel[r.slug]=!!r.hex}); buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
+$('peo-all').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=true}); afterSel(); };
+$('peo-none').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=false}); afterSel(); };
 $('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; drawBeacons(); writeUrl(); };
-
+$('g-family').onclick=function(){ switchGrain('family') };
+$('g-brand').onclick=function(){ switchGrain('brand') };
+$('pm-addr').onclick=function(){ setPlacement('address') };
+$('pm-zip').onclick=function(){ setPlacement('zip') };
+function setPlacement(pm){
+  if(S.placement===pm) return;
+  S.placement=pm;
+  $('pm-addr').className=pm==='address'?'on':''; $('pm-zip').className=pm==='zip'?'on':'';
+  scheduleDraw(); writeUrl();
+}
+function switchGrain(g){
+  if(S.grain===g) return;
+  S.grain=g;
+  $('g-family').className=g==='family'?'on':''; $('g-brand').className=g==='brand'?'on':'';
+  buildPeoPanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl();
+}
 function updateStats(){
-  var nSel=0,total=0;
-  catRows().forEach(function(r){ if(S.sel[r.slug]){ nSel++; total+=Number(r.n_clients)||0; } });
+  var sel=selMap(); var nSel=0;
+  catRows().forEach(function(r){ if(sel[r.slug]!==false) nSel++; });
   var stOn=Object.keys(S.states).filter(function(s){return S.states[s]}).length;
-  $('stats').textContent=nSel+' PEOs · '+stOn+' states · ~'+total.toLocaleString()+' clients selected';
+  $('stats').textContent=nSel+' PEOs · '+stOn+' states';
 }
 
-// ------------------------- url state -------------------------
-function writeUrl(){
-  try{
-    var p=new URLSearchParams();
-    p.set('grain',S.grain);
-    var off=catRows().filter(function(r){return !S.sel[r.slug]}).map(function(r){return r.slug});
-    var on=catRows().filter(function(r){return S.sel[r.slug]}).map(function(r){return r.slug});
-    if(on.length<=40) p.set('on',on.join(',')); else if(off.length<=40) p.set('off',off.join(','));
-    var stOff=Object.keys(S.states).filter(function(s){return !S.states[s]});
-    if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
-    if(!S.beaconsOn) p.set('b','0');
-    if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
-    history.replaceState(null,'','map.html?'+p.toString());
-  }catch(e){}
-}
-function readUrl(){
-  try{
-    var p=new URLSearchParams(location.search);
-    if(p.get('grain')==='brand'){ applyGrain('brand',true); }
-    if(p.get('on')){ Object.keys(S.sel).forEach(function(k){S.sel[k]=false}); p.get('on').split(',').forEach(function(s){ if(s in S.sel) S.sel[s]=true; }); }
-    else if(p.get('off')){ p.get('off').split(',').forEach(function(s){ if(s in S.sel) S.sel[s]=false; }); }
-    if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
-    if(p.get('b')==='0'){ S.beaconsOn=false; $('beacons-on').checked=false; }
-    S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
-  }catch(e){}
-}
-$('permalink').onclick=function(){
-  writeUrl();
-  try{ navigator.clipboard.writeText(location.href); $('permalink').textContent='Copied!'; setTimeout(function(){$('permalink').textContent='Copy view link'},1400); }catch(e){}
-};
-
-// ------------------------- google map (standard basemap — Gazz 2026-08-27: no dark styling, classic look) -------------------------
-var PIN_PATH='M 0,0 C -2,-7 -9,-9.5 -9,-15.5 A 9,9 0 1 1 9,-15.5 C 9,-9.5 2,-7 0,0 z'; // classic teardrop, tip-anchored
-var PIN_STROKE='#463f38'; // dark edge = contrast relief on the light basemap (validator WARN remedy)
-function pinIcon(col,scale,withLabel){
-  return {path:PIN_PATH,fillColor:col,fillOpacity:1,strokeColor:PIN_STROKE,strokeWeight:1.4,scale:scale||1,
-          anchor:new google.maps.Point(0,0),labelOrigin:new google.maps.Point(0,-15.5)};
-}
-function labText(hex){
-  try{ var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-       return (0.299*r+0.587*g+0.114*b)>150?'#20262e':'#ffffff'; }catch(e){ return '#ffffff'; }
-}
-window.initMap=function(){
-  var z=isFinite(S._urlZ)?S._urlZ:4.6;
-  var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
-  S.map=new google.maps.Map($('map'),{center:c,zoom:z,
-    disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
-    mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
-  S.map.addListener('idle',function(){ scheduleRender(); writeUrl(); });
-  drawBeacons();
-};
-function loadGmaps(){
-  var s=document.createElement('script');
-  s.src='https://maps.googleapis.com/maps/api/js?key='+GMAPS_KEY+'&v=weekly&loading=async&callback=initMap';
-  s.async=true; document.head.appendChild(s);
-}
-
-// ------------------------- rendering -------------------------
-var renderTimer=null;
-function scheduleRender(){ if(renderTimer) clearTimeout(renderTimer); renderTimer=setTimeout(render,350); }
-function clearMarkers(){ S.markers.forEach(function(m){m.setMap(null)}); S.markers=[]; }
-function tierFor(z){ return z<5.5?'state':(z<10.5?'zip':'pin'); }
-function selectedSlugs(){ return Object.keys(S.sel).filter(function(k){return S.sel[k]}); }
-function slugOf(r){ return S.grain==='brand'?(r.brand_slug||r.family_slug):(r.family_slug); }
-function colorOf(slug){ return S.colors[slug]||OTHER; }
-function visibleStates(){
-  if(!S.map) return [];
-  var b=S.map.getBounds(); if(!b) return [];
-  return Object.keys(S.states).filter(function(st){ return S.states[st]; });
-}
-function statesInView(){
-  // ON states whose centroid falls inside the current viewport, padded ~3.5°, nearest-center first
-  if(!S.map) return [];
-  var b=S.map.getBounds(); if(!b) return visibleStates();
-  var ne=b.getNorthEast(), sw=b.getSouthWest(), pad=3.5;
-  var cLat=(ne.lat()+sw.lat())/2, cLng=(ne.lng()+sw.lng())/2;
-  return visibleStates().filter(function(st){
-    var c=STATE_CENTROIDS[st]; if(!c) return false;
-    return c[0]>sw.lat()-pad && c[0]<ne.lat()+pad && c[1]>sw.lng()-pad && c[1]<ne.lng()+pad;
-  }).sort(function(a,b2){
-    var A=STATE_CENTROIDS[a],B=STATE_CENTROIDS[b2];
-    return (Math.pow(A[0]-cLat,2)+Math.pow(A[1]-cLng,2))-(Math.pow(B[0]-cLat,2)+Math.pow(B[1]-cLng,2));
-  });
-}
-function loading(on){ $('loading').style.display=on?'block':'none'; }
-
-function render(){
-  if(!S.map||!S.catalog) return;
-  var z=S.map.getZoom(); var tier=tierFor(z); var seq=++S.lastFetchSeq;
-  if(tier==='state'){ renderStateBubbles(); return; }
-  var b=S.map.getBounds(); if(!b) return;
-  var ne=b.getNorthEast(), sw=b.getSouthWest();
-  var sel=selectedSlugs(); if(!sel.length){ clearMarkers(); return; }
-  if(tier==='zip'){ renderZipDots(seq); }
-  else { renderPins(seq,{minLat:sw.lat(),maxLat:ne.lat(),minLng:sw.lng(),maxLng:ne.lng()}); }
-}
-
-// --- national: one bubble per ON state
-function renderStateBubbles(){
-  clearMarkers(); closeTip();
-  if(!S.stateAgg){ api({mode:'state_agg',grain:S.grain}).then(function(r){S.stateAgg=r; renderStateBubbles();}); return; }
-  var topBy={}; (S.stateAgg.top||[]).forEach(function(r){ (topBy[r.state]=topBy[r.state]||[]).push(r); });
-  var cent=STATE_CENTROIDS;
-  (S.stateAgg.totals||[]).forEach(function(r){
-    var st=r.state; if(!S.states[st]||!cent[st]) return;
-    var n=Number(r.n)||0; if(!n) return;
-    var lead=(topBy[st]||[])[0];
-    var col=lead?colorOf(lead.slug):OTHER;
-    var sc=1.5+Math.min(1.7,Math.sqrt(n)/160);
-    var m=new google.maps.Marker({position:{lat:cent[st][0],lng:cent[st][1]},map:S.map,
-      icon:pinIcon(col,sc),
-      label:{text:st,color:labText(col),fontSize:'11px',fontWeight:'700'},zIndex:5});
-    m.addListener('mouseover',function(ev){ tipState(st,n,topBy[st]||[],ev.domEvent); });
-    m.addListener('mouseout',closeTip);
-    m.addListener('click',function(){ openSharePanel(st); S.map.setZoom(6.2); S.map.panTo({lat:cent[st][0],lng:cent[st][1]}); });
-    S.markers.push(m);
-  });
-}
-
-// --- state zoom: zip dots
-function renderZipDots(seq){
-  var sts=statesInView(); var sel=selectedSlugs(); var selSet={}; sel.forEach(function(s){selSet[s]=1});
-  var b=S.map.getBounds(); var ne=b.getNorthEast(), sw=b.getSouthWest();
-  var need=sts.filter(function(st){ return !S.zipCache[S.grain+'|'+st]; });
-  var fetches=need.slice(0,6).map(function(st){
-    return api({mode:'zip_agg',grain:S.grain,state:st}).then(function(r){ S.zipCache[S.grain+'|'+st]=r.rows||[]; });
-  });
-  if(fetches.length) loading(true);
-  Promise.all(fetches).then(function(){
-    loading(false);
-    if(seq!==S.lastFetchSeq) return;
-    clearMarkers();
-    var byZip={};
-    sts.forEach(function(st){
-      (S.zipCache[S.grain+'|'+st]||[]).forEach(function(r){
-        if(!selSet[r.slug]) return;
-        if(r.lat<sw.lat()||r.lat>ne.lat()||r.lng<sw.lng()||r.lng>ne.lng()) return;
-        var k=st+'|'+r.zip;
-        var e=byZip[k]||(byZip[k]={zip:r.zip,st:st,lat:r.lat,lng:r.lng,n:0,parts:[]});
-        e.n+=r.n; e.parts.push(r);
-      });
-    });
-    var keys=Object.keys(byZip);
-    keys.forEach(function(k){
-      var e=byZip[k];
-      e.parts.sort(function(a,b){return b.n-a.n});
-      var col=colorOf(e.parts[0].slug);
-      var sc=0.85+Math.min(0.9,Math.sqrt(e.n)*0.09);
-      var m=new google.maps.Marker({position:{lat:e.lat,lng:e.lng},map:S.map,
-        icon:pinIcon(col,sc),
-        label:e.n>1?{text:String(e.n>999?'1k+':e.n),color:labText(col),fontSize:'10px',fontWeight:'700'}:null,zIndex:6});
-      m.addListener('mouseover',function(ev){ tipZip(e,ev.domEvent); });
-      m.addListener('mouseout',closeTip);
-      m.addListener('click',function(){ S.map.setZoom(11.2); S.map.panTo({lat:e.lat,lng:e.lng}); });
-      S.markers.push(m);
-    });
-  });
-}
-
-// --- deep zoom: true client pins
-function renderPins(seq,box){
-  var sts=statesInView(); var sel=selectedSlugs();
-  loading(true);
-  var perState=sts.slice(0,4).map(function(st){
-    return api({mode:'pins',grain:S.grain,state:st,slugs:sel.length<=120?sel:[],minLat:box.minLat,maxLat:box.maxLat,minLng:box.minLng,maxLng:box.maxLng,limit:2000});
-  });
-  Promise.all(perState).then(function(rs){
-    loading(false);
-    if(seq!==S.lastFetchSeq) return;
-    clearMarkers();
-    var selSet={}; sel.forEach(function(s){selSet[s]=1});
-    var total=0, shown=0;
-    rs.forEach(function(r){
-      total+=Number(r.total)||0;
-      (r.rows||[]).forEach(function(p){
-        var slug=slugOf(p); if(!selSet[slug]) return;
-        shown++;
-        var pos=jitter(p);
-        var m=new google.maps.Marker({position:pos,map:S.map,
-          icon:pinIcon(colorOf(slug),1.0),zIndex:7});
-        m.addListener('mouseover',function(ev){ tipPin(p,slug,ev.domEvent); });
-        m.addListener('mouseout',closeTip);
-        m.addListener('click',function(){ openCard(p,slug); });
-        S.markers.push(m);
-      });
-    });
-    if(total>shown) $('loading').textContent='showing '+shown.toLocaleString()+' of '+total.toLocaleString()+' in view — zoom in for the rest', $('loading').style.display='block';
-    else $('loading').textContent='loading…';
-  });
-}
-function jitter(p){
-  if(p.geo_precision!=='zip') return {lat:Number(p.lat),lng:Number(p.lng)};
-  var h=0,s=String(p.company_id);
-  for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; }
-  var ang=(h%360)*Math.PI/180, rad=0.0008+((h>>>9)%1000)/1000*0.0035;
-  return {lat:Number(p.lat)+Math.sin(ang)*rad,lng:Number(p.lng)+Math.cos(ang)*rad*1.25};
-}
-
-// ------------------------- beacons -------------------------
-function beaconIcon(kind,col){
-  if(kind==='administrative') return {path:'M 0,-11 L 9,0 L 0,11 L -9,0 Z',fillColor:col,fillOpacity:.95,strokeColor:PIN_STROKE,strokeWeight:1.6,scale:1.15};
-  var star='M 0,-13 L 3.6,-4.2 L 13,-3.6 L 5.8,2.6 L 8,12 L 0,6.8 L -8,12 L -5.8,2.6 L -13,-3.6 L -3.6,-4.2 Z';
-  return {path:star,fillColor:col,fillOpacity:kind==='hq_candidate'?.6:1,strokeColor:kind==='hq_candidate'?col:PIN_STROKE,strokeWeight:1.6,scale:1.25};
-}
-function drawBeacons(){
-  S.beaconMarkers.forEach(function(m){m.setMap(null)}); S.beaconMarkers=[];
-  if(!S.map||!S.beaconsOn) return;
-  S.beacons.forEach(function(b){
-    if(b.kind==='po_box'||b.kind==='zip_beacon') return;      // advanced kinds stay off the visual layer v1
-    if(b.state && S.states[b.state]===false) return;
-    if(!S.sel[b.family_slug]) return;                          // beacons are family-grain; same-named brand slugs match too
-    var col=S.colors[b.family_slug]||OTHER;
-    var m=new google.maps.Marker({position:{lat:Number(b.lat),lng:Number(b.lng)},map:S.map,icon:beaconIcon(b.kind,col),zIndex:9999});
-    m.addListener('mouseover',function(ev){ tipBeacon(b,ev.domEvent); });
-    m.addListener('mouseout',closeTip);
-    S.beaconMarkers.push(m);
-  });
-}
-
-// ------------------------- tooltips & cards -------------------------
+// ------------------------- tooltips & card -------------------------
 function tipShow(html,ev){
   var t=$('tip'); t.innerHTML=html; t.style.display='block';
   var x=(ev&&ev.clientX||0)+14, y=(ev&&ev.clientY||0)+12;
-  if(x+300>innerWidth) x=innerWidth-310; if(y+140>innerHeight) y=innerHeight-150;
+  if(x+310>innerWidth) x=innerWidth-320; if(y+170>innerHeight) y=innerHeight-180;
   t.style.left=x+'px'; t.style.top=y+'px';
 }
 function closeTip(){ $('tip').style.display='none'; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}); }
-function tipPin(p,slug,ev){
-  var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' <span class="mut">('+esc(p.renewal_month_basis||'basis unknown')+')</span>':'<span class="mut">unknown</span>';
-  tipShow('<b>'+esc(p.company_display)+'</b><br>'+
-    '<span class="pe" style="color:'+colorOf(slug)+'">'+esc(S.displays[slug]||slug)+'</span><br>'+
-    esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||'')+'<br>'+
-    'WC renewal: '+ren+'<br>'+
-    (p.wc_carrier?('Carrier: '+esc(p.wc_carrier)+'<br>'):'')+
-    (p.headcount_est?('~'+esc(p.headcount_est)+' employees<br>'):'')+
-    '<span class="mut">pin: '+esc(p.geo_precision)+' precision'+(p.is_multistate?' · multistate':'')+' · click for record</span>',ev);
-}
-function tipZip(e,ev){
-  var rows=e.parts.slice(0,4).map(function(r){ return '<span style="color:'+colorOf(r.slug)+'">●</span> '+esc(S.displays[r.slug]||r.slug)+' <span class="mut">'+r.n+'</span>'; }).join('<br>');
-  tipShow('<b>ZIP '+esc(e.zip)+' · '+e.n+' clients</b><br>'+rows+(e.parts.length>4?'<br><span class="mut">+'+(e.parts.length-4)+' more…</span>':'')+'<br><span class="mut">click to zoom to pins</span>',ev);
-}
-function tipState(st,n,top,ev){
-  var rows=top.slice(0,3).map(function(r){ return '<span style="color:'+colorOf(r.slug)+'">●</span> '+esc(r.display)+' <span class="mut">'+r.share_pct+'%</span>'; }).join('<br>');
-  tipShow('<b>'+esc(STATE_NAMES[st]||st)+' · '+n.toLocaleString()+' clients</b><br>'+rows+'<br><span class="mut">click to zoom in + full share</span>',ev);
-}
-function tipBeacon(b,ev){
-  var kinds={hq:'Headquarters',administrative:'Administrative beacon',hq_candidate:'HQ (candidate)'};
-  tipShow('<b>'+esc(b.peo_display||b.family_slug)+'</b><br>'+esc(kinds[b.kind]||b.kind)+'<br>'+
-    esc((b.city||'')+', '+(b.state||''))+'<br><span class="mut">'+esc(b.basis)+' · '+esc(b.geo_precision)+' precision'+
-    (b.company_count?' · '+b.company_count+' co-located clients':'')+'</span>',ev);
-}
+function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
 function openCard(p,slug){
   var c=$('card');
   var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(p.renewal_month_basis||'basis unknown')+')':'unknown';
   var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(p.peo_current_since_basis||'basis unknown')+')':'unknown';
-  c.innerHTML='<div class="hd"><span class="sw" style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px"></span>'+
-    '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(S.displays[slug]||slug)+'</div></div>'+
+  c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
+    '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div></div>'+
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
     '<div class="bd">'+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
@@ -526,28 +509,58 @@ function openCard(p,slug){
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
     kv('With PEO since',since)+
     kv('Multistate',p.is_multistate?'yes':'no')+
-    kv('Pin precision',esc(p.geo_precision)+(p.geocoded_at?' · as of '+String(p.geocoded_at).slice(0,10):''))+
-    '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase — this card will link straight to it.</div>'+
+    kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
+    '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase.</div>'+
     '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
     '</div>';
   c.style.display='block';
 }
-function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
 function openSharePanel(st){
   api({mode:'state_share',grain:S.grain,state:st}).then(function(r){
     var p=$('sharepanel');
     var rows=(r.rows||[]).map(function(x){
-      return '<tr><td><span style="color:'+colorOf(x.slug)+'">●</span> '+esc(x.display)+'</td><td class="r">'+Number(x.n).toLocaleString()+'</td><td class="r">'+x.share_pct+'%</td></tr>';
+      return '<tr><td><span style="color:'+(S.colors[S.grain][x.slug]||OTHER)+'">●</span> '+esc(x.display)+'</td><td class="r">'+Number(x.n).toLocaleString()+'</td><td class="r">'+x.share_pct+'%</td></tr>';
     }).join('');
-    p.innerHTML='<div class="hd"><b>'+esc(STATE_NAMES[st]||st)+'</b> — market share ('+esc(r.grain)+' view) '+
+    p.innerHTML='<div class="hd"><b>'+esc(STATE_NAMES[st]||st)+'</b> — market share '+
       '<button class="x" style="float:right;background:none;border:0;color:var(--muted);cursor:pointer" onclick="document.getElementById(\'sharepanel\').style.display=\'none\'">×</button></div>'+
       '<table>'+rows+'</table>';
     p.style.display='block';
   });
 }
 
-// ------------------------- state centroids (approx, for national bubbles) -------------------------
-var STATE_CENTROIDS={AL:[32.8,-86.8],AK:[64.0,-152.0],AZ:[34.2,-111.6],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.3,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.1,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[47.0,-109.6],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.5,-79.4],ND:[47.4,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[43.9,-120.6],PA:[40.9,-77.8],PR:[18.2,-66.4],RI:[41.7,-71.6],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.8,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.5],WV:[38.6,-80.6],WI:[44.6,-89.7],WY:[43.0,-107.6],VI:[18.34,-64.9],GU:[13.44,144.79]};
+// ------------------------- url state -------------------------
+function writeUrl(){
+  try{
+    var p=new URLSearchParams(); var sel=selMap();
+    p.set('grain',S.grain);
+    var off=catRows().filter(function(r){return sel[r.slug]===false}).map(function(r){return r.slug});
+    var on=catRows().filter(function(r){return sel[r.slug]!==false}).map(function(r){return r.slug});
+    if(on.length<=40) p.set('on',on.join(',')); else if(off.length<=40) p.set('off',off.join(','));
+    var stOff=Object.keys(S.states).filter(function(s){return !S.states[s]});
+    if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
+    if(!S.beaconsOn) p.set('b','0');
+    if(S.placement==='zip') p.set('pm','zip');
+    if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
+    history.replaceState(null,'','map.html?'+p.toString());
+  }catch(e){}
+}
+function readUrl(){
+  try{
+    var p=new URLSearchParams(location.search);
+    if(p.get('grain')==='brand'){ S.grain='brand'; $('g-family').className=''; $('g-brand').className='on'; }
+    var sel=selMap();
+    if(p.get('on')){ Object.keys(sel).forEach(function(k){sel[k]=false}); p.get('on').split(',').forEach(function(s){ sel[s]=true; }); }
+    else if(p.get('off')){ p.get('off').split(',').forEach(function(s){ sel[s]=false; }); }
+    if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
+    if(p.get('b')==='0'){ S.beaconsOn=false; $('beacons-on').checked=false; }
+    if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
+    S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
+  }catch(e){}
+}
+$('permalink').onclick=function(){
+  writeUrl();
+  try{ navigator.clipboard.writeText(location.href); $('permalink').textContent='Copied!'; setTimeout(function(){$('permalink').textContent='Copy view link'},1400); }catch(e){}
+};
 
 // ------------------------- start -------------------------
 loadGmaps();
