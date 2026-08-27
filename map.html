@@ -4,7 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.8 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.9 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.9 (claim 113 — "still takes way too long to load"): NATIONAL BUNDLE LOADING. Cold load was
+     ~112 edge requests (55 states x 2 waves + catalog + beacons + ~40 lazy logo fetches); now ~5:
+     mode=pins_all paints EVERY state's pins in one request, mode=details_all streams all hover
+     detail in one background request (atomic bake_key pair, one cache-busted retry), mode=logos_all
+     warms every HQ chip at once, and mode=catalog serves a baked snapshot instead of recomputing the
+     heavy filter catalog per load (map-data v2.9, deploy v15; 0583 wave vocab + warm cron = 5 bundle
+     warms). Old per-state loader retained as automatic fallback. SIZING (owner): teardrop pins now
+     GROW as you zoom in (0.95 -> 1.55 by z14); HQ logo chips are LARGE zoomed out (44px national,
+     top-40 brands only below z5 to avoid chip soup) and SHRINK as you zoom in (20px at z11+),
+     ceding the stage to the client pins.
+     v3.8 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.8 (claim 112 — the "loads displaced" refresh bug, REPRODUCED live in owner Chrome + probed):
      Google's raster tile layer can settle in a stale post-init render (probe proof: getZoom()=5 and
      getBounds() span 61.9° = self-consistent, while the painted tiles spanned ~75°); our canvas
@@ -221,7 +232,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.8 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.9 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -375,6 +386,17 @@ function boot(){
     S.beacons=(rs[1].beacons||[]).filter(function(b){ return b.kind!=='po_box'&&b.kind!=='zip_beacon'; });
     S.beacons.forEach(function(b){ b._mx=mercX(Number(b.lng)); b._my=mercY(Number(b.lat)); });
     readUrl();
+    S._topFams={}; (S.catalog.families||[]).slice(0,40).forEach(function(r){ S._topFams[r.slug]=true; });
+    apiGet('mode=logos_all').then(function(r){   // one request warms every HQ logo chip
+      var L=(r&&r.logos)||{};
+      Object.keys(L).forEach(function(slug){
+        if(S.logoImgs[slug]!==undefined) return;
+        S.logoImgs[slug]=null; S.logoCache[slug]=L[slug];
+        var img=new Image();
+        img.onload=function(){ S.logoImgs[slug]=img; scheduleDraw(); };
+        img.src=L[slug];
+      });
+    }).catch(function(){});
     S.flags=S.catalog.flags||{};
     if(S.flags.historical_layer){
       $('histsec').style.display='block';
@@ -387,7 +409,44 @@ function boot(){
 
 // ------------------------- two-wave loading (viewport-first) -------------------------
 var liteQ=[], detQ=[];
+// v3.9 BUNDLE LOADER: the whole country in TWO requests (pins_all -> full first paint;
+// details_all in the background), atomic pair by shared bake_key with one cache-busted retry.
+// The old 110-request per-state loader remains below as the fallback path.
 function startPinLoads(){
+  S.toLoad=1; S.liteLoaded=0; S.detLoaded=0; progress();
+  apiGet('mode=pins_all').then(function(r){
+    if(!r||!r.states){ startPinLoadsLegacy(); return; }
+    (r.states||[]).forEach(function(sd){ commitLiteState(sd, r.bake_key); });
+    S.liteLoaded=1; progress(); bump(); scheduleDraw();
+    function takeDetail(d, bake, retried){
+      if(!d||d.bake_key!==bake){
+        if(retried){ S.detLoaded=1; progress(); return; }
+        return apiGet('mode=pins_all&b='+Date.now()).then(function(r2){
+          (r2.states||[]).forEach(function(sd){ commitLiteState(sd, r2.bake_key); });
+          bump(); scheduleDraw();
+          return apiGet('mode=details_all&b='+Date.now()).then(function(d2){ takeDetail(d2, r2.bake_key, true); });
+        }).catch(function(){ S.detLoaded=1; progress(); });
+      }
+      commitDetailAll(d);
+      S.detLoaded=1; progress(); bump(); scheduleDraw();
+    }
+    apiGet('mode=details_all').then(function(d){ takeDetail(d, r.bake_key, false); })
+      .catch(function(){ S.detLoaded=1; progress(); });
+  }).catch(function(){ startPinLoadsLegacy(); });
+}
+function commitLiteState(sd, bake){
+  var n=sd.n||0, pins=sd.pins||[];
+  var mxA=new Float64Array(n), myA=new Float64Array(n), fis=new Int16Array(n), bis=new Int16Array(n);
+  for(var i=0;i<n;i++){ var p=pins[i]; mxA[i]=mercX(p[1]); myA[i]=mercY(p[0]); fis[i]=p[2]; bis[i]=p[3]; }
+  S.pinData[sd.st]={fams:sd.fams||[],brds:sd.brds||[],n:n,mxA:mxA,myA:myA,mxZ:mxA,myZ:myA,fis:fis,bis:bis,lat0:pins.map(function(p){return p[0]}),lng0:pins.map(function(p){return p[1]}),bake:bake,detail:null};
+}
+function commitDetailAll(d){
+  (d.states||[]).forEach(function(sd){
+    var dd=S.pinData[sd.st]; if(!dd||sd.n!==dd.n) return;
+    commitDetail(sd.st, sd);
+  });
+}
+function startPinLoadsLegacy(){
   var byN={}; (S.catalog.states||[]).forEach(function(r){ byN[r.state]=Number(r.n)||0; });
   var c=S.map?S.map.getCenter():null;
   var cl=c?c.lat():38.5, cg=c?c.lng():-96.5;
@@ -489,7 +548,8 @@ function loadHist(){
 }
 function progress(){
   $('loading').style.display='block';
-  $('loading').textContent='pins '+S.liteLoaded+'/'+S.toLoad+' · details '+S.detLoaded+'/'+S.toLoad;
+  if(S.toLoad===1){ $('loading').textContent=S.liteLoaded<1?'loading the map…':'pins live · loading hover detail…'; }
+  else { $('loading').textContent='pins '+S.liteLoaded+'/'+S.toLoad+' · details '+S.detLoaded+'/'+S.toLoad; }
   if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad){ $('loading').style.display='none'; try{ computeViewLegend(); }catch(_){ } }
 }
 
@@ -554,7 +614,11 @@ function movePump(){
     if(performance.now()-_pumpLast<350){ requestAnimationFrame(frame); } else { _pumpOn=false; }
   });
 }
-function pinScale(z){ return z<5.5?0.6:(z<8?0.75:(z<11?0.9:1.0)); }
+// v3.9: pins GROW as you zoom in (owner: teardrops were too small at street level)
+function pinScale(z){ return z<5.5?0.6:(z<8?0.75:(z<9.5?0.85:(z<11?0.95:(z<12.5?1.15:(z<14?1.35:1.55))))); }
+// v3.9: HQ logo chips are LARGE zoomed out (the brand layer of the national view) and SHRINK as
+// you zoom in, ceding the stage to the client teardrops (owner directive).
+function chipSize(z){ return z<5?44:(z<6.5?38:(z<9?30:(z<11?24:20))); }
 function sprite(kind,hex,ps){
   var key=kind+'|'+hex+'|'+ps;
   if(spriteCache[key]) return spriteCache[key];
@@ -644,7 +708,7 @@ function draw(){
       } else {
         var sp2=sprite('pin',pinColorAt(d2,i2,slugArr2[IDX2[i2]]),ps);
         ctx.drawImage(sp2.img,0,0,sp2.img.width,sp2.img.height,sx3-sp2.ax,sy3-sp2.ay,sp2.w,sp2.h);
-        if(hits.length<80000) hits.push({x:sx3,y:sy3-8*ps,r:11,kind:'pin',st:st2,i:i2});
+        if(hits.length<80000) hits.push({x:sx3,y:sy3-8*ps,r:11*ps,kind:'pin',st:st2,i:i2});
       }
     }
   }
@@ -689,9 +753,9 @@ function draw(){
       else { if(!S.beaconsOn||z<6) continue; }                   // admin ◆ + candidates ✩: opt-in, z≥6 only
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
       if(bx<-22||bx>W+22||by<-22||by>H+22) continue;
-      if(isHq&&b.has_logo){
+      if(isHq&&b.has_logo&&(z>=5||!S._topFams||S._topFams[b.family_slug])){
         var im=beaconLogo(b.family_slug);
-        if(im){ var chs=z<6?24:32; drawLogoChip(bx,by,im,chs); hits.push({x:bx,y:by,r:chs*0.58,kind:'beacon',b:b}); continue; }
+        if(im){ var chs=chipSize(z); drawLogoChip(bx,by,im,chs); hits.push({x:bx,y:by,r:chs*0.58,kind:'beacon',b:b}); continue; }
       }
       var col=b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER;
       var kind=b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star');
