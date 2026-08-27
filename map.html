@@ -4,7 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.7 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.8 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.8 (claim 112 — the "loads displaced" refresh bug, REPRODUCED live in owner Chrome + probed):
+     Google's raster tile layer can settle in a stale post-init render (probe proof: getZoom()=5 and
+     getBounds() span 61.9° = self-consistent, while the painted tiles spanned ~75°); our canvas
+     draws from the API state, so every mark sat radially expanded vs the tiles until ANY user
+     interaction forced Google to re-render (which is why it always self-corrected on zoom). FIX:
+     kickMap() = trigger('resize') + recenter + redraw, fired on first tilesloaded, at 1.2s/3s after
+     boot, on window resize, and via ResizeObserver on the map container. ALSO: the URL is no longer
+     continuously rewritten (history.replaceState removed) — a plain refresh ALWAYS loads the clean
+     default view (owner's refresh had inherited yesterday's lens=hea + zoom from the URL); the
+     Copy view link button builds the full-state URL on demand, and shared links restore via readUrl.
+     v3.7 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.7 (claim 111 — Gazz brainless-UI + tracking round): CONTINUOUS RENDER TRACKING — a rAF pump
      redraws every frame during pan/zoom (350ms settle + idle seal), so pins move commensurate with
      the map (owner's screenshot showed marks lagging the tiles mid-interaction). Panel restructured
@@ -210,7 +221,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.7 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.8 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -496,7 +507,16 @@ window.initMap=function(){
   S.map.addListener('zoom_changed',movePump);
   S.map.addListener('bounds_changed',movePump);
   S.map.addListener('drag',movePump);
-  S.map.addListener('idle',function(){ scheduleDraw(); writeUrl(); scheduleViewLegend(); });
+  S.map.addListener('idle',function(){ scheduleDraw(); scheduleViewLegend(); });
+  // v3.8: TILE-RENDER KICK — root cause of the "loads displaced" screenshot: Google's raster layer
+  // can settle in a stale post-init state (tiles rendered for pre-layout metrics) while the API
+  // reports the correct zoom/bounds; our marks (drawn from the API) then sit misaligned until any
+  // interaction forces Google to re-render. Kicking resize+recenter after boot, on first tiles,
+  // shortly after, and on ANY container resize forces tiles and marks to agree with no interaction.
+  google.maps.event.addListenerOnce(S.map,'tilesloaded',function(){ kickMap(); });
+  setTimeout(kickMap,1200); setTimeout(kickMap,3000);
+  window.addEventListener('resize',function(){ kickMap(); });
+  try{ new ResizeObserver(function(){ kickMap(); }).observe($('mapwrap')); }catch(_){}
   var mapDiv=$('map');
   mapDiv.addEventListener('mousemove',onMove);
   mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
@@ -516,6 +536,15 @@ function loadGmaps(){
 var cvs=$('pincanvas'), ctx=cvs.getContext('2d'), spriteCache={}, drawScheduled=false;
 var hits=[];                 // rebuilt each draw: {x,y,r,kind:'pin'|'beacon'|'hist', ...}
 function scheduleDraw(){ if(drawScheduled) return; drawScheduled=true; requestAnimationFrame(function(){ drawScheduled=false; draw(); }); }
+function kickMap(){
+  if(!S.map) return;
+  try{
+    var c=S.map.getCenter();
+    google.maps.event.trigger(S.map,'resize');
+    if(c) S.map.setCenter(c);
+  }catch(_){}
+  scheduleDraw();
+}
 var _pumpLast=0,_pumpOn=false;
 function movePump(){
   _pumpLast=performance.now();
@@ -1032,7 +1061,12 @@ function openSharePanel(st){
 }
 
 // ------------------------- url state -------------------------
-function writeUrl(){
+// v3.8: the URL is NO LONGER rewritten while you use the map — a plain refresh always loads the
+// clean default view (owner: refresh looked "wrong" because yesterday's lens/zoom rode the URL).
+// Full view state travels ONLY via the Copy view link button (buildUrl), and shared links still
+// restore everything through readUrl.
+function writeUrl(){ /* intentionally inert (v3.8) */ }
+function buildUrl(){
   try{
     var p=new URLSearchParams(); var sel=selMap();
     p.set('grain',S.grain);
@@ -1048,8 +1082,8 @@ function writeUrl(){
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.hist) p.set('hist','1');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
-    history.replaceState(null,'','map.html?'+p.toString());
-  }catch(e){}
+    return location.origin+location.pathname+'?'+p.toString();
+  }catch(e){ return location.href; }
 }
 function readUrl(){
   try{
@@ -1071,8 +1105,7 @@ function readUrl(){
   }catch(e){}
 }
 $('permalink').onclick=function(){
-  writeUrl();
-  try{ navigator.clipboard.writeText(location.href); $('permalink').textContent='Copied!'; setTimeout(function(){$('permalink').textContent='Copy view link'},1400); }catch(e){}
+  try{ navigator.clipboard.writeText(buildUrl()); $('permalink').textContent='Copied!'; setTimeout(function(){$('permalink').textContent='Copy view link'},1400); }catch(e){}
 };
 
 // ------------------------- THIS VIEW legend (live viewport market report) -------------------------
