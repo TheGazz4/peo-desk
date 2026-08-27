@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.2 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.3 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.3: renewal-heat lens (rm/rmb from detail wave; urgency ramp; basis CLASS labeled on hover per B.7 —
+     verified/reasoned/unverified, never silently merged); territory circle-draw with ON-SCREEN results only
+     (NO export — owner data-protection ruling 2026-08-27: no CSV anywhere on the platform for now);
+     head-to-head readout when exactly 2 PEOs visible; Coverage Map link added to ask.html tab bar.
+     Time slider DATA-GATED OUT this round: peo_current_since coverage 38.2% < owner reliability bar.
      v3.2: multi-state operator filter (data-gated: 100% footprint coverage verified, 46,070 known multi-state —
      label is honest: "observed in 2+ states"; ms[] rides the detail wave, snapshots rebaked); collapsible left
      panel (☰, map resizes); mobile-responsive (drawer panel, greedy gestures, tap-friendly, full-width dock/card).
@@ -96,6 +101,21 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
   border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
 #panel-toggle{font-size:15px;padding:4px 10px}
 #panel.off{display:none}
+#lenslegend{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:33;display:none;gap:10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:6px 14px;font-size:11px;color:var(--ink2)}
+#lenslegend span{display:inline-flex;align-items:center;gap:5px;margin:0 4px}
+#lenslegend i{width:9px;height:9px;border-radius:3px;display:inline-block}
+#terr{position:absolute;bottom:24px;right:12px;z-index:37;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:52%;overflow:hidden;flex-direction:column}
+#terr .hd{padding:9px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink);font-weight:650}
+#terr .hd .x{float:right;background:none;border:0;color:var(--muted);cursor:pointer;font-size:15px}
+#terr .sub{padding:2px 12px 8px;font-size:11px;color:var(--muted)}
+#terr .tops{padding:0 12px 8px;border-bottom:1px solid var(--grid)}
+#terr .list{overflow-y:auto;flex:1;padding:4px 6px}
+#terr .tr{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:5px;font-size:12px;color:var(--ink2);cursor:pointer}
+#terr .tr:hover{background:rgba(99,144,238,.08);color:var(--ink)}
+#terr .dot{width:8px;height:8px;border-radius:2.5px;flex:none}
+#draw-btn.on{background:var(--accent);color:#0b1220;border-color:var(--accent)}
+@media (max-width:760px){ #terr{width:calc(100vw - 24px);max-width:340px} #lenslegend{bottom:78px;white-space:nowrap;overflow-x:auto;max-width:94vw} }
 @media (max-width:760px){
   header{flex-wrap:wrap;gap:8px;padding:8px 10px}
   header .stamp, header a{display:none}
@@ -146,7 +166,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.2 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.3 · 2026-08-27</span>
+    <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
     <span id="stats">loading…</span>
@@ -164,6 +185,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
         <h2 style="margin-top:10px" title="Multi-state = observed operating in 2+ states in our footprint data">Operators</h2>
         <div class="seg"><button id="ms-all" class="on">All clients</button><button id="ms-multi" title="Only clients observed operating in 2+ states">Multi-state</button></div>
+        <h2 style="margin-top:10px" title="Renewal heat colors every pin by how soon its WC renewal month comes up">Color by</h2>
+        <div class="seg"><button id="lens-peo" class="on">PEO</button><button id="lens-ren">Renewal heat</button></div>
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
       </div>
       <div class="sec">
@@ -190,6 +213,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
       <div id="loading">loading…</div>
       <div id="card"></div>
       <div id="sharepanel"></div>
+      <div id="lenslegend"></div>
+      <div id="terr"></div>
       <div id="aidock" class="min">
         <div class="hd" id="ai-hd">✦ Ask the map <span class="min" id="ai-min">▴</span></div>
         <div class="bd">
@@ -226,6 +251,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var S={
   grain:'family', placement:'address', clusterMode:'cluster', msOnly:false, panelOpen:true,
+  lens:'peo', terr:null, drawMode:false, _drawStart:null,
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
   sel:{family:null,brand:null}, states:{},
   beaconsOn:true, beacons:[],
@@ -340,7 +366,7 @@ function loadDetail(st){
       mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);   // ZIP view: everything at its ZIP center, jittered
     }
     d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
-    d.detail={ids:r.ids||[],names:r.names||[],cities:r.cities||[],street:r.street||[],ms:r.ms||[]};
+    d.detail={ids:r.ids||[],names:r.names||[],cities:r.cities||[],street:r.street||[],ms:r.ms||[],rm:r.rm||[],rmb:r.rmb||[]};
     d.lat0=null; d.lng0=null;
     S.detLoaded++; bump(); progress(); scheduleDraw(); pump();
   }).catch(function(){ S.detLoaded++; progress(); pump(); });
@@ -365,6 +391,8 @@ window.initMap=function(){
   mapDiv.addEventListener('mousemove',onMove);
   mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
   mapDiv.addEventListener('click',onClick);
+  mapDiv.addEventListener('mousedown',onDrawDown,true);
+  mapDiv.addEventListener('mouseup',onDrawUp,true);
   window.addEventListener('resize',scheduleDraw);
   scheduleDraw();
 };
@@ -409,7 +437,16 @@ function sprite(kind,hex,ps){
   var o={img:c,w:w,h:h,ax:ax,ay:ay};
   spriteCache[key]=o; return o;
 }
-function clusterOn(z,visCount){ return S.clusterMode==='cluster' && z<12.5 && visCount>3; }
+// renewal-heat lens: urgency class from WC renewal month (B.7: basis class labeled, never silently merged)
+var URG_COLORS=['#de6b5f','#e0985c','#bd8a35','#5b7f96','#9aa5ad'];
+var URG_LABELS=['Renews ≤2 mo','3–4 mo out','5–6 mo out','7+ mo out','Unknown'];
+var RMB_LABELS=['','unverified','reasoned','verified'];
+function urgClass(rm){ if(!rm) return 4; var mu=((rm-1)-(new Date().getMonth())+12)%12; return mu<=1?0:(mu<=3?1:(mu<=5?2:3)); }
+function keyFor(d,i,slug){ return S.lens==='renewal' ? ('urg:'+(d.detail?urgClass(d.detail.rm[i]):4)) : slug; }
+function slugColor(s){ return (s&&s.indexOf('urg:')===0)?URG_COLORS[+s.slice(4)]:(S.colors[S.grain][s]||OTHER); }
+function slugLabel(s){ return (s&&s.indexOf('urg:')===0)?URG_LABELS[+s.slice(4)]:dispOf(s); }
+function pinColorAt(d,i,slug){ return S.lens==='renewal' ? URG_COLORS[d.detail?urgClass(d.detail.rm[i]):4] : (S.colors[S.grain][slug]||OTHER); }
+function clusterOn(z,visCount){ return S.clusterMode==='cluster' && z<12.5 && (visCount>3||S.lens==='renewal'); }
 function rebuildClusters(z){
   var scale=256*Math.pow(2,Math.round(z*2)/2);
   var cell=72/scale;
@@ -429,7 +466,7 @@ function rebuildClusters(z){
       var e=cells[key];
       if(!e){ e=cells[key]={n:0,sx:0,sy:0,slugs:{},members:[]}; }
       e.n++; e.sx+=MX[i]; e.sy+=MY[i];
-      var sl=slugArr[IDX[i]]; e.slugs[sl]=(e.slugs[sl]||0)+1;
+      var sl=keyFor(d,i,slugArr[IDX[i]]); e.slugs[sl]=(e.slugs[sl]||0)+1;
       if(e.members.length<7) e.members.push([st,i]);
     }
   }
@@ -469,7 +506,7 @@ function draw(){
       if(sx<-16||sx>W+16||sy<-24||sy>H+8) continue;
       var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
       var sl=slugArr[IDX[i]];
-      var sp=sprite('pin',S.colors[S.grain][sl]||OTHER,ps);
+      var sp=sprite('pin',pinColorAt(d,i,sl),ps);
       ctx.drawImage(sp.img,0,0,sp.img.width,sp.img.height,sx-sp.ax,sy-sp.ay,sp.w,sp.h);
       hits.push({x:sx,y:sy-8*ps,r:11,kind:'pin',st:st,i:i});
     }
@@ -495,11 +532,18 @@ function draw(){
         if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
         var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
         if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
-        var sp2=sprite('pin',S.colors[S.grain][slugArr2[IDX2[i2]]]||OTHER,ps);
+        var sp2=sprite('pin',pinColorAt(d2,i2,slugArr2[IDX2[i2]]),ps);
         ctx.drawImage(sp2.img,0,0,sp2.img.width,sp2.img.height,sx3-sp2.ax,sy3-sp2.ay,sp2.w,sp2.h);
         if(hits.length<80000) hits.push({x:sx3,y:sy3-8*ps,r:11,kind:'pin',st:st2,i:i2});
       }
     }
+  }
+  // territory circle (preview while drawing, persistent after)
+  if(S.terr){
+    var tx=(S.terr.cmx-cx)*scale+W/2, ty=(S.terr.cmy-cy)*scale+H/2, tr=S.terr.rMerc*scale;
+    ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle='rgba(99,144,238,.95)'; ctx.setLineDash([6,5]);
+    ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.fillStyle='rgba(99,144,238,.07)'; ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.fill();
   }
   // beacons on top
   if(S.beaconsOn){
@@ -528,7 +572,7 @@ function drawDonut(x,y,r,K){
     ctx.beginPath(); ctx.strokeStyle=col; ctx.arc(x,y,r,start,end); ctx.stroke();
     start=end;
   }
-  topList.forEach(function(t){ seg(t[1]/total,S.colors[S.grain][t[0]]||OTHER); });
+  topList.forEach(function(t){ seg(t[1]/total,slugColor(t[0])); });
   if(rest>0) seg(rest/total,OTHER);
   ctx.beginPath(); ctx.fillStyle='rgba(255,255,255,.9)'; ctx.arc(x,y,Math.max(3,r-ctx.lineWidth/1.6),0,Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.lineWidth=1; ctx.strokeStyle='rgba(70,63,56,.55)'; ctx.arc(x,y,r+ctx.lineWidth,0,Math.PI*2); ctx.stroke();
@@ -545,8 +589,90 @@ function pick(e){
   }
   return best;
 }
+// ---- territory draw (screen-only results; NO export by owner ruling) ----
+function pxToMerc(px,py){
+  var wrap=$('mapwrap'); var W=wrap.clientWidth, H=wrap.clientHeight;
+  var z=S.map.getZoom(); var scale=256*Math.pow(2,z);
+  var ctr=S.map.getCenter();
+  return [mercX(ctr.lng())+(px-W/2)/scale, mercY(ctr.lat())+(py-H/2)/scale];
+}
+$('draw-btn').onclick=function(){
+  S.drawMode=!S.drawMode;
+  $('draw-btn').className=S.drawMode?'ghost on':'ghost';
+  if(S.map) S.map.setOptions({draggable:!S.drawMode});
+  $('mapwrap').style.cursor=S.drawMode?'crosshair':'';
+  if(!S.drawMode&&!S.terr) closeTerr();
+};
+function onDrawDown(e){
+  if(!S.drawMode) return;
+  var p=mapXY(e); var m=pxToMerc(p[0],p[1]);
+  S._drawStart={mx:m[0],my:m[1]};
+  S.terr={cmx:m[0],cmy:m[1],rMerc:0};
+  e.preventDefault(); e.stopPropagation();
+}
+function onDrawMove(e){
+  if(!S.drawMode||!S._drawStart) return;
+  var p=mapXY(e); var m=pxToMerc(p[0],p[1]);
+  var dx=m[0]-S._drawStart.mx, dy=m[1]-S._drawStart.my;
+  S.terr={cmx:S._drawStart.mx,cmy:S._drawStart.my,rMerc:Math.sqrt(dx*dx+dy*dy)};
+  scheduleDraw();
+}
+function onDrawUp(){
+  if(!S.drawMode||!S._drawStart) return;
+  S._drawStart=null;
+  S.drawMode=false; $('draw-btn').className='ghost';
+  if(S.map) S.map.setOptions({draggable:true});
+  $('mapwrap').style.cursor='';
+  if(S.terr&&S.terr.rMerc>0) terrResults(); else { S.terr=null; scheduleDraw(); }
+}
+function terrResults(){
+  var t=S.terr; if(!t) return;
+  var sel=selMap(); var byKey={}; var members=[]; var total=0;
+  for(var st in S.pinData){
+    if(S.states[st]===false) continue;
+    var d=S.pinData[st];
+    var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    for(var i=0;i<d.n;i++){
+      if(!vis[IDX[i]]) continue;
+      if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
+      var dx=MX[i]-t.cmx, dy=MY[i]-t.cmy;
+      if(dx*dx+dy*dy > t.rMerc*t.rMerc) continue;
+      total++;
+      var sl=slugArr[IDX[i]]; byKey[sl]=(byKey[sl]||0)+1;
+      if(members.length<300) members.push([st,i,sl]);
+    }
+  }
+  var lat=invLat(t.cmy);
+  var miles=Math.round(t.rMerc*40075016.7*Math.cos(lat*Math.PI/180)/1609.34*10)/10;
+  var top=Object.keys(byKey).map(function(s){return [s,byKey[s]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,6);
+  var el=$('terr');
+  var tops=top.map(function(x){ var pct=total?Math.round(100*x[1]/total):0;
+    return '<div class="vl-row"><span class="dot" style="background:'+colorOf(x[0])+'"></span><span class="nm">'+esc(dispOf(x[0]))+'</span><span class="bar"><i style="width:'+Math.max(3,pct)+'%;background:'+colorOf(x[0])+'"></i></span><span class="ct">'+x[1].toLocaleString()+'</span></div>'; }).join('');
+  var list=members.map(function(mm){
+    var d=S.pinData[mm[0]]; var nm=d.detail?(d.detail.names[mm[1]]||'—'):'(loading…)'; var city=d.detail?(d.detail.cities[mm[1]]||''):'';
+    return '<div class="tr" data-st="'+mm[0]+'" data-i="'+mm[1]+'"><span class="dot" style="background:'+colorOf(mm[2])+'"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span><span style="color:var(--muted);font-size:10.5px">'+esc(city)+'</span></div>'; }).join('');
+  el.innerHTML='<div class="hd">'+total.toLocaleString()+' clients in circle <button class="x" id="terr-x">×</button></div>'+
+    '<div class="sub">~'+miles+' mi radius · results stay on screen — nothing exports</div>'+
+    '<div class="tops" id="terr-tops">'+tops+'</div>'+
+    '<div class="list" id="terr-list">'+list+(total>300?'<div class="sub">showing first 300 — zoom the circle tighter for a full list</div>':'')+'</div>';
+  el.style.display='flex';
+  document.getElementById('terr-x').onclick=closeTerr;
+  document.getElementById('terr-list').addEventListener('click',function(ev){
+    var row=ev.target.closest('.tr'); if(!row) return;
+    var d=S.pinData[row.dataset.st]; if(!d||!d.detail) return;
+    var id=d.detail.ids[+row.dataset.i]; if(!id) return;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slugArr[IDX[+row.dataset.i]]); });
+  });
+  scheduleDraw();
+}
+function closeTerr(){ S.terr=null; $('terr').style.display='none'; scheduleDraw(); }
+
 var hoverRaf=false;
 function onMove(e){
+  if(S.drawMode){ onDrawMove(e); return; }
   if(hoverRaf) return; hoverRaf=true;
   requestAnimationFrame(function(){
     hoverRaf=false;
@@ -561,13 +687,17 @@ function onMove(e){
     var nm=d.detail?(d.detail.names[h.i]||'—'):'Loading…';
     var city=d.detail?(d.detail.cities[h.i]||''):'';
     var street=d.detail?!!d.detail.street[h.i]:false;
+    var renLine='';
+    if(d.detail&&d.detail.rm[h.i]){ renLine='Renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+RMB_LABELS[d.detail.rmb[h.i]]+')</span><br>'; }
+    else if(S.lens==='renewal'&&d.detail){ renLine='<span class="mut">Renewal month unknown</span><br>'; }
     tipShow('<b>'+esc(nm)+'</b><br>'+
       '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
-      esc(city+(city?', ':'')+h.st)+'<br>'+
+      esc(city+(city?', ':'')+h.st)+'<br>'+renLine+
       '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
   });
 }
 function onClick(e){
+  if(S.drawMode) return;
   var h=pick(e); if(!h) return;
   if(h.kind==='cluster'){
     var lat=invLat(h.cl.my), lng=invLng(h.cl.mx);
@@ -584,8 +714,8 @@ function onClick(e){
 function tipCluster(K,ev){
   var rows=K.top.slice(0,5).map(function(t){
     var pct=Math.round(100*t[1]/K.n);
-    return '<span style="color:'+(S.colors[S.grain][t[0]]||OTHER)+'">●</span> '+esc(dispOf(t[0]))+' <span class="mut">'+t[1].toLocaleString()+' · '+pct+'%</span>'+
-      '<div class="bar" style="width:'+Math.max(6,pct)+'%;background:'+(S.colors[S.grain][t[0]]||OTHER)+'"></div>';
+    return '<span style="color:'+slugColor(t[0])+'">●</span> '+esc(slugLabel(t[0]))+' <span class="mut">'+t[1].toLocaleString()+' · '+pct+'%</span>'+
+      '<div class="bar" style="width:'+Math.max(6,pct)+'%;background:'+slugColor(t[0])+'"></div>';
   }).join('');
   tipShow('<b>'+K.n.toLocaleString()+' clients here</b><br>'+rows+'<span class="mut">click to zoom in</span>',ev);
 }
@@ -664,6 +794,21 @@ $('cm-cluster').onclick=function(){ setClusterMode('cluster') };
 $('cm-all').onclick=function(){ setClusterMode('all') };
 $('ms-all').onclick=function(){ setMsOnly(false) };
 $('ms-multi').onclick=function(){ setMsOnly(true) };
+$('lens-peo').onclick=function(){ setLens('peo') };
+$('lens-ren').onclick=function(){ setLens('renewal') };
+function setLens(v){
+  if(S.lens===v) return;
+  S.lens=v;
+  $('lens-peo').className=v==='peo'?'on':''; $('lens-ren').className=v==='renewal'?'on':'';
+  renderLensLegend();
+  bump(); scheduleDraw(); writeUrl();
+}
+function renderLensLegend(){
+  var l=$('lenslegend');
+  if(S.lens!=='renewal'){ l.style.display='none'; return; }
+  l.innerHTML=URG_LABELS.map(function(t,i){ return '<span><i style="background:'+URG_COLORS[i]+'"></i>'+t+'</span>'; }).join('');
+  l.style.display='block';
+}
 function setMsOnly(v){
   if(S.msOnly===v) return;
   S.msOnly=v;
@@ -755,6 +900,7 @@ function writeUrl(){
     if(S.placement==='zip') p.set('pm','zip');
     if(S.clusterMode==='all') p.set('cm','all');
     if(S.msOnly) p.set('ms','1');
+    if(S.lens==='renewal') p.set('lens','ren');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
     history.replaceState(null,'','map.html?'+p.toString());
   }catch(e){}
@@ -771,6 +917,7 @@ function readUrl(){
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
     if(p.get('cm')==='all'){ S.clusterMode='all'; $('cm-cluster').className=''; $('cm-all').className='on'; }
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-all').className=''; $('ms-multi').className='on'; }
+    if(p.get('lens')==='ren'){ S.lens='renewal'; $('lens-peo').className=''; $('lens-ren').className='on'; renderLensLegend(); }
     S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
   }catch(e){}
 }
@@ -803,7 +950,13 @@ function computeViewLegend(){
   }
   var top=Object.keys(counts).map(function(s){return [s,counts[s]]}).sort(function(a,b2){return b2[1]-a[1]}).slice(0,8);
   S._vlSummary={total:total, top:top.map(function(t){return {slug:t[0], name:dispOf(t[0]), n:t[1]}})};
-  $('vl-total').textContent=total?total.toLocaleString()+' clients in this view':'no clients in this view';
+  var visSel=catRows().filter(function(r){return selMap()[r.slug]!==false});
+  if(visSel.length===2&&total>0){
+    var a=counts[visSel[0].slug]||0, b3=counts[visSel[1].slug]||0;
+    $('vl-total').innerHTML='Head-to-head here: <b style="color:'+colorOf(visSel[0].slug)+'">'+esc(visSel[0].display)+'</b> '+a.toLocaleString()+' vs <b style="color:'+colorOf(visSel[1].slug)+'">'+esc(visSel[1].display)+'</b> '+b3.toLocaleString();
+  } else {
+    $('vl-total').textContent=total?total.toLocaleString()+' clients in this view':'no clients in this view';
+  }
   var host=$('viewlegend'); host.innerHTML='';
   top.forEach(function(t){
     var pct=total?Math.round(100*t[1]/total):0;
