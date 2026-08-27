@@ -413,26 +413,32 @@ var liteQ=[], detQ=[];
 // details_all in the background), atomic pair by shared bake_key with one cache-busted retry.
 // The old 110-request per-state loader remains below as the fallback path.
 function startPinLoads(){
-  S.toLoad=1; S.liteLoaded=0; S.detLoaded=0; progress();
-  apiGet('mode=pins_all').then(function(r){
-    if(!r||!r.states){ startPinLoadsLegacy(); return; }
-    (r.states||[]).forEach(function(sd){ commitLiteState(sd, r.bake_key); });
-    S.liteLoaded=1; progress(); bump(); scheduleDraw();
-    function takeDetail(d, bake, retried){
-      if(!d||d.bake_key!==bake){
-        if(retried){ S.detLoaded=1; progress(); return; }
-        return apiGet('mode=pins_all&b='+Date.now()).then(function(r2){
-          (r2.states||[]).forEach(function(sd){ commitLiteState(sd, r2.bake_key); });
-          bump(); scheduleDraw();
-          return apiGet('mode=details_all&b='+Date.now()).then(function(d2){ takeDetail(d2, r2.bake_key, true); });
-        }).catch(function(){ S.detLoaded=1; progress(); });
+  S.toLoad=4; S.liteLoaded=0; S.detLoaded=0; progress();
+  var fellBack=false;
+  [1,2,3,4].forEach(function(part){
+    apiGet('mode=pins_all&part='+part).then(function(r){
+      if(!r||!r.states) throw new Error('no bundle');
+      (r.states||[]).forEach(function(sd){ commitLiteState(sd, r.bake_key); });
+      S.liteLoaded++; progress(); bump(); scheduleDraw();
+      function takeDetail(d, bake, retried){
+        if(!d||d.bake_key!==bake){
+          if(retried){ S.detLoaded++; progress(); return; }
+          return apiGet('mode=pins_all&part='+part+'&b='+Date.now()).then(function(r2){
+            (r2.states||[]).forEach(function(sd){ commitLiteState(sd, r2.bake_key); });
+            bump(); scheduleDraw();
+            return apiGet('mode=details_all&part='+part+'&b='+Date.now()).then(function(d2){ takeDetail(d2, r2.bake_key, true); });
+          }).catch(function(){ S.detLoaded++; progress(); });
+        }
+        commitDetailAll(d);
+        S.detLoaded++; progress(); bump(); scheduleDraw();
       }
-      commitDetailAll(d);
-      S.detLoaded=1; progress(); bump(); scheduleDraw();
-    }
-    apiGet('mode=details_all').then(function(d){ takeDetail(d, r.bake_key, false); })
-      .catch(function(){ S.detLoaded=1; progress(); });
-  }).catch(function(){ startPinLoadsLegacy(); });
+      apiGet('mode=details_all&part='+part).then(function(d){ takeDetail(d, r.bake_key, false); })
+        .catch(function(){ S.detLoaded++; progress(); });
+    }).catch(function(){
+      if(!fellBack){ fellBack=true; startPinLoadsLegacy(); }
+      else { S.liteLoaded++; S.detLoaded++; progress(); }
+    });
+  });
 }
 function commitLiteState(sd, bake){
   var n=sd.n||0, pins=sd.pins||[];
@@ -548,7 +554,7 @@ function loadHist(){
 }
 function progress(){
   $('loading').style.display='block';
-  if(S.toLoad===1){ $('loading').textContent=S.liteLoaded<1?'loading the map…':'pins live · loading hover detail…'; }
+  if(S.toLoad===4){ $('loading').textContent=S.liteLoaded<4?('loading the map… '+S.liteLoaded+'/4'):'pins live · loading hover detail…'; }
   else { $('loading').textContent='pins '+S.liteLoaded+'/'+S.toLoad+' · details '+S.detLoaded+'/'+S.toLoad; }
   if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad){ $('loading').style.display='none'; try{ computeViewLegend(); }catch(_){ } }
 }
