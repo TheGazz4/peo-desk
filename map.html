@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.3 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.4 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.4 (Gazz 6-point feedback, claim 104): PIN-VANISH FIX — paired-wave loader now verifies detail bake_key
+     AND array length against the lite wave; on any mismatch it refetches BOTH waves cache-busted and commits
+     them atomically (never a mixed pair — the old path committed mismatched detail over cached lite, yielding
+     NaN mercators that silently no-op'd drawImage, so pins vanished state-by-state as stale-cache users
+     interacted). Plus NaN guards at commit. HEALTH renewal lens: hrm/hrmb (health_renewal_month + basis class)
+     ride the detail wave; lens is now 3-way PEO | Health renewal | WC renewal — health is the primary renewal
+     heat per owner ruling (WC kept as secondary); hover + card show health first, WC after, basis class always
+     labeled (B.7). AI briefing (map-data v2.6) speaks "headquartered vs operating" and carries a GLOBAL
+     grounding rule: no fact from model memory, ever — plus weekly golden-question tripwires (migration 0573).
      v3.3: renewal-heat lens (rm/rmb from detail wave; urgency ramp; basis CLASS labeled on hover per B.7 —
      verified/reasoned/unverified, never silently merged); territory circle-draw with ON-SCREEN results only
      (NO export — owner data-protection ruling 2026-08-27: no CSV anywhere on the platform for now);
@@ -166,7 +175,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.3 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.4 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -185,8 +194,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
         <h2 style="margin-top:10px" title="Multi-state = observed operating in 2+ states in our footprint data">Operators</h2>
         <div class="seg"><button id="ms-all" class="on">All clients</button><button id="ms-multi" title="Only clients observed operating in 2+ states">Multi-state</button></div>
-        <h2 style="margin-top:10px" title="Renewal heat colors every pin by how soon its WC renewal month comes up">Color by</h2>
-        <div class="seg"><button id="lens-peo" class="on">PEO</button><button id="lens-ren">Renewal heat</button></div>
+        <h2 style="margin-top:10px" title="Renewal heat colors every pin by how soon its renewal month comes up — health/benefits renewal is the primary trigger; WC is secondary">Color by</h2>
+        <div class="seg"><button id="lens-peo" class="on">PEO</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health renewal</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC renewal</button></div>
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
       </div>
       <div class="sec">
@@ -338,36 +347,61 @@ function pump(){
   else if(detQ.length){ loadDetail(detQ.shift()); }
   else if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad){ $('loading').style.display='none'; }
 }
+// PAIRED-WAVE LOADER (v3.4 vanish fix). The two waves of one state MUST come from the same bake:
+// detail commits ONLY when its bake_key matches the lite wave AND every array is exactly n long.
+// On any mismatch (stale browser-cached lite + fresh detail, or vice versa) BOTH waves are refetched
+// cache-busted and committed atomically. Never a mixed pair, never a NaN written to a mercator array.
+function commitLite(st,r){
+  var n=r.n||0, pins=r.pins||[];
+  var mxA=new Float64Array(n), myA=new Float64Array(n), fis=new Int16Array(n), bis=new Int16Array(n);
+  for(var i=0;i<n;i++){ var p=pins[i]; mxA[i]=mercX(p[1]); myA[i]=mercY(p[0]); fis[i]=p[2]; bis[i]=p[3]; }
+  S.pinData[st]={fams:r.fams||[],brds:r.brds||[],n:n,mxA:mxA,myA:myA,mxZ:mxA,myZ:myA,fis:fis,bis:bis,lat0:pins.map(function(p){return p[0]}),lng0:pins.map(function(p){return p[1]}),bake:r.bake_key,detail:null};
+}
 function loadLite(st){
   apiGet('mode=pins_lite&state='+st).then(function(r){
-    var n=r.n||0, pins=r.pins||[];
-    var mxA=new Float64Array(n), myA=new Float64Array(n), fis=new Int16Array(n), bis=new Int16Array(n);
-    for(var i=0;i<n;i++){ var p=pins[i]; mxA[i]=mercX(p[1]); myA[i]=mercY(p[0]); fis[i]=p[2]; bis[i]=p[3]; }
-    S.pinData[st]={fams:r.fams||[],brds:r.brds||[],n:n,mxA:mxA,myA:myA,mxZ:mxA,myZ:myA,fis:fis,bis:bis,lat0:pins.map(function(p){return p[0]}),lng0:pins.map(function(p){return p[1]}),bake:r.bake_key,detail:null};
+    commitLite(st,r);
     S.liteLoaded++; detQ.push(st); bump(); progress(); scheduleDraw(); pump();
   }).catch(function(){ S.liteLoaded++; progress(); pump(); });
 }
-function loadDetail(st){
-  apiGet('mode=pins_detail&state='+st).then(function(r){
+function detailMatches(d,r){
+  if(!d||r.bake_key!==d.bake) return false;
+  var n=d.n;
+  var arrs=[r.ids,r.names,r.cities,r.street,r.ms,r.rm,r.rmb,r.zlat,r.zlng];
+  for(var k=0;k<arrs.length;k++){ if(!arrs[k]||arrs[k].length!==n) return false; }
+  return true;   // hrm/hrmb checked separately: optional (older bakes), but if present must be n long
+}
+function commitDetail(st,r){
+  var d=S.pinData[st], n=d.n;
+  var mxA=new Float64Array(n), myA=new Float64Array(n), mxZ=new Float64Array(n), myZ=new Float64Array(n);
+  for(var i=0;i<n;i++){
+    var lat=d.lat0[i], lng=d.lng0[i];
+    if(!isFinite(lat)||!isFinite(lng)){ mxA[i]=d.mxA[i]; myA[i]=d.myA[i]; mxZ[i]=d.mxA[i]; myZ[i]=d.myA[i]; continue; }
+    var id=r.ids[i]||''; var j=jit(id);
+    var street=r.street[i]?1:0;
+    var aLat=lat, aLng=lng; if(!street){ aLat+=j[0]; aLng+=j[1]; }
+    mxA[i]=mercX(aLng); myA[i]=mercY(aLat);
+    var zLat=(street&&r.zlat[i]!=null)?r.zlat[i]:lat;
+    var zLng=(street&&r.zlng[i]!=null)?r.zlng[i]:lng;
+    mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);   // ZIP view: everything at its ZIP center, jittered
+  }
+  var hOk=r.hrm&&r.hrm.length===n&&r.hrmb&&r.hrmb.length===n;
+  d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
+  d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
+            hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null};
+  d.lat0=null; d.lng0=null;
+}
+function loadDetail(st,retried){
+  apiGet('mode=pins_detail&state='+st+(retried?'&b='+Date.now():'')).then(function(r){
     var d=S.pinData[st]; if(!d){ S.detLoaded++; progress(); pump(); return; }
-    if(r.bake_key!==d.bake){ /* snapshot rolled between waves — refetch lite once */
-      apiGet('mode=pins_lite&state='+st+'&r='+Date.now()).then(function(){ }).catch(function(){});
+    if(!detailMatches(d,r)){
+      if(retried){ S.detLoaded++; progress(); pump(); return; }   // give up: keep lite-only pins (still drawn, just no hover detail) — never commit a mixed pair
+      apiGet('mode=pins_lite&state='+st+'&b='+Date.now()).then(function(lr){   // refetch BOTH waves cache-busted, commit atomically
+        commitLite(st,lr); bump(); scheduleDraw();
+        loadDetail(st,true);
+      }).catch(function(){ S.detLoaded++; progress(); pump(); });
+      return;
     }
-    var n=d.n;
-    var mxA=new Float64Array(n), myA=new Float64Array(n), mxZ=new Float64Array(n), myZ=new Float64Array(n);
-    for(var i=0;i<n;i++){
-      var id=(r.ids&&r.ids[i])||''; var j=jit(id);
-      var lat=d.lat0[i], lng=d.lng0[i];
-      var street=(r.street&&r.street[i])?1:0;
-      var aLat=lat, aLng=lng; if(!street){ aLat+=j[0]; aLng+=j[1]; }
-      mxA[i]=mercX(aLng); myA[i]=mercY(aLat);
-      var zLat=(street&&r.zlat&&r.zlat[i]!=null)?r.zlat[i]:lat;
-      var zLng=(street&&r.zlng&&r.zlng[i]!=null)?r.zlng[i]:lng;
-      mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);   // ZIP view: everything at its ZIP center, jittered
-    }
-    d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
-    d.detail={ids:r.ids||[],names:r.names||[],cities:r.cities||[],street:r.street||[],ms:r.ms||[],rm:r.rm||[],rmb:r.rmb||[]};
-    d.lat0=null; d.lng0=null;
+    commitDetail(st,r);
     S.detLoaded++; bump(); progress(); scheduleDraw(); pump();
   }).catch(function(){ S.detLoaded++; progress(); pump(); });
 }
@@ -437,16 +471,19 @@ function sprite(kind,hex,ps){
   var o={img:c,w:w,h:h,ax:ax,ay:ay};
   spriteCache[key]=o; return o;
 }
-// renewal-heat lens: urgency class from WC renewal month (B.7: basis class labeled, never silently merged)
+// renewal-heat lens (v3.4: 3-way — health is the PRIMARY renewal trigger per owner; WC secondary).
+// B.7 law everywhere: basis class labeled, inferred timing never silently treated as known.
 var URG_COLORS=['#de6b5f','#e0985c','#bd8a35','#5b7f96','#9aa5ad'];
 var URG_LABELS=['Renews ≤2 mo','3–4 mo out','5–6 mo out','7+ mo out','Unknown'];
 var RMB_LABELS=['','unverified','reasoned','verified'];
+function renLens(){ return S.lens==='health'||S.lens==='wc'; }
+function lensMonth(d,i){ var dd=d.detail; if(!dd) return 0; return S.lens==='health'?((dd.hrm&&dd.hrm[i])||0):((dd.rm&&dd.rm[i])||0); }
 function urgClass(rm){ if(!rm) return 4; var mu=((rm-1)-(new Date().getMonth())+12)%12; return mu<=1?0:(mu<=3?1:(mu<=5?2:3)); }
-function keyFor(d,i,slug){ return S.lens==='renewal' ? ('urg:'+(d.detail?urgClass(d.detail.rm[i]):4)) : slug; }
+function keyFor(d,i,slug){ return renLens() ? ('urg:'+urgClass(lensMonth(d,i))) : slug; }
 function slugColor(s){ return (s&&s.indexOf('urg:')===0)?URG_COLORS[+s.slice(4)]:(S.colors[S.grain][s]||OTHER); }
 function slugLabel(s){ return (s&&s.indexOf('urg:')===0)?URG_LABELS[+s.slice(4)]:dispOf(s); }
-function pinColorAt(d,i,slug){ return S.lens==='renewal' ? URG_COLORS[d.detail?urgClass(d.detail.rm[i]):4] : (S.colors[S.grain][slug]||OTHER); }
-function clusterOn(z,visCount){ return S.clusterMode==='cluster' && z<12.5 && (visCount>3||S.lens==='renewal'); }
+function pinColorAt(d,i,slug){ return renLens() ? URG_COLORS[urgClass(lensMonth(d,i))] : (S.colors[S.grain][slug]||OTHER); }
+function clusterOn(z,visCount){ return S.clusterMode==='cluster' && z<12.5 && (visCount>3||renLens()); }
 function rebuildClusters(z){
   var scale=256*Math.pow(2,Math.round(z*2)/2);
   var cell=72/scale;
@@ -688,8 +725,13 @@ function onMove(e){
     var city=d.detail?(d.detail.cities[h.i]||''):'';
     var street=d.detail?!!d.detail.street[h.i]:false;
     var renLine='';
-    if(d.detail&&d.detail.rm[h.i]){ renLine='Renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+RMB_LABELS[d.detail.rmb[h.i]]+')</span><br>'; }
-    else if(S.lens==='renewal'&&d.detail){ renLine='<span class="mut">Renewal month unknown</span><br>'; }
+    if(d.detail){
+      var hm=(d.detail.hrm&&d.detail.hrm[h.i])||0, hb=(d.detail.hrmb&&d.detail.hrmb[h.i])||0;
+      if(hm){ renLine+='Health renews ~'+MONTHS[hm]+' <span class="mut">('+(RMB_LABELS[hb]||'unverified')+')</span><br>'; }
+      else if(S.lens==='health'){ renLine+='<span class="mut">Health renewal month unknown</span><br>'; }
+      if(d.detail.rm[h.i]){ renLine+='WC renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+RMB_LABELS[d.detail.rmb[h.i]]+')</span><br>'; }
+      else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
+    }
     tipShow('<b>'+esc(nm)+'</b><br>'+
       '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
       esc(city+(city?', ':'')+h.st)+'<br>'+renLine+
@@ -795,18 +837,23 @@ $('cm-all').onclick=function(){ setClusterMode('all') };
 $('ms-all').onclick=function(){ setMsOnly(false) };
 $('ms-multi').onclick=function(){ setMsOnly(true) };
 $('lens-peo').onclick=function(){ setLens('peo') };
-$('lens-ren').onclick=function(){ setLens('renewal') };
+$('lens-hea').onclick=function(){ setLens('health') };
+$('lens-wc').onclick=function(){ setLens('wc') };
+function syncLensButtons(){
+  $('lens-peo').className=S.lens==='peo'?'on':''; $('lens-hea').className=S.lens==='health'?'on':''; $('lens-wc').className=S.lens==='wc'?'on':'';
+}
 function setLens(v){
   if(S.lens===v) return;
   S.lens=v;
-  $('lens-peo').className=v==='peo'?'on':''; $('lens-ren').className=v==='renewal'?'on':'';
+  syncLensButtons();
   renderLensLegend();
   bump(); scheduleDraw(); writeUrl();
 }
 function renderLensLegend(){
   var l=$('lenslegend');
-  if(S.lens!=='renewal'){ l.style.display='none'; return; }
-  l.innerHTML=URG_LABELS.map(function(t,i){ return '<span><i style="background:'+URG_COLORS[i]+'"></i>'+t+'</span>'; }).join('');
+  if(!renLens()){ l.style.display='none'; return; }
+  l.innerHTML='<span style="font-weight:650">'+(S.lens==='health'?'Health renewal':'WC renewal')+'</span>'+
+    URG_LABELS.map(function(t,i){ return '<span><i style="background:'+URG_COLORS[i]+'"></i>'+t+'</span>'; }).join('');
   l.style.display='block';
 }
 function setMsOnly(v){
@@ -856,12 +903,14 @@ function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span clas
 function openCard(p,slug){
   var c=$('card');
   var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(p.renewal_month_basis||'basis unknown')+')':'unknown';
+  var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(p.health_renewal_basis||'basis unknown')+')':'unknown';
   var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(p.peo_current_since_basis||'basis unknown')+')':'unknown';
   c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
     '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div></div>'+
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
     '<div class="bd">'+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
+    kv('Health renewal',hren)+
     kv('WC renewal',ren)+
     kv('WC carrier',esc(p.wc_carrier||'—'))+
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
@@ -900,7 +949,7 @@ function writeUrl(){
     if(S.placement==='zip') p.set('pm','zip');
     if(S.clusterMode==='all') p.set('cm','all');
     if(S.msOnly) p.set('ms','1');
-    if(S.lens==='renewal') p.set('lens','ren');
+    if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
     history.replaceState(null,'','map.html?'+p.toString());
   }catch(e){}
@@ -917,7 +966,9 @@ function readUrl(){
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
     if(p.get('cm')==='all'){ S.clusterMode='all'; $('cm-cluster').className=''; $('cm-all').className='on'; }
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-all').className=''; $('ms-multi').className='on'; }
-    if(p.get('lens')==='ren'){ S.lens='renewal'; $('lens-peo').className=''; $('lens-ren').className='on'; renderLensLegend(); }
+    var lz=p.get('lens');
+    if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
+    else if(lz==='wc'){ S.lens='wc'; syncLensButtons(); renderLensLegend(); }
     S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
   }catch(e){}
 }
@@ -1007,7 +1058,7 @@ $('ai-q').addEventListener('keydown',function(e){ if(e.key==='Enter') aiAsk(this
 $('ai-desc').onclick=function(){ aiAsk('Describe this view for me.'); };
 function viewContext(){
   var stOn=Object.keys(S.states).filter(function(s){return S.states[s]});
-  return { grain:S.grain, placement:S.placement, cluster_mode:S.clusterMode,
+  return { grain:S.grain, placement:S.placement, cluster_mode:S.clusterMode, lens:S.lens,
     states_on: stOn.length<=15?stOn:stOn.length+' states',
     zoom: S.map?Math.round(S.map.getZoom()*10)/10:null,
     center: S.map?{lat:Math.round(S.map.getCenter().lat()*100)/100,lng:Math.round(S.map.getCenter().lng()*100)/100}:null,
