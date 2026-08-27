@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v2.0 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
-     v2.0 (Gazz directives): ONE PIN PER CLIENT at every zoom (canvas layer, ~160K pins, no clusters, no numbers);
-     every PEO colored by its LOGO color (map_family_colors: logo-first, unique-assigned fallback);
-     HQ stars hover shows the PEO's LOGO; hover on a client pin = company / PEO / city only;
-     standard Google basemap. Street-precision pins arrive continuously from the Census drain lane.
-     Pin placement toggle (Gazz): Actual address (best precision) vs ZIP area (everything at ZIP centers).
-     Data: map-data edge fn v1.2 (pins_bulk gzip columnar). Auth: desk key (localStorage 'desk_key') or GoTrue login. -->
+<!-- map v3.0 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.0: renderer rewritten container-fixed (fixes the ghost/offset pin duplicates seen in Gazz's screenshot —
+     no google pane transforms; one canvas, own Mercator math, beacons drawn on the same canvas last/on top).
+     Composition clusters: PEO-colored donut rings that burst into real pins as you zoom (Clusters | All pins toggle);
+     no numbers on the map — cluster hover lists top PEOs (the readability exception Gazz allowed).
+     Two-wave loading from pre-baked gzip snapshots (map-data v2.0: pins_lite then pins_detail, browser-cached, ETag 304s):
+     dots appear in ~1-2s, names/hover/street precision attach as wave 2 lands. Viewport-first state order.
+     Logo colors per PEO (map_family_colors), logo on HQ hover, placement toggle (Actual address | ZIP area). -->
 <style>
 :root{
   --bg:#070b0f; --surface:#0d141b; --surface2:#131c25; --ink:#ecf1f4; --ink2:#aebac3; --muted:#71808b;
@@ -47,12 +48,13 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .peo-row .solo{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden}
 .peo-row:hover .solo{visibility:visible}
 .peo-row.off .sw{opacity:.25}
-#states{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;max-height:170px;overflow-y:auto}
+#states{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;max-height:150px;overflow-y:auto}
 .st{font-size:10.5px;text-align:center;padding:4px 0;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);cursor:pointer;user-select:none}
 .st.on{background:rgba(99,144,238,.16);border-color:var(--accent);color:var(--ink)}
 .st.off{opacity:.35}
-.mapwrap{position:relative;flex:1;display:flex;min-width:0}
+.mapwrap{position:relative;flex:1;display:flex;min-width:0;overflow:hidden}
 #map{flex:1;min-width:0}
+#pincanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:5}
 .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);cursor:pointer;padding:3px 0;user-select:none}
 .chk input{accent-color:var(--accent)}
 #tip{position:fixed;z-index:50;pointer-events:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
@@ -61,6 +63,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #tip .mut{color:var(--muted);font-size:11px}
 #tip .logo{background:#fff;border-radius:6px;padding:5px;display:inline-block;margin-bottom:6px}
 #tip .logo img{display:block;width:56px;height:56px;object-fit:contain}
+#tip .bar{height:5px;border-radius:3px;margin:2px 0 5px}
 #card{position:absolute;top:12px;right:12px;z-index:40;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;
   box-shadow:0 10px 34px rgba(0,0,0,.55);display:none;max-height:calc(100% - 24px);overflow-y:auto}
 #card .hd{display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-bottom:1px solid var(--grid)}
@@ -86,13 +89,12 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #gate .err{color:#f2ada4;font-size:12px;margin-top:8px;display:none}
 #loading{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:30;background:var(--surface2);border:1px solid var(--border);
   border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
-#pincanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:2}
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v2.0 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.0 · 2026-08-27</span>
     <span class="spacer"></span>
     <span id="stats">loading…</span>
     <a href="ask.html">← AI Data Desk</a>
@@ -103,6 +105,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
       <div class="sec">
         <h2>View by</h2>
         <div class="seg"><button id="g-family" class="on">Family brand</button><button id="g-brand">PEO specific</button></div>
+        <h2 style="margin-top:10px">Pins</h2>
+        <div class="seg"><button id="cm-cluster" class="on">Clusters</button><button id="cm-all">All pins</button></div>
         <h2 style="margin-top:10px">Pin placement</h2>
         <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
@@ -120,8 +124,9 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div id="peo-list"></div>
       </div>
     </div>
-    <div class="mapwrap">
+    <div class="mapwrap" id="mapwrap">
       <div id="map"></div>
+      <canvas id="pincanvas"></canvas>
       <div id="loading">loading…</div>
       <div id="card"></div>
       <div id="sharepanel"></div>
@@ -143,38 +148,50 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 // ------------------------- config -------------------------
 var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-data';
 var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
-var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE'; // referrer-restricted browser key
+var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE';
 var OTHER='#71808b';
 var $=function(id){return document.getElementById(id)};
 var STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'D.C.',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',PR:'Puerto Rico',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',VI:'Virgin Islands',GU:'Guam'};
+var STATE_CENTROIDS={AL:[32.8,-86.8],AK:[64.0,-152.0],AZ:[34.2,-111.6],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.3,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.1,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[47.0,-109.6],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.5,-79.4],ND:[47.4,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[43.9,-120.6],PA:[40.9,-77.8],PR:[18.2,-66.4],RI:[41.7,-71.6],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.8,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.5],WV:[38.6,-80.6],WI:[44.6,-89.7],WY:[43.0,-107.6],VI:[18.34,-64.9],GU:[13.44,144.79]};
 var MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ------------------------- state -------------------------
 var S={
-  grain:'family',
-  placement:'address',             // 'address' (best precision) | 'zip' (ZIP centers)
-  catalog:null,
-  colors:{family:{},brand:{}},     // slug -> color_hex per grain
-  displays:{family:{},brand:{}},
-  sel:{family:null,brand:null},    // slug -> bool per grain (lazy init all-on)
-  states:{},                       // ST -> bool
-  beaconsOn:true, beacons:[], beaconMarkers:[],
-  pinData:{},                      // ST -> {fams,brds,pins:[[lat,lng,fi,bi,id,name,city,street]], mx:Float64Array, my:Float64Array}
-  loadQueue:[], loaded:0, toLoad:0,
-  map:null, overlay:null, logoCache:{},
-  hover:null
+  grain:'family', placement:'address', clusterMode:'cluster',
+  catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
+  sel:{family:null,brand:null}, states:{},
+  beaconsOn:true, beacons:[],
+  pinData:{},            // ST -> {fams,brds,mxA,myA,mxZ,myZ,n,detail:{ids,names,cities,street}|null}
+  liteLoaded:0, detLoaded:0, toLoad:0,
+  map:null, logoCache:{}, hover:null, rev:0
 };
+function bump(){ S.rev++; }
 function selMap(){ if(!S.sel[S.grain]){ var m={}; catRows().forEach(function(r){m[r.slug]=true}); m['unattributed']=true; S.sel[S.grain]=m; } return S.sel[S.grain]; }
 function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
 function colorOf(slug){ return S.colors[S.grain][slug]||OTHER; }
 function dispOf(slug){ return S.displays[S.grain][slug]||slug; }
+function mercX(lng){ return (lng+180)/360; }
+function mercY(lat){ var s=Math.sin(lat*Math.PI/180); s=Math.max(-0.9999,Math.min(0.9999,s)); return 0.5-Math.log((1+s)/(1-s))/(4*Math.PI); }
+function invLat(my){ return Math.asin(Math.tanh((0.5-my)*2*Math.PI))*180/Math.PI; }
+function invLng(mx){ return mx*360-180; }
+function jit(id){
+  var h=0; for(var i=0;i<id.length;i++){ h=(h*31+id.charCodeAt(i))>>>0; }
+  var ang=(h%360)*Math.PI/180, rad=0.0008+((h>>>9)%1000)/1000*0.0035;
+  return [Math.sin(ang)*rad, Math.cos(ang)*rad*1.25];
+}
 
 // ------------------------- api -------------------------
 function deskKey(){ try{return localStorage.getItem('desk_key')||''}catch(e){return ''} }
+function hdrs(){ var h={'apikey':ANON,'Authorization':'Bearer '+ANON}; var k=deskKey(); if(k) h['x-desk-key']=k; return h; }
 function api(params){
-  var h={'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON};
-  var k=deskKey(); if(k) h['x-desk-key']=k;
+  var h=hdrs(); h['Content-Type']='application/json';
   return fetch(EP,{method:'POST',headers:h,body:JSON.stringify(params)}).then(function(r){
+    if(r.status===401||r.status===403){ showGate(true); throw new Error('auth'); }
+    return r.json();
+  });
+}
+function apiGet(qs){ // GET so the browser HTTP cache + ETag revalidation kick in for snapshots
+  return fetch(EP+'?'+qs,{method:'GET',headers:hdrs()}).then(function(r){
     if(r.status===401||r.status===403){ showGate(true); throw new Error('auth'); }
     return r.json();
   });
@@ -193,72 +210,95 @@ var booted=false;
 function boot(){
   if(booted) return; booted=true;
   Promise.all([api({mode:'catalog'}),api({mode:'beacons'})]).then(function(rs){
-    S.catalog=rs[0]; S.beacons=rs[1].beacons||[];
+    S.catalog=rs[0];
     ['families','brands'].forEach(function(k){
       var g=k==='families'?'family':'brand';
       (S.catalog[k]||[]).forEach(function(r){ S.colors[g][r.slug]=r.color_hex||null; S.displays[g][r.slug]=r.display||r.slug; });
     });
     (S.catalog.states||[]).forEach(function(r){ if(r.state && !(r.state in S.states)) S.states[r.state]=true; });
+    S.beacons=(rs[1].beacons||[]).filter(function(b){ return b.kind!=='po_box'&&b.kind!=='zip_beacon'; });
+    S.beacons.forEach(function(b){ b._mx=mercX(Number(b.lng)); b._my=mercY(Number(b.lat)); });
     readUrl();
-    buildStatePanel(); buildPeoPanel(); drawBeacons(); updateStats();
-    startPinLoads();
+    buildStatePanel(); buildPeoPanel(); updateStats();
+    startPinLoads(); scheduleDraw();
   }).catch(function(e){ if(String(e.message)!=='auth') console.error(e); });
 }
 
-// ------------------------- bulk pin loading (progressive, biggest states first) -------------------------
+// ------------------------- two-wave loading (viewport-first) -------------------------
+var liteQ=[], detQ=[];
 function startPinLoads(){
-  var order=(S.catalog.states||[]).map(function(r){return r.state}).filter(Boolean);
-  S.loadQueue=order.slice(); S.toLoad=order.length; S.loaded=0;
-  for(var i=0;i<3;i++) nextLoad();
+  var byN={}; (S.catalog.states||[]).forEach(function(r){ byN[r.state]=Number(r.n)||0; });
+  var c=S.map?S.map.getCenter():null;
+  var cl=c?c.lat():38.5, cg=c?c.lng():-96.5;
+  var order=(S.catalog.states||[]).map(function(r){return r.state}).filter(Boolean).sort(function(a,b){
+    var A=STATE_CENTROIDS[a]||[0,0], B=STATE_CENTROIDS[b]||[0,0];
+    var da=Math.pow(A[0]-cl,2)+Math.pow(A[1]-cg,2), db=Math.pow(B[0]-cl,2)+Math.pow(B[1]-cg,2);
+    if(Math.abs(da-db)>4) return da-db;
+    return (byN[b]||0)-(byN[a]||0);
+  });
+  S.toLoad=order.length; liteQ=order.slice(); detQ=[];
+  for(var i=0;i<3;i++) pump();
 }
-function nextLoad(){
-  var st=S.loadQueue.shift(); if(!st){ if(S.loaded>=S.toLoad) loadingDone(); return; }
-  api({mode:'pins_bulk',state:st}).then(function(r){
+function pump(){
+  if(liteQ.length){ loadLite(liteQ.shift()); }
+  else if(detQ.length){ loadDetail(detQ.shift()); }
+  else if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad){ $('loading').style.display='none'; }
+}
+function loadLite(st){
+  apiGet('mode=pins_lite&state='+st).then(function(r){
     var n=r.n||0, pins=r.pins||[];
-    function merc(lat,lng,mx,my,i){
-      mx[i]=(lng+180)/360;
-      var s=Math.sin(lat*Math.PI/180); s=Math.max(-0.9999,Math.min(0.9999,s));
-      my[i]=0.5-Math.log((1+s)/(1-s))/(4*Math.PI);
-    }
-    var mxA=new Float64Array(n), myA=new Float64Array(n);   // address mode: best precision (jitter only zip-precision pins)
-    var mxZ=new Float64Array(n), myZ=new Float64Array(n);   // zip mode: everything at its ZIP center (always jittered)
-    for(var i=0;i<n;i++){
-      var p=pins[i]; var j=jit(p[4]);
-      var aLat=p[0], aLng=p[1];
-      if(!p[7]){ aLat+=j[0]; aLng+=j[1]; }
-      merc(aLat,aLng,mxA,myA,i);
-      var zLat=(p[7]&&p[8]!=null)?p[8]:p[0];
-      var zLng=(p[7]&&p[9]!=null)?p[9]:p[1];
-      merc(zLat+j[0],zLng+j[1],mxZ,myZ,i);
-    }
-    S.pinData[st]={fams:r.fams||[],brds:r.brds||[],pins:pins,mxA:mxA,myA:myA,mxZ:mxZ,myZ:myZ};
-    S.loaded++;
-    $('loading').style.display='block';
-    $('loading').textContent='loading pins… '+S.loaded+'/'+S.toLoad+' states';
-    if(S.overlay) S.overlay.redraw();
-    nextLoad();
-  }).catch(function(){ S.loaded++; nextLoad(); });
+    var mxA=new Float64Array(n), myA=new Float64Array(n), fis=new Int16Array(n), bis=new Int16Array(n);
+    for(var i=0;i<n;i++){ var p=pins[i]; mxA[i]=mercX(p[1]); myA[i]=mercY(p[0]); fis[i]=p[2]; bis[i]=p[3]; }
+    S.pinData[st]={fams:r.fams||[],brds:r.brds||[],n:n,mxA:mxA,myA:myA,mxZ:mxA,myZ:myA,fis:fis,bis:bis,lat0:pins.map(function(p){return p[0]}),lng0:pins.map(function(p){return p[1]}),bake:r.bake_key,detail:null};
+    S.liteLoaded++; detQ.push(st); bump(); progress(); scheduleDraw(); pump();
+  }).catch(function(){ S.liteLoaded++; progress(); pump(); });
 }
-function loadingDone(){ $('loading').style.display='none'; if(S.overlay) S.overlay.redraw(); }
-function jit(id){
-  var h=0; for(var i=0;i<id.length;i++){ h=(h*31+id.charCodeAt(i))>>>0; }
-  var ang=(h%360)*Math.PI/180, rad=0.0008+((h>>>9)%1000)/1000*0.0035;
-  return [Math.sin(ang)*rad, Math.cos(ang)*rad*1.25];
+function loadDetail(st){
+  apiGet('mode=pins_detail&state='+st).then(function(r){
+    var d=S.pinData[st]; if(!d){ S.detLoaded++; progress(); pump(); return; }
+    if(r.bake_key!==d.bake){ /* snapshot rolled between waves — refetch lite once */
+      apiGet('mode=pins_lite&state='+st+'&r='+Date.now()).then(function(){ }).catch(function(){});
+    }
+    var n=d.n;
+    var mxA=new Float64Array(n), myA=new Float64Array(n), mxZ=new Float64Array(n), myZ=new Float64Array(n);
+    for(var i=0;i<n;i++){
+      var id=(r.ids&&r.ids[i])||''; var j=jit(id);
+      var lat=d.lat0[i], lng=d.lng0[i];
+      var street=(r.street&&r.street[i])?1:0;
+      var aLat=lat, aLng=lng; if(!street){ aLat+=j[0]; aLng+=j[1]; }
+      mxA[i]=mercX(aLng); myA[i]=mercY(aLat);
+      var zLat=(street&&r.zlat&&r.zlat[i]!=null)?r.zlat[i]:lat;
+      var zLng=(street&&r.zlng&&r.zlng[i]!=null)?r.zlng[i]:lng;
+      mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);   // ZIP view: everything at its ZIP center, jittered
+    }
+    d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
+    d.detail={ids:r.ids||[],names:r.names||[],cities:r.cities||[],street:r.street||[]};
+    d.lat0=null; d.lng0=null;
+    S.detLoaded++; bump(); progress(); scheduleDraw(); pump();
+  }).catch(function(){ S.detLoaded++; progress(); pump(); });
+}
+function progress(){
+  $('loading').style.display='block';
+  $('loading').textContent='pins '+S.liteLoaded+'/'+S.toLoad+' · details '+S.detLoaded+'/'+S.toLoad;
+  if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad) $('loading').style.display='none';
 }
 
-// ------------------------- google map + canvas pin layer -------------------------
+// ------------------------- google map -------------------------
 window.initMap=function(){
   var z=isFinite(S._urlZ)?S._urlZ:4.6;
   var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
   S.map=new google.maps.Map($('map'),{center:c,zoom:z,
     disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
     mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
-  makeOverlay(); drawBeacons();
-  S.map.addListener('idle',function(){ writeUrl(); });
+  S.map.addListener('center_changed',scheduleDraw);
+  S.map.addListener('zoom_changed',function(){ scheduleDraw(); });
+  S.map.addListener('idle',function(){ scheduleDraw(); writeUrl(); });
   var mapDiv=$('map');
   mapDiv.addEventListener('mousemove',onMove);
-  mapDiv.addEventListener('mouseleave',function(){ if(S.hover&&S.hover.kind==='pin'){S.hover=null;closeTip();} });
+  mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
   mapDiv.addEventListener('click',onClick);
+  window.addEventListener('resize',scheduleDraw);
+  scheduleDraw();
 };
 function loadGmaps(){
   var s=document.createElement('script');
@@ -266,145 +306,218 @@ function loadGmaps(){
   s.async=true; document.head.appendChild(s);
 }
 
-var cvs=null, ctx=null, spriteCache={}, hitPts=null, hitN=0, drawScheduled=false;
-function makeOverlay(){
-  function PinLayer(){ this.setMap(S.map); }
-  PinLayer.prototype=new google.maps.OverlayView();
-  PinLayer.prototype.onAdd=function(){
-    cvs=document.createElement('canvas'); cvs.id='pincanvas';
-    this.getPanes().overlayLayer.appendChild(cvs);
-    ctx=cvs.getContext('2d');
-  };
-  PinLayer.prototype.onRemove=function(){ if(cvs&&cvs.parentNode) cvs.parentNode.removeChild(cvs); cvs=null; };
-  PinLayer.prototype.draw=function(){ scheduleDraw(); };
-  PinLayer.prototype.redraw=function(){ scheduleDraw(); };
-  S.overlay=new PinLayer();
-}
-function scheduleDraw(){ if(drawScheduled) return; drawScheduled=true; requestAnimationFrame(function(){ drawScheduled=false; drawPins(); }); }
-
-function pinScale(z){ return z<5.5?0.55:(z<8?0.72:(z<11?0.88:1.0)); }
-function sprite(hex,ps){
-  var key=hex+'|'+ps;
+// ------------------------- renderer v3 (container-fixed canvas; no google panes) -------------------------
+var cvs=$('pincanvas'), ctx=cvs.getContext('2d'), spriteCache={}, drawScheduled=false;
+var hits=[];                 // rebuilt each draw: {x,y,r,kind:'pin'|'cluster'|'beacon', ...}
+var clusterCache={key:'',clusters:[],loose:[]};
+function scheduleDraw(){ if(drawScheduled) return; drawScheduled=true; requestAnimationFrame(function(){ drawScheduled=false; draw(); }); }
+function pinScale(z){ return z<5.5?0.6:(z<8?0.75:(z<11?0.9:1.0)); }
+function sprite(kind,hex,ps){
+  var key=kind+'|'+hex+'|'+ps;
   if(spriteCache[key]) return spriteCache[key];
   var dpr=Math.min(window.devicePixelRatio||1,2);
-  var w=Math.ceil(15*ps), h=Math.ceil(21*ps);
-  var c=document.createElement('canvas'); c.width=w*dpr; c.height=h*dpr;
-  var x=c.getContext('2d'); x.scale(dpr*ps,dpr*ps);
-  x.beginPath();
-  x.arc(7.5,6.6,5.7,Math.PI*0.82,Math.PI*0.18);   // head
-  x.lineTo(7.5,20);                                 // tail tip
-  x.closePath();
-  x.fillStyle=hex; x.fill();
-  x.lineWidth=1.25; x.strokeStyle='#463f38'; x.stroke();
-  x.beginPath(); x.arc(7.5,6.6,2.05,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.92)'; x.fill();
-  var o={img:c,w:w,h:h,ax:7.5*ps,ay:20*ps};
+  var w,h,ax,ay;
+  var c=document.createElement('canvas');
+  if(kind==='pin'){ w=15*ps; h=21*ps; ax=7.5*ps; ay=20*ps; }
+  else if(kind==='star'||kind==='starh'){ w=30; h=30; ax=15; ay=15; }
+  else { w=24; h=24; ax=12; ay=12; }
+  c.width=Math.ceil(w*dpr); c.height=Math.ceil(h*dpr);
+  var x=c.getContext('2d'); x.scale(dpr,dpr);
+  if(kind==='pin'){
+    x.scale(ps,ps);
+    x.beginPath(); x.arc(7.5,6.6,5.7,Math.PI*0.82,Math.PI*0.18); x.lineTo(7.5,20); x.closePath();
+    x.fillStyle=hex; x.fill(); x.lineWidth=1.25; x.strokeStyle='#463f38'; x.stroke();
+    x.beginPath(); x.arc(7.5,6.6,2.05,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.92)'; x.fill();
+  } else if(kind==='star'||kind==='starh'){
+    x.translate(15,15); x.beginPath();
+    for(var i=0;i<10;i++){ var r=(i%2===0)?13:5.6, a=-Math.PI/2+i*Math.PI/5; x[i===0?'moveTo':'lineTo'](Math.cos(a)*r,Math.sin(a)*r); }
+    x.closePath();
+    x.fillStyle=hex; x.globalAlpha=kind==='starh'?0.6:1; x.fill(); x.globalAlpha=1;
+    x.lineWidth=1.6; x.strokeStyle=kind==='starh'?hex:'#463f38'; x.stroke();
+  } else {
+    x.translate(12,12); x.beginPath(); x.moveTo(0,-10); x.lineTo(9,0); x.lineTo(0,10); x.lineTo(-9,0); x.closePath();
+    x.fillStyle=hex; x.fill(); x.lineWidth=1.6; x.strokeStyle='#463f38'; x.stroke();
+  }
+  var o={img:c,w:w,h:h,ax:ax,ay:ay};
   spriteCache[key]=o; return o;
 }
-function drawPins(){
-  if(!cvs||!S.map) return;
-  var proj=S.overlay.getProjection(); if(!proj) return;
-  var div=$('map'); var W=div.clientWidth, H=div.clientHeight;
-  var dpr=Math.min(window.devicePixelRatio||1,2);
-  if(cvs.width!==W*dpr||cvs.height!==H*dpr){ cvs.width=W*dpr; cvs.height=H*dpr; cvs.style.width=W+'px'; cvs.style.height=H+'px'; }
-  // pin the canvas to the current viewport within the overlay pane
-  var b=S.map.getBounds(); if(!b) return;
-  var sw=proj.fromLatLngToDivPixel(b.getSouthWest()), ne=proj.fromLatLngToDivPixel(b.getNorthEast());
-  cvs.style.transform='translate('+Math.round(sw.x)+'px,'+Math.round(ne.y)+'px)';
-  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
-
-  var z=S.map.getZoom(); var scale=256*Math.pow(2,z);
-  var ctr=S.map.getCenter();
-  var cx=(ctr.lng()+180)/360;
-  var s0=Math.sin(ctr.lat()*Math.PI/180); s0=Math.max(-0.9999,Math.min(0.9999,s0));
-  var cy=0.5-Math.log((1+s0)/(1-s0))/(4*Math.PI);
-  var ps=pinScale(z);
+function clusterOn(z,visCount){ return S.clusterMode==='cluster' && z<12.5 && visCount>3; }
+function rebuildClusters(z){
+  var scale=256*Math.pow(2,Math.round(z*2)/2);
+  var cell=72/scale;
   var sel=selMap();
-  hitPts={x:new Float32Array(60000),y:new Float32Array(60000),st:[],ix:new Int32Array(60000)}; hitN=0;
-  var drawn=0;
+  var cells={}; var loose=[];
   for(var st in S.pinData){
     if(S.states[st]===false) continue;
     var d=S.pinData[st];
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
     var slugArr=(S.grain==='brand')?d.brds:d.fams;
-    var idxCol=(S.grain==='brand')?3:2;
-    var visSlug=[]; for(var k=0;k<slugArr.length;k++){ visSlug[k]=sel[slugArr[k]]!==false && sel[slugArr[k]]!==undefined ? sel[slugArr[k]] : (sel[slugArr[k]]===undefined); }
-    // sel map contains all catalog slugs; unknown slugs default visible
-    for(var i=0;i<d.pins.length;i++){
-      var si=d.pins[i][idxCol];
-      if(visSlug[si]===false) continue;
-      var sx=(MX[i]-cx)*scale+W/2, sy=(MY[i]-cy)*scale+H/2;
-      if(sx<-16||sx>W+16||sy<-24||sy>H+8) continue;
-      var col=S.colors[S.grain][slugArr[si]]||OTHER;
-      var sp=sprite(col,ps);
-      ctx.drawImage(sp.img,0,0,sp.img.width,sp.img.height,sx-sp.ax,sy-sp.ay,sp.w,sp.h);
-      if(hitN<60000){ hitPts.x[hitN]=sx; hitPts.y[hitN]=sy; hitPts.st[hitN]=st; hitPts.ix[hitN]=i; hitN++; }
-      drawn++;
+    var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var vis=[]; for(var k=0;k<slugArr.length;k++){ vis[k]=sel[slugArr[k]]!==false; }
+    for(var i=0;i<d.n;i++){
+      if(!vis[IDX[i]]) continue;
+      var key=Math.floor(MX[i]/cell)+'_'+Math.floor(MY[i]/cell);
+      var e=cells[key];
+      if(!e){ e=cells[key]={n:0,sx:0,sy:0,slugs:{},members:[]}; }
+      e.n++; e.sx+=MX[i]; e.sy+=MY[i];
+      var sl=slugArr[IDX[i]]; e.slugs[sl]=(e.slugs[sl]||0)+1;
+      if(e.members.length<7) e.members.push([st,i]);
     }
   }
-  S._canvasOffset=[Math.round(sw.x),Math.round(ne.y)];
-  S._lastDrawn=drawn;
-}
-// map div-relative mouse position -> canvas space (canvas is translated to viewport already; use client offsets)
-function mapXY(e){
-  var r=$('map').getBoundingClientRect();
-  return [e.clientX-r.left, e.clientY-r.top];
-}
-function pickPin(e){
-  if(!hitPts||!hitN) return null;
-  var p=mapXY(e); var mxp=p[0], myp=p[1];
-  var best=-1, bd=144;
-  for(var i=0;i<hitN;i++){
-    var dx=hitPts.x[i]-mxp, dy=(hitPts.y[i]-8)-myp;  // aim near pin head
-    var dd=dx*dx+dy*dy;
-    if(dd<bd){ bd=dd; best=i; }
+  var clusters=[];
+  for(var ck in cells){
+    var e=cells[ck];
+    if(e.n>=6){
+      var top=Object.keys(e.slugs).map(function(s){return [s,e.slugs[s]]}).sort(function(a,b){return b[1]-a[1]});
+      clusters.push({mx:e.sx/e.n,my:e.sy/e.n,n:e.n,top:top});
+    } else {
+      for(var m=0;m<e.members.length&&m<e.n;m++) loose.push(e.members[m]);
+    }
   }
-  if(best<0) return null;
-  return {st:hitPts.st[best], i:hitPts.ix[best]};
+  clusterCache={key:clusterKey(z),clusters:clusters,loose:loose};
+}
+function clusterKey(z){ return Math.round(z*2)/2+'|'+S.grain+'|'+S.placement+'|'+S.rev; }
+function draw(){
+  if(!S.map) return;
+  var wrap=$('mapwrap'); var W=wrap.clientWidth, H=wrap.clientHeight;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  if(cvs.width!==Math.round(W*dpr)||cvs.height!==Math.round(H*dpr)){ cvs.width=Math.round(W*dpr); cvs.height=Math.round(H*dpr); cvs.style.width=W+'px'; cvs.style.height=H+'px'; }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  if(!S.catalog) return;
+  var z=S.map.getZoom(); var scale=256*Math.pow(2,z);
+  var ctr=S.map.getCenter(); var cx=mercX(ctr.lng()), cy=mercY(ctr.lat());
+  var sel=selMap(); var visCount=0; catRows().forEach(function(r){ if(sel[r.slug]!==false) visCount++; });
+  hits=[];
+  var ps=pinScale(z);
+  if(clusterOn(z,visCount)){
+    if(clusterCache.key!==clusterKey(z)) rebuildClusters(z);
+    // loose pins first
+    var loose=clusterCache.loose;
+    for(var li=0;li<loose.length;li++){
+      var st=loose[li][0], i=loose[li][1]; var d=S.pinData[st]; if(!d||S.states[st]===false) continue;
+      var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
+      var sx=(MX[i]-cx)*scale+W/2, sy=(MY[i]-cy)*scale+H/2;
+      if(sx<-16||sx>W+16||sy<-24||sy>H+8) continue;
+      var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+      var sl=slugArr[IDX[i]];
+      var sp=sprite('pin',S.colors[S.grain][sl]||OTHER,ps);
+      ctx.drawImage(sp.img,0,0,sp.img.width,sp.img.height,sx-sp.ax,sy-sp.ay,sp.w,sp.h);
+      hits.push({x:sx,y:sy-8*ps,r:11,kind:'pin',st:st,i:i});
+    }
+    // donut clusters
+    var cl=clusterCache.clusters;
+    for(var c2=0;c2<cl.length;c2++){
+      var K=cl[c2];
+      var sx2=(K.mx-cx)*scale+W/2, sy2=(K.my-cy)*scale+H/2;
+      var r=Math.min(34,12+10*Math.log(K.n/5)/Math.LN10);
+      if(sx2<-r-10||sx2>W+r+10||sy2<-r-10||sy2>H+r+10) continue;
+      drawDonut(sx2,sy2,r,K);
+      hits.push({x:sx2,y:sy2,r:r+4,kind:'cluster',cl:K});
+    }
+  } else {
+    for(var st2 in S.pinData){
+      if(S.states[st2]===false) continue;
+      var d2=S.pinData[st2];
+      var MX2=(S.placement==='zip')?d2.mxZ:d2.mxA, MY2=(S.placement==='zip')?d2.myZ:d2.myA;
+      var slugArr2=(S.grain==='brand')?d2.brds:d2.fams; var IDX2=(S.grain==='brand')?d2.bis:d2.fis;
+      var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=sel[slugArr2[k2]]!==false; }
+      for(var i2=0;i2<d2.n;i2++){
+        if(!vis2[IDX2[i2]]) continue;
+        var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
+        if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
+        var sp2=sprite('pin',S.colors[S.grain][slugArr2[IDX2[i2]]]||OTHER,ps);
+        ctx.drawImage(sp2.img,0,0,sp2.img.width,sp2.img.height,sx3-sp2.ax,sy3-sp2.ay,sp2.w,sp2.h);
+        if(hits.length<80000) hits.push({x:sx3,y:sy3-8*ps,r:11,kind:'pin',st:st2,i:i2});
+      }
+    }
+  }
+  // beacons on top
+  if(S.beaconsOn){
+    for(var b2=0;b2<S.beacons.length;b2++){
+      var b=S.beacons[b2];
+      if(b.state && S.states[b.state]===false) continue;
+      if(sel[b.family_slug]===false) continue;
+      var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
+      if(bx<-20||bx>W+20||by<-20||by>H+20) continue;
+      var col=b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER;
+      var kind=b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star');
+      var sp3=sprite(kind,col,1);
+      ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,bx-sp3.ax,by-sp3.ay,sp3.w,sp3.h);
+      hits.push({x:bx,y:by,r:14,kind:'beacon',b:b});
+    }
+  }
+}
+function drawDonut(x,y,r,K){
+  var total=K.n; var start=-Math.PI/2;
+  var topList=K.top.slice(0,6);
+  var shown=0; topList.forEach(function(t){shown+=t[1]});
+  var rest=total-shown;
+  ctx.lineWidth=Math.max(7,r*0.42);
+  function seg(frac,col){
+    var end=start+frac*Math.PI*2;
+    ctx.beginPath(); ctx.strokeStyle=col; ctx.arc(x,y,r,start,end); ctx.stroke();
+    start=end;
+  }
+  topList.forEach(function(t){ seg(t[1]/total,S.colors[S.grain][t[0]]||OTHER); });
+  if(rest>0) seg(rest/total,OTHER);
+  ctx.beginPath(); ctx.fillStyle='rgba(255,255,255,.9)'; ctx.arc(x,y,Math.max(3,r-ctx.lineWidth/1.6),0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.lineWidth=1; ctx.strokeStyle='rgba(70,63,56,.55)'; ctx.arc(x,y,r+ctx.lineWidth,0,Math.PI*2); ctx.stroke();
+}
+
+// ------------------------- hover / click -------------------------
+function mapXY(e){ var r=$('mapwrap').getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+function pick(e){
+  var p=mapXY(e); var best=null, bd=1e9;
+  for(var i=hits.length-1;i>=0;i--){
+    var h=hits[i]; var dx=h.x-p[0], dy=h.y-p[1]; var dd=dx*dx+dy*dy;
+    var rr=h.r*h.r;
+    if(dd<=rr){ var score=dd-(h.kind==='beacon'?400:(h.kind==='cluster'?200:0)); if(score<bd){ bd=score; best=h; } }
+  }
+  return best;
 }
 var hoverRaf=false;
 function onMove(e){
   if(hoverRaf) return; hoverRaf=true;
   requestAnimationFrame(function(){
     hoverRaf=false;
-    if(S._beaconTipActive) return;
-    var hit=pickPin(e);
-    if(!hit){ if(S.hover&&S.hover.kind==='pin'){S.hover=null;closeTip();} return; }
-    var d=S.pinData[hit.st]; var p=d.pins[hit.i];
-    var slug=(S.grain==='brand')?d.brds[p[3]]:d.fams[p[2]];
-    S.hover={kind:'pin',st:hit.st,i:hit.i};
-    tipShow('<b>'+esc(p[5])+'</b><br>'+
+    var h=pick(e);
+    if(!h){ if(S.hover){S.hover=null;closeTip();} return; }
+    S.hover=h;
+    if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }
+    if(h.kind==='cluster'){ tipCluster(h.cl,e); return; }
+    var d=S.pinData[h.st];
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var slug=slugArr[IDX[h.i]];
+    var nm=d.detail?(d.detail.names[h.i]||'—'):'Loading…';
+    var city=d.detail?(d.detail.cities[h.i]||''):'';
+    var street=d.detail?!!d.detail.street[h.i]:false;
+    tipShow('<b>'+esc(nm)+'</b><br>'+
       '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
-      esc((p[6]||'')+', '+hit.st)+'<br>'+
-      '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(p[7]?'exact address':'ZIP area — exact location coming'))+' · click for details</span>',e);
+      esc(city+(city?', ':'')+h.st)+'<br>'+
+      '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
   });
 }
 function onClick(e){
-  var hit=pickPin(e); if(!hit) return;
-  var d=S.pinData[hit.st]; var p=d.pins[hit.i];
-  var slug=(S.grain==='brand')?d.brds[p[3]]:d.fams[p[2]];
-  api({mode:'company',id:p[4]}).then(function(r){ if(r.company) openCard(r.company,slug); });
+  var h=pick(e); if(!h) return;
+  if(h.kind==='cluster'){
+    var lat=invLat(h.cl.my), lng=invLng(h.cl.mx);
+    S.map.panTo({lat:lat,lng:lng}); S.map.setZoom(Math.min(16,S.map.getZoom()+2));
+    return;
+  }
+  if(h.kind==='beacon') return;
+  var d=S.pinData[h.st]; if(!d||!d.detail) return;
+  var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+  var slug=slugArr[IDX[h.i]];
+  var id=d.detail.ids[h.i];
+  if(id) api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slug); });
 }
-
-// ------------------------- beacons (google markers above canvas) -------------------------
-function beaconIcon(kind,col){
-  if(kind==='administrative') return {path:'M 0,-11 L 9,0 L 0,11 L -9,0 Z',fillColor:col,fillOpacity:.95,strokeColor:'#463f38',strokeWeight:1.6,scale:1.15};
-  var star='M 0,-13 L 3.6,-4.2 L 13,-3.6 L 5.8,2.6 L 8,12 L 0,6.8 L -8,12 L -5.8,2.6 L -13,-3.6 L -3.6,-4.2 Z';
-  return {path:star,fillColor:col,fillOpacity:kind==='hq_candidate'?.6:1,strokeColor:kind==='hq_candidate'?col:'#463f38',strokeWeight:1.6,scale:1.25};
-}
-function drawBeacons(){
-  S.beaconMarkers.forEach(function(m){m.setMap(null)}); S.beaconMarkers=[];
-  if(!S.map||!S.beaconsOn) return;
-  var sel=selMap();
-  S.beacons.forEach(function(b){
-    if(b.kind==='po_box'||b.kind==='zip_beacon') return;
-    if(b.state && S.states[b.state]===false) return;
-    if(sel[b.family_slug]===false) return;
-    var col=b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER;
-    var m=new google.maps.Marker({position:{lat:Number(b.lat),lng:Number(b.lng)},map:S.map,icon:beaconIcon(b.kind,col),zIndex:9999});
-    m.addListener('mouseover',function(ev){ S._beaconTipActive=true; tipBeacon(b,ev.domEvent); });
-    m.addListener('mouseout',function(){ S._beaconTipActive=false; closeTip(); });
-    S.beaconMarkers.push(m);
-  });
+function tipCluster(K,ev){
+  var rows=K.top.slice(0,5).map(function(t){
+    var pct=Math.round(100*t[1]/K.n);
+    return '<span style="color:'+(S.colors[S.grain][t[0]]||OTHER)+'">●</span> '+esc(dispOf(t[0]))+' <span class="mut">'+t[1].toLocaleString()+' · '+pct+'%</span>'+
+      '<div class="bar" style="width:'+Math.max(6,pct)+'%;background:'+(S.colors[S.grain][t[0]]||OTHER)+'"></div>';
+  }).join('');
+  tipShow('<b>'+K.n.toLocaleString()+' clients here</b><br>'+rows+'<span class="mut">click to zoom in</span>',ev);
 }
 function tipBeacon(b,ev){
   var kinds={hq:'Headquarters',administrative:'Administrative beacon',hq_candidate:'HQ (candidate)'};
@@ -412,12 +525,12 @@ function tipBeacon(b,ev){
   var cached=S.logoCache[b.family_slug];
   if(cached){ logoHtml='<span class="logo"><img src="'+cached+'" alt=""></span><br>'; }
   tipShow(logoHtml+'<b>'+esc(b.peo_display||b.family_slug)+'</b><br>'+esc(kinds[b.kind]||b.kind)+'<br>'+
-    esc((b.city||'')+', '+(b.state||''))+'<br><span class="mut">'+esc(b.geo_precision==='zip'?'ZIP-level placement':'city-level placement')+'</span>',ev);
+    esc((b.city||'')+', '+(b.state||'')),ev);
   if(!cached && b.has_logo && S.logoCache[b.family_slug]!==''){
     S.logoCache[b.family_slug]='';
     api({mode:'logo',slug:b.family_slug}).then(function(r){
       if(r&&r.data_uri){ S.logoCache[b.family_slug]=r.data_uri;
-        if(S._beaconTipActive) tipBeacon(b,ev); }
+        if(S.hover&&S.hover.kind==='beacon'&&S.hover.b===b) tipBeacon(b,ev); }
     }).catch(function(){});
   }
 }
@@ -425,18 +538,17 @@ function tipBeacon(b,ev){
 // ------------------------- panels -------------------------
 function buildStatePanel(){
   var host=$('states'); host.innerHTML='';
-  var byN={}; (S.catalog.states||[]).forEach(function(r){ byN[r.state]=Number(r.n)||0; });
   var sts=Object.keys(S.states).sort();
   sts.forEach(function(st){
     var d=document.createElement('div'); d.className='st '+(S.states[st]?'on':'off'); d.textContent=st;
     d.title=(STATE_NAMES[st]||st);
-    d.onclick=function(){ S.states[st]=!S.states[st]; d.className='st '+(S.states[st]?'on':'off'); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); };
+    d.onclick=function(){ S.states[st]=!S.states[st]; d.className='st '+(S.states[st]?'on':'off'); bump(); scheduleDraw(); updateStats(); writeUrl(); };
     d.ondblclick=function(){ openSharePanel(st); };
     host.appendChild(d);
   });
   $('st-count').textContent='('+sts.length+')';
-  $('st-all').onclick=function(){ sts.forEach(function(s){S.states[s]=true}); buildStatePanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); };
-  $('st-none').onclick=function(){ sts.forEach(function(s){S.states[s]=false}); buildStatePanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); };
+  $('st-all').onclick=function(){ sts.forEach(function(s){S.states[s]=true}); buildStatePanel(); bump(); scheduleDraw(); updateStats(); writeUrl(); };
+  $('st-none').onclick=function(){ sts.forEach(function(s){S.states[s]=false}); buildStatePanel(); bump(); scheduleDraw(); updateStats(); writeUrl(); };
 }
 function buildPeoPanel(){
   var host=$('peo-list'); host.innerHTML='';
@@ -457,26 +569,34 @@ function buildPeoPanel(){
     host.appendChild(d);
   });
 }
-function afterSel(){ buildPeoPanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl(); }
+function afterSel(){ bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl(); }
 $('peo-search').addEventListener('input',buildPeoPanel);
 $('peo-all').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=true}); afterSel(); };
 $('peo-none').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=false}); afterSel(); };
-$('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; drawBeacons(); writeUrl(); };
+$('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
 $('g-family').onclick=function(){ switchGrain('family') };
 $('g-brand').onclick=function(){ switchGrain('brand') };
+function switchGrain(g){
+  if(S.grain===g) return;
+  S.grain=g;
+  $('g-family').className=g==='family'?'on':''; $('g-brand').className=g==='brand'?'on':'';
+  bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl();
+}
 $('pm-addr').onclick=function(){ setPlacement('address') };
 $('pm-zip').onclick=function(){ setPlacement('zip') };
 function setPlacement(pm){
   if(S.placement===pm) return;
   S.placement=pm;
   $('pm-addr').className=pm==='address'?'on':''; $('pm-zip').className=pm==='zip'?'on':'';
-  scheduleDraw(); writeUrl();
+  bump(); scheduleDraw(); writeUrl();
 }
-function switchGrain(g){
-  if(S.grain===g) return;
-  S.grain=g;
-  $('g-family').className=g==='family'?'on':''; $('g-brand').className=g==='brand'?'on':'';
-  buildPeoPanel(); scheduleDraw(); drawBeacons(); updateStats(); writeUrl();
+$('cm-cluster').onclick=function(){ setClusterMode('cluster') };
+$('cm-all').onclick=function(){ setClusterMode('all') };
+function setClusterMode(cm){
+  if(S.clusterMode===cm) return;
+  S.clusterMode=cm;
+  $('cm-cluster').className=cm==='cluster'?'on':''; $('cm-all').className=cm==='all'?'on':'';
+  bump(); scheduleDraw(); writeUrl();
 }
 function updateStats(){
   var sel=selMap(); var nSel=0;
@@ -489,7 +609,7 @@ function updateStats(){
 function tipShow(html,ev){
   var t=$('tip'); t.innerHTML=html; t.style.display='block';
   var x=(ev&&ev.clientX||0)+14, y=(ev&&ev.clientY||0)+12;
-  if(x+310>innerWidth) x=innerWidth-320; if(y+170>innerHeight) y=innerHeight-180;
+  if(x+310>innerWidth) x=innerWidth-320; if(y+190>innerHeight) y=innerHeight-200;
   t.style.left=x+'px'; t.style.top=y+'px';
 }
 function closeTip(){ $('tip').style.display='none'; }
@@ -540,6 +660,7 @@ function writeUrl(){
     if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
     if(!S.beaconsOn) p.set('b','0');
     if(S.placement==='zip') p.set('pm','zip');
+    if(S.clusterMode==='all') p.set('cm','all');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
     history.replaceState(null,'','map.html?'+p.toString());
   }catch(e){}
@@ -554,6 +675,7 @@ function readUrl(){
     if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
     if(p.get('b')==='0'){ S.beaconsOn=false; $('beacons-on').checked=false; }
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
+    if(p.get('cm')==='all'){ S.clusterMode='all'; $('cm-cluster').className=''; $('cm-all').className='on'; }
     S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
   }catch(e){}
 }
