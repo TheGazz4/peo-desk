@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.0 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.1 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.1: live THIS-VIEW legend (viewport market report), search-and-fly (companies/cities/ZIPs via mode=search),
+     AI dock (mode=ai copilot: grounded answers + applies filter_spec + flies the map; brain-spend governed).
      v3.0: renderer rewritten container-fixed (fixes the ghost/offset pin duplicates seen in Gazz's screenshot —
      no google pane transforms; one canvas, own Mercator math, beacons drawn on the same canvas last/on top).
      Composition clusters: PEO-colored donut rings that burst into real pins as you zoom (Clusters | All pins toggle);
@@ -89,12 +91,44 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #gate .err{color:#f2ada4;font-size:12px;margin-top:8px;display:none}
 #loading{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:30;background:var(--surface2);border:1px solid var(--border);
   border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
+#searchwrap{position:relative;width:250px}
+#q{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:6px 9px;font-size:12.5px}
+#q-drop{position:absolute;top:32px;left:0;right:0;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  box-shadow:0 8px 26px rgba(0,0,0,.5);display:none;max-height:320px;overflow-y:auto}
+.q-row{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12.5px;color:var(--ink2);cursor:pointer}
+.q-row:hover{background:rgba(99,144,238,.1)}
+.q-row .dot{width:9px;height:9px;border-radius:3px;flex:none}
+.q-row .sub{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
+.q-hd{padding:6px 10px 2px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+#viewlegend .vl-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;color:var(--ink2);cursor:pointer}
+#viewlegend .vl-row:hover{color:var(--ink)}
+#viewlegend .dot{width:9px;height:9px;border-radius:3px;flex:none}
+#viewlegend .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
+#viewlegend .bar{height:4px;border-radius:2px;flex:1;background:var(--grid);overflow:hidden}
+#viewlegend .bar i{display:block;height:100%}
+#viewlegend .ct{font-size:10.5px;color:var(--muted);min-width:38px;text-align:right}
+#vl-total{font-size:11px;color:var(--muted);margin-bottom:6px}
+#aidock{position:absolute;left:12px;bottom:24px;z-index:36;width:330px;background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:0 10px 34px rgba(0,0,0,.55)}
+#aidock .hd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink);font-weight:650;cursor:pointer}
+#aidock .hd .min{margin-left:auto;color:var(--muted);font-size:14px}
+#aidock .bd{padding:10px 12px;display:block}
+#aidock.min .bd{display:none}
+#ai-ans{font-size:12.5px;color:var(--ink2);margin-bottom:8px;max-height:150px;overflow-y:auto;white-space:pre-wrap}
+#ai-ans:empty{display:none}
+#ai-row{display:flex;gap:6px}
+#ai-q{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:7px 9px;font-size:12.5px}
+#ai-send{background:var(--accent);border:0;border-radius:7px;color:#0b1220;font-weight:650;padding:0 13px;cursor:pointer;font-size:12.5px}
+#ai-send:disabled{opacity:.5}
+#ai-desc{margin-top:7px;width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:7px;padding:5px 0;font-size:11.5px;cursor:pointer}
+#ai-desc:hover{border-color:var(--accent);color:var(--ink)}
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.0 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.1 · 2026-08-27</span>
+    <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
     <span id="stats">loading…</span>
     <a href="ask.html">← AI Data Desk</a>
@@ -117,6 +151,11 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div class="btnrow"><button id="st-all">All</button><button id="st-none">None</button></div>
         <div style="font-size:10.5px;color:var(--muted);margin-top:6px">double-click a state for its market share</div>
       </div>
+      <div class="sec">
+        <h2>This view</h2>
+        <div id="vl-total">move the map…</div>
+        <div id="viewlegend"></div>
+      </div>
       <div class="sec" style="flex:1;display:flex;flex-direction:column;min-height:120px;border-bottom:0">
         <h2>PEOs <span id="peo-count" style="color:var(--muted);font-weight:400"></span></h2>
         <input id="peo-search" placeholder="Search PEOs…">
@@ -130,6 +169,14 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
       <div id="loading">loading…</div>
       <div id="card"></div>
       <div id="sharepanel"></div>
+      <div id="aidock" class="min">
+        <div class="hd" id="ai-hd">✦ Ask the map <span class="min" id="ai-min">▴</span></div>
+        <div class="bd">
+          <div id="ai-ans"></div>
+          <div id="ai-row"><input id="ai-q" placeholder="e.g. show Insperity in Florida…"><button id="ai-send">Ask</button></div>
+          <button id="ai-desc">Describe this view</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -292,7 +339,7 @@ window.initMap=function(){
     mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
   S.map.addListener('center_changed',scheduleDraw);
   S.map.addListener('zoom_changed',function(){ scheduleDraw(); });
-  S.map.addListener('idle',function(){ scheduleDraw(); writeUrl(); });
+  S.map.addListener('idle',function(){ scheduleDraw(); writeUrl(); scheduleViewLegend(); });
   var mapDiv=$('map');
   mapDiv.addEventListener('mousemove',onMove);
   mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
@@ -603,6 +650,7 @@ function updateStats(){
   catRows().forEach(function(r){ if(sel[r.slug]!==false) nSel++; });
   var stOn=Object.keys(S.states).filter(function(s){return S.states[s]}).length;
   $('stats').textContent=nSel+' PEOs · '+stOn+' states';
+  scheduleViewLegend();
 }
 
 // ------------------------- tooltips & card -------------------------
@@ -683,6 +731,119 @@ $('permalink').onclick=function(){
   writeUrl();
   try{ navigator.clipboard.writeText(location.href); $('permalink').textContent='Copied!'; setTimeout(function(){$('permalink').textContent='Copy view link'},1400); }catch(e){}
 };
+
+// ------------------------- THIS VIEW legend (live viewport market report) -------------------------
+var vlTimer=null;
+function scheduleViewLegend(){ if(vlTimer) clearTimeout(vlTimer); vlTimer=setTimeout(computeViewLegend,250); }
+function computeViewLegend(){
+  if(!S.map||!S.catalog) return;
+  var b=S.map.getBounds(); if(!b) return;
+  var ne=b.getNorthEast(), sw=b.getSouthWest();
+  var x1=mercX(sw.lng()), x2=mercX(ne.lng()), y1=mercY(ne.lat()), y2=mercY(sw.lat());
+  var sel=selMap(); var counts={}; var total=0;
+  for(var st in S.pinData){
+    if(S.states[st]===false) continue;
+    var d=S.pinData[st];
+    var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    for(var i=0;i<d.n;i++){
+      if(!vis[IDX[i]]) continue;
+      if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
+      var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
+    }
+  }
+  var top=Object.keys(counts).map(function(s){return [s,counts[s]]}).sort(function(a,b2){return b2[1]-a[1]}).slice(0,8);
+  S._vlSummary={total:total, top:top.map(function(t){return {slug:t[0], name:dispOf(t[0]), n:t[1]}})};
+  $('vl-total').textContent=total?total.toLocaleString()+' clients in this view':'no clients in this view';
+  var host=$('viewlegend'); host.innerHTML='';
+  top.forEach(function(t){
+    var pct=total?Math.round(100*t[1]/total):0;
+    var r=document.createElement('div'); r.className='vl-row'; r.title=dispOf(t[0])+' · '+t[1].toLocaleString()+' clients here — click to show only them';
+    r.innerHTML='<span class="dot" style="background:'+colorOf(t[0])+'"></span><span class="nm">'+esc(dispOf(t[0]))+'</span>'+
+      '<span class="bar"><i style="width:'+Math.max(3,pct)+'%;background:'+colorOf(t[0])+'"></i></span><span class="ct">'+pct+'%</span>';
+    r.onclick=function(){ var sm=selMap(); Object.keys(sm).forEach(function(k2){sm[k2]=false}); sm[t[0]]=true; afterSel(); };
+    host.appendChild(r);
+  });
+}
+
+// ------------------------- search-and-fly -------------------------
+function flyTo(lat,lng,z){ if(!S.map) return; S.map.panTo({lat:Number(lat),lng:Number(lng)}); if(z) S.map.setZoom(z); }
+var qTimer=null;
+$('q').addEventListener('input',function(){
+  var v=this.value.trim();
+  if(qTimer) clearTimeout(qTimer);
+  if(v.length<2){ $('q-drop').style.display='none'; return; }
+  qTimer=setTimeout(function(){ runSearch(v); },300);
+});
+$('q').addEventListener('keydown',function(e){ if(e.key==='Escape') $('q-drop').style.display='none'; });
+document.addEventListener('click',function(e){ try{ if(!$('searchwrap').contains(e.target)) $('q-drop').style.display='none'; }catch(_){} });
+function runSearch(v){
+  api({mode:'search',q:v}).then(function(r){
+    var d=$('q-drop'); d.innerHTML='';
+    function row(html,fn){ var e=document.createElement('div'); e.className='q-row'; e.innerHTML=html; e.onclick=fn; d.appendChild(e); }
+    function hd(t){ var e=document.createElement('div'); e.className='q-hd'; e.textContent=t; d.appendChild(e); }
+    if((r.companies||[]).length){ hd('Companies');
+      r.companies.forEach(function(c){
+        var slug=(S.grain==='brand')?(c.brand_slug||c.family_slug):c.family_slug;
+        row('<span class="dot" style="background:'+colorOf(slug)+'"></span>'+esc(c.company_display)+'<span class="sub">'+esc((c.city||'')+', '+(c.state||''))+'</span>',
+          function(){ $('q-drop').style.display='none'; flyTo(c.lat,c.lng,14.5);
+            api({mode:'company',id:c.company_id}).then(function(rr){ if(rr.company) openCard(rr.company,slug); }).catch(function(){}); });
+      });
+    }
+    if((r.cities||[]).length){ hd('Places');
+      r.cities.forEach(function(c){ row('&#128205; '+esc(c.city+', '+c.state),function(){ $('q-drop').style.display='none'; flyTo(c.lat,c.lng,11); }); });
+    }
+    (r.zips||[]).forEach(function(z){ row('&#128205; ZIP '+esc(z.zip)+'<span class="sub">'+esc(z.state||'')+'</span>',function(){ $('q-drop').style.display='none'; flyTo(z.lat,z.lng,12.5); }); });
+    d.style.display=d.children.length?'block':'none';
+  }).catch(function(){});
+}
+
+// ------------------------- AI dock (the map copilot) -------------------------
+$('ai-hd').onclick=function(){ var a=$('aidock'); a.className=a.className==='min'?'':'min'; $('ai-min').textContent=a.className==='min'?'▴':'▾'; };
+$('ai-send').onclick=function(){ aiAsk($('ai-q').value.trim()); };
+$('ai-q').addEventListener('keydown',function(e){ if(e.key==='Enter') aiAsk(this.value.trim()); });
+$('ai-desc').onclick=function(){ aiAsk('Describe this view for me.'); };
+function viewContext(){
+  var stOn=Object.keys(S.states).filter(function(s){return S.states[s]});
+  return { grain:S.grain, placement:S.placement, cluster_mode:S.clusterMode,
+    states_on: stOn.length<=15?stOn:stOn.length+' states',
+    zoom: S.map?Math.round(S.map.getZoom()*10)/10:null,
+    center: S.map?{lat:Math.round(S.map.getCenter().lat()*100)/100,lng:Math.round(S.map.getCenter().lng()*100)/100}:null,
+    in_view: S._vlSummary||null };
+}
+function aiAsk(q){
+  if(!q) return;
+  var a=$('aidock'); if(a.className==='min'){ a.className=''; $('ai-min').textContent='▾'; }
+  $('ai-send').disabled=true; $('ai-ans').textContent='Thinking…';
+  api({mode:'ai', q:q, view:viewContext()}).then(function(r){
+    $('ai-send').disabled=false;
+    if(r.error){ $('ai-ans').textContent=r.detail||('Unavailable: '+r.error); return; }
+    $('ai-ans').textContent=r.answer||'—';
+    applyFilterSpec(r.filter_spec);
+    if(r.fly_to&&isFinite(Number(r.fly_to.lat))&&isFinite(Number(r.fly_to.lng))){
+      flyTo(Number(r.fly_to.lat),Number(r.fly_to.lng),Number(r.fly_to.zoom)||undefined);
+    }
+    $('ai-q').value='';
+  }).catch(function(){ $('ai-send').disabled=false; $('ai-ans').textContent='Could not reach the map brain — try again.'; });
+}
+function applyFilterSpec(fs){
+  if(!fs||typeof fs!=='object') return;
+  if(fs.grain==='family'||fs.grain==='brand') switchGrain(fs.grain);
+  if(fs.placement==='address'||fs.placement==='zip') setPlacement(fs.placement);
+  if(fs.cluster_mode==='cluster'||fs.cluster_mode==='all') setClusterMode(fs.cluster_mode);
+  if(fs.states==='all'){ Object.keys(S.states).forEach(function(s){S.states[s]=true}); buildStatePanel(); }
+  else if(Array.isArray(fs.states)&&fs.states.length){
+    Object.keys(S.states).forEach(function(s){S.states[s]=false});
+    fs.states.forEach(function(s){ var u=String(s).toUpperCase(); if(u in S.states) S.states[u]=true; });
+    buildStatePanel();
+  }
+  var sel=selMap();
+  if(fs.solo){ Object.keys(sel).forEach(function(k){sel[k]=false}); sel[String(fs.solo)]=true; }
+  else if(Array.isArray(fs.on)&&fs.on.length){ Object.keys(sel).forEach(function(k){sel[k]=false}); fs.on.forEach(function(s){sel[String(s)]=true}); }
+  if(Array.isArray(fs.off)) fs.off.forEach(function(s){sel[String(s)]=false});
+  bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl();
+}
 
 // ------------------------- start -------------------------
 loadGmaps();
