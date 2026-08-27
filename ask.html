@@ -109,7 +109,7 @@
 <body>
 
 <header>
-  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.9 · 2026-08-19 +map</span></div></div>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.10 · 2026-08-27</span></div></div>
   <div class="hd-chips" id="chips"></div>
 </header>
 
@@ -157,6 +157,7 @@
   <div class="row" style="margin-top:0"><button class="btn" id="riReload">Load scoreboard</button><button class="btn ghost" id="riCalBtn" title="the brand-level health master policy calendar (existing pull — the instrument layer this tab must never be confused with)">Health master calendar</button><span class="mini" id="riNote"></span></div>
   <div id="riHead" class="mini" style="margin-top:8px"></div>
   <div id="riBars" style="margin-top:8px"></div>
+  <div style="margin-top:12px"><div class="mini" style="margin-bottom:4px"><b>CALL LIST — OPEN SEASON NOW</b> — hottest first (live switch score, then window proximity). Ask the two questions — "when does your health plan renew?" and "who's your carrier?" — and log them right here; the gate runs the tier ladder (LIKELY alone, KNOWN when it corroborates, conflicts held for review). <button class="btn ghost" id="riCallLoad" style="padding:3px 10px;font-size:11.5px">Load call list</button> <span class="mini" id="riCallNote"></span></div><div class="tablewrap" id="riCallWrap" style="display:none"><table id="riCallTable"></table></div></div>
   <div style="margin-top:10px"><div class="mini" style="margin-bottom:4px"><b>THE PEO LENS</b> — how much of each book we hold the timing code on (sorted by book size; modeled-only = legacy brand-inherited layer, shown for contrast, never counted as profiled)</div><div class="tablewrap"><table id="riLens"></table></div></div>
   <div style="margin-top:10px"><div class="mini" style="margin-bottom:4px"><b>TOP-20 REGIME DOSSIERS</b> — chip = regime standing (ratified / hypothesis / unknown); n/9 = mandated section completeness; click a family for the full dossier</div><div class="tablewrap"><table id="riGrid"></table></div></div>
   <div id="riEdu" class="mini" style="margin-top:10px"></div>
@@ -402,6 +403,41 @@
       }
       step();
     }).catch(function(){ netFail(); });
+  }
+
+  function riLoadCalls(){
+    var b=$('riCallLoad'); if(b){ b.disabled=true; b.textContent='Loading…'; }
+    var Q="select company_id, legal_name, city, state, current_peo, renewal_month, months_until, tier, confidence, basis_short, switch_pct, headcount_est, phone, prior_claims from v_ws4_call_list limit 300";
+    api({mode:'sql',sql:Q,label:'ws4 call list',quiet:true},45000).then(function(j){
+      if(b){ b.disabled=false; b.textContent='Load call list'; }
+      if(handleCommon(j)) return;
+      var rows=j.rows||[];
+      var h='<thead><tr><th>#</th><th>company</th><th>st</th><th>current PEO</th><th title="evidence-earned renewal month + tier — hover for the basis">renewal</th><th class="num" title="months until the renewal month">mo out</th><th class="num">switch %</th><th class="num">size</th><th>phone</th><th title="log what the client says — the gate runs the §5 tier ladder and reconciles every entry">log x-date / carrier</th></tr></thead><tbody>';
+      rows.forEach(function(r,i){
+        h+='<tr data-cid="'+esc(String(r.company_id))+'"><td class="num">'+(i+1)+'</td>'
+          +'<td><a href="#" class="riCo" data-cid="'+esc(String(r.company_id))+'" style="color:var(--accent);text-decoration:none">'+esc(r.legal_name||'')+'</a>'+(Number(r.prior_claims)>0?' <span class="mini">('+r.prior_claims+' logged)</span>':'')+'</td>'
+          +'<td class="ctr">'+esc(r.state||'')+'</td><td>'+esc(r.current_peo||'')+'</td>'
+          +'<td title="'+esc(r.basis_short||'')+'">'+esc(r.renewal_month||'')+' <span class="mini">'+esc(r.tier||'')+'</span></td>'
+          +'<td class="num">'+r.months_until+'</td><td class="num">'+(r.switch_pct!=null?r.switch_pct+'%':'')+'</td>'
+          +'<td class="num">'+(r.headcount_est!=null?fmtN(r.headcount_est):'')+'</td><td>'+esc(r.phone||'')+'</td>'
+          +'<td style="white-space:nowrap"><select class="riMon" style="width:auto;padding:3px 5px;font-size:11.5px"><option value="">month…</option>'+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(function(m,mi){return '<option value="'+(mi+1)+'">'+m+'</option>';}).join('')+'</select> <input type="text" class="riCarr" placeholder="carrier" style="width:80px;padding:3px 5px;font-size:11.5px"> <button class="btn ghost riLog" style="padding:3px 9px;font-size:11.5px">Log</button></td></tr>';
+      });
+      $('riCallTable').innerHTML=h+'</tbody>';
+      $('riCallWrap').style.display='block';
+      $('riCallNote').textContent=rows.length+' shown (top of the open-season book, hottest first)';
+      Array.prototype.forEach.call($('riCallTable').querySelectorAll('.riCo'),function(a){ a.onclick=function(e){ e.preventDefault(); openCard(a.getAttribute('data-cid')); }; });
+      Array.prototype.forEach.call($('riCallTable').querySelectorAll('.riLog'),function(btn){ btn.onclick=function(){
+        var tr=btn.closest('tr'); var cid=tr.getAttribute('data-cid');
+        var mon=tr.querySelector('.riMon').value; var carr=tr.querySelector('.riCarr').value.trim();
+        if(!mon&&!carr){ banner('warn','capture at least the stated month or the carrier — that is the whole harvest.'); return; }
+        btn.disabled=true; btn.textContent='…';
+        api({mode:'record_xdate',company_id:cid,month:mon||undefined,carrier:carr||undefined},30000).then(function(j2){
+          btn.disabled=false; btn.textContent='Log';
+          if(j2&&j2.ok){ var act=(j2.result&&j2.result.action)||''; banner('warn','<b>harvested through the gate:</b> '+esc(String(act).replace(/_/g,' '))+' — dated, attributed, reconciled.'); btn.textContent='✓'; }
+          else banner('crit','<b>gate refused:</b> '+esc(String((j2&&(j2.detail||j2.error))||'no response')));
+        }).catch(function(){ btn.disabled=false; btn.textContent='Log'; netFail(); });
+      }; });
+    }).catch(function(){ if(b){ b.disabled=false; b.textContent='Load call list'; } netFail(); });
   }
 
   // ---------- quick pulls ----------
@@ -817,6 +853,7 @@
   $('csvBtn').onclick=csv;
   $('refineBtn').onclick=function(){ switchTab('ask'); $('followup').checked=true; $('q').focus(); };
   $('peoReload').onclick=runPeoProfiles;
+  if($('riCallLoad')) $('riCallLoad').onclick=riLoadCalls;
   if($('riCalBtn')) $('riCalBtn').onclick=function(){ var p=null; for(var i=0;i<PULLS.length;i++){ if(PULLS[i][0]==='Health master renewal calendar'){ p=PULLS[i]; break; } } if(p) runPull(p,-1); };
   if($('riDosClose')) $('riDosClose').onclick=function(){ $('riDossier').style.display='none'; };
   $('grainFam')&&($('grainFam').onclick=function(){ setPeoGrain('family'); });
