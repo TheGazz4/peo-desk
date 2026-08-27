@@ -4,7 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.9 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.10 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.10 (claim 116): BEACON FAN-OUT — overlapping HQ logo chips/stars no longer stack: a
+     deterministic repulsion layout displaces them just enough that ALL are visible simultaneously,
+     each displaced mark tied to its TRUE location by a leader line + white/brown anchor dot (owner
+     directive). Offsets cached per zoom bucket (screen-relative → pans reuse them); hover/click
+     targets follow the displaced marks. PLUS: state outlines more pronounced than Google's faint
+     dotted default (styled administrative.province 1.6px / country 1.8px strokes, warm gray).
+     v3.9 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.9 (claim 113 — "still takes way too long to load"): NATIONAL BUNDLE LOADING. Cold load was
      ~112 edge requests (55 states x 2 waves + catalog + beacons + ~40 lazy logo fetches); now ~5:
      mode=pins_all paints EVERY state's pins in one request, mode=details_all streams all hover
@@ -232,7 +239,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.9 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.10 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -565,7 +572,14 @@ window.initMap=function(){
   var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
   S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
     disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
-    mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
+    mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT},
+    // v3.10 (owner): state outlines more pronounced than Google's faint dotted default
+    styles:[
+      {featureType:'administrative.province',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#7d7466'},{weight:1.6}]},
+      {featureType:'administrative.country',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#6b6255'},{weight:1.8}]}
+    ]});
   // v3.7: continuous render tracking — during any pan/zoom interaction a rAF pump redraws EVERY
   // frame (reading live center/zoom), so pins move commensurate with the map instead of lagging
   // behind the tile animation. Pump self-stops 350ms after the last movement event; idle seals it.
@@ -750,6 +764,7 @@ function draw(){
   // zoomed out; "HQ logo pins" renders the PEO's actual logo as a white chip at its HQ, ★ fallback)
   if(S.beaconsOn||S.hqLogos){
     var bps=z<6?0.7:1;
+    var bDraw=[];   // v3.10: collect first, fan out overlaps, THEN render with leader lines
     for(var b2=0;b2<S.beacons.length;b2++){
       var b=S.beacons[b2];
       if(b.state && S.states[b.state]===false) continue;
@@ -758,18 +773,83 @@ function draw(){
       if(isHq){ if(!S.hqLogos) continue; }                       // "PEO HQ pins (logos)" governs headquarters
       else { if(!S.beaconsOn||z<6) continue; }                   // admin ◆ + candidates ✩: opt-in, z≥6 only
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
-      if(bx<-22||bx>W+22||by<-22||by>H+22) continue;
+      if(bx<-200||bx>W+200||by<-200||by>H+200) continue;   // wide cull margin keeps the fan-out stable near edges
+      var asChip=false, im=null, chs=0;
       if(isHq&&b.has_logo&&(z>=5||!S._topFams||S._topFams[b.family_slug])){
-        var im=beaconLogo(b.family_slug);
-        if(im){ var chs=chipSize(z); drawLogoChip(bx,by,im,chs); hits.push({x:bx,y:by,r:chs*0.58,kind:'beacon',b:b}); continue; }
+        im=beaconLogo(b.family_slug);
+        if(im){ asChip=true; chs=chipSize(z); }
       }
-      var col=b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER;
-      var kind=b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star');
-      var sp3=sprite(kind,col,bps);
-      ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,bx-sp3.ax,by-sp3.ay,sp3.w,sp3.h);
-      hits.push({x:bx,y:by,r:14*bps,kind:'beacon',b:b});
+      bDraw.push({id:String(b.beacon_id||(b.family_slug+':'+b.kind)), b:b, tx:bx, ty:by,
+                  chip:asChip, im:im, s:asChip?chs:26*bps, bps:bps,
+                  col:b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER,
+                  kind:b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star')});
+    }
+    layoutBeacons(bDraw, z);
+    for(var e1=0;e1<bDraw.length;e1++){   // pass 1: leader lines + true-location anchor dots
+      var e=bDraw[e1];
+      var ddx=e.dx-e.tx, ddy=e.dy-e.ty;
+      if(ddx*ddx+ddy*ddy>36){
+        ctx.beginPath(); ctx.lineWidth=1.25; ctx.strokeStyle='rgba(70,63,56,.6)';
+        ctx.moveTo(e.tx,e.ty); ctx.lineTo(e.dx,e.dy); ctx.stroke();
+        ctx.beginPath(); ctx.fillStyle='#ffffff'; ctx.arc(e.tx,e.ty,3.4,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.fillStyle='#463f38'; ctx.arc(e.tx,e.ty,2,0,Math.PI*2); ctx.fill();
+      }
+    }
+    for(var e2=0;e2<bDraw.length;e2++){   // pass 2: marks at their fanned-out positions
+      var m=bDraw[e2];
+      if(m.chip){
+        drawLogoChip(m.dx,m.dy,m.im,m.s);
+        hits.push({x:m.dx,y:m.dy,r:m.s*0.58,kind:'beacon',b:m.b});
+      } else {
+        var sp3=sprite(m.kind,m.col,m.bps);
+        ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,m.dx-sp3.ax,m.dy-sp3.ay,sp3.w,sp3.h);
+        hits.push({x:m.dx,y:m.dy,r:14*m.bps,kind:'beacon',b:m.b});
+      }
     }
   }
+}
+// v3.10 BEACON FAN-OUT (owner: "icons are stacked on top of one another — I want to see them ALL,
+// with a line to specifically where they are located"). Deterministic pairwise repulsion pushes
+// overlapping marks apart (bounded travel); each displaced mark gets a leader line + anchor dot at
+// its TRUE spot. Offsets are screen-relative, so panning reuses them; zoom buckets recompute.
+var beaconLayoutCache={key:'',off:{}};
+function layoutBeacons(list,z){
+  if(!list.length) return;
+  list.sort(function(a,b){ return a.id<b.id?-1:(a.id>b.id?1:0); });
+  var key=(Math.round(z*4)/4)+'|'+S.rev+'|'+list.map(function(e){return e.id}).join(',');
+  if(beaconLayoutCache.key===key){
+    for(var k0=0;k0<list.length;k0++){ var o=beaconLayoutCache.off[list[k0].id]||[0,0]; list[k0].dx=list[k0].tx+o[0]; list[k0].dy=list[k0].ty+o[1]; }
+    return;
+  }
+  var P=list.map(function(e){ return {x:e.tx,y:e.ty}; });
+  for(var it=0;it<40;it++){
+    var moved=false;
+    for(var i=0;i<list.length;i++){
+      for(var j=i+1;j<list.length;j++){
+        var need=(list[i].s+list[j].s)/2+4;
+        var dx=P[j].x-P[i].x, dy=P[j].y-P[i].y;
+        var d=Math.sqrt(dx*dx+dy*dy);
+        if(d<need){
+          var ux,uy;
+          if(d<0.01){ var a=((i*137+j*61)%360)*Math.PI/180; ux=Math.cos(a); uy=Math.sin(a); d=0.01; }
+          else { ux=dx/d; uy=dy/d; }
+          var push=(need-d)/2+0.5;
+          P[i].x-=ux*push; P[i].y-=uy*push;
+          P[j].x+=ux*push; P[j].y+=uy*push;
+          moved=true;
+        }
+      }
+    }
+    for(var c=0;c<list.length;c++){
+      var e=list[c]; var hx=P[c].x-e.tx, hy=P[c].y-e.ty; var hd=Math.sqrt(hx*hx+hy*hy);
+      var mx2=Math.max(70,e.s*2.4);
+      if(hd>mx2){ P[c].x=e.tx+hx/hd*mx2; P[c].y=e.ty+hy/hd*mx2; }
+    }
+    if(!moved) break;
+  }
+  var off={};
+  for(var f=0;f<list.length;f++){ off[list[f].id]=[P[f].x-list[f].tx, P[f].y-list[f].ty]; list[f].dx=P[f].x; list[f].dy=P[f].y; }
+  beaconLayoutCache={key:key,off:off};
 }
 // HQ logo chips: decoded-image cache fed by mode=logo data URIs (same source as the hover tooltip)
 function beaconLogo(slug){
