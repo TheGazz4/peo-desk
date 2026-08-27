@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEO Coverage Map</title>
+<!-- map v1.0 · 2026-08-26 · Instance A · Coverage Map (claude/coverage-map-spec)
+     Data: map-data edge fn (v_map_* views only). Auth: desk key (localStorage 'desk_key', shared with ask.html) or GoTrue login made on ask.html.
+     Palette: platform tokens (Gazz-ratified). Colors come ONLY from map_color_registry via catalog — never invented here. -->
+<style>
+:root{
+  --bg:#070b0f; --surface:#0d141b; --surface2:#131c25; --ink:#ecf1f4; --ink2:#aebac3; --muted:#71808b;
+  --grid:#223039; --border:#2e3e4a; --accent:#6390ee; --accent-h:#4470c8; --good:#43a566; --crit:#de6b5f;
+  --warn:#e0985c; --hl:#9781ea; --other:#71808b; --ring:rgba(255,255,255,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  background-image:radial-gradient(1100px 700px at 6% -8%, rgba(22,52,58,.45) 0%, transparent 60%);}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+header h1{font-size:16px;font-weight:650;letter-spacing:.2px}
+header .stamp{color:var(--muted);font-size:11px}
+header a{color:var(--accent);text-decoration:none;font-size:12px}
+header a:hover{color:var(--accent-h)}
+.spacer{flex:1}
+#stats{font-size:12px;color:var(--ink2);white-space:nowrap}
+#main{display:flex;flex:1;min-height:0}
+#panel{width:280px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+#panel .sec{padding:10px 12px;border-bottom:1px solid var(--grid)}
+#panel h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px}
+.seg{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{flex:1;background:none;border:0;color:var(--ink2);padding:7px 0;font-size:12.5px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#0b1220;font-weight:650}
+.btnrow{display:flex;gap:6px;margin-top:8px}
+.btnrow button, .ghost{background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:6px;padding:4px 9px;font-size:11.5px;cursor:pointer}
+.btnrow button:hover,.ghost:hover{border-color:var(--accent);color:var(--ink)}
+#peo-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12.5px;margin-bottom:8px}
+#peo-list{overflow-y:auto;flex:1;padding:4px 6px}
+.peo-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
+.peo-row:hover{background:rgba(99,144,238,.08)}
+.peo-row .sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--ring)}
+.peo-row .nm{flex:1;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peo-row.on .nm{color:var(--ink)}
+.peo-row .ct{font-size:11px;color:var(--muted)}
+.peo-row .solo{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden}
+.peo-row:hover .solo{visibility:visible}
+.peo-row.off .sw{opacity:.25}
+#states{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;max-height:170px;overflow-y:auto}
+.st{font-size:10.5px;text-align:center;padding:4px 0;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);cursor:pointer;user-select:none}
+.st.on{background:rgba(99,144,238,.16);border-color:var(--accent);color:var(--ink)}
+.st.off{opacity:.35}
+#map{flex:1;min-width:0}
+.chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);cursor:pointer;padding:3px 0;user-select:none}
+.chk input{accent-color:var(--accent)}
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;font-size:12px;color:var(--ink2);max-width:290px;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
+#tip b{color:var(--ink);font-size:12.5px}
+#tip .pe{font-weight:650}
+#tip .mut{color:var(--muted);font-size:11px}
+#card{position:absolute;top:12px;right:12px;z-index:40;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 10px 34px rgba(0,0,0,.55);display:none;max-height:calc(100% - 24px);overflow-y:auto}
+#card .hd{display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-bottom:1px solid var(--grid)}
+#card .hd b{font-size:14px;color:var(--ink)}
+#card .x{margin-left:auto;background:none;border:0;color:var(--muted);font-size:16px;cursor:pointer}
+#card .bd{padding:10px 14px}
+#card .kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12.5px}
+#card .kv .k{color:var(--muted)}
+#card .kv .v{color:var(--ink2);text-align:right}
+#card .note{margin-top:8px;padding:7px 9px;border-radius:7px;background:rgba(224,152,92,.12);color:#f0c9a6;font-size:11.5px}
+#card .lk{display:block;margin-top:10px;color:var(--accent);font-size:12.5px;text-decoration:none}
+#gate{position:fixed;inset:0;background:rgba(7,11,15,.92);z-index:100;display:flex;align-items:center;justify-content:center}
+#gate .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px;width:340px}
+#gate h2{font-size:15px;margin-bottom:6px}
+#gate p{font-size:12.5px;color:var(--ink2);margin-bottom:12px}
+#gate input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:9px 10px;font-size:13px}
+#gate button{margin-top:10px;width:100%;background:var(--accent);border:0;border-radius:7px;color:#0b1220;font-weight:650;padding:9px 0;cursor:pointer}
+#gate .err{color:#f2ada4;font-size:12px;margin-top:8px;display:none}
+#loading{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:30;background:var(--surface2);border:1px solid var(--border);
+  border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
+#sharepanel{position:absolute;bottom:24px;right:12px;z-index:35;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:46%;overflow-y:auto}
+#sharepanel .hd{padding:10px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink)}
+#sharepanel table{width:100%;border-collapse:collapse;font-size:12px}
+#sharepanel td{padding:4px 12px;color:var(--ink2);border-bottom:1px solid var(--grid)}
+#sharepanel td.r{text-align:right;color:var(--muted)}
+.mapwrap{position:relative;flex:1;display:flex;min-width:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>PEO Coverage Map</h1><span class="stamp" id="stamp">map v1.0 · 2026-08-26</span>
+    <span class="spacer"></span>
+    <span id="stats">loading…</span>
+    <a href="ask.html">← AI Data Desk</a>
+    <button class="ghost" id="permalink">Copy view link</button>
+  </header>
+  <div id="main">
+    <div id="panel">
+      <div class="sec">
+        <h2>View by</h2>
+        <div class="seg"><button id="g-family" class="on">Family brand</button><button id="g-brand">PEO specific</button></div>
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ + administrative beacons</label>
+      </div>
+      <div class="sec">
+        <h2>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
+        <div id="states"></div>
+        <div class="btnrow"><button id="st-all">All</button><button id="st-none">None</button></div>
+      </div>
+      <div class="sec" style="flex:1;display:flex;flex-direction:column;min-height:120px;border-bottom:0">
+        <h2>PEOs <span id="peo-count" style="color:var(--muted);font-weight:400"></span></h2>
+        <input id="peo-search" placeholder="Search PEOs…">
+        <div class="btnrow" style="margin:0 0 6px"><button id="peo-all">All</button><button id="peo-none">None</button><button id="peo-top">Top 10</button></div>
+        <div id="peo-list"></div>
+      </div>
+    </div>
+    <div class="mapwrap">
+      <div id="map"></div>
+      <div id="loading">loading…</div>
+      <div id="card"></div>
+      <div id="sharepanel"></div>
+    </div>
+  </div>
+</div>
+<div id="tip"></div>
+<div id="gate" style="display:none">
+  <div class="box">
+    <h2>PEO_Engine — Coverage Map</h2>
+    <p>Enter the desk key (same key as the AI Data Desk).</p>
+    <input id="gate-key" type="password" placeholder="Desk key">
+    <button id="gate-go">Enter</button>
+    <div class="err" id="gate-err">That key was refused.</div>
+  </div>
+</div>
+<script>
+'use strict';
+// ------------------------- config -------------------------
+var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-data';
+var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
+var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE'; // browser key, referrer-restricted to thegazz4.github.io
+var OTHER='#71808b';
+var $=function(id){return document.getElementById(id)};
+var STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'D.C.',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',PR:'Puerto Rico',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',VI:'Virgin Islands',GU:'Guam'};
+var MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// ------------------------- state -------------------------
+var S={
+  grain:'family',          // 'family' | 'brand'
+  catalog:null,            // {families, brands, states, other_hex}
+  colors:{},               // slug -> hex for current grain
+  displays:{},             // slug -> display for current grain
+  sel:{},                  // slug -> true (selected PEOs, current grain)
+  states:{},               // ST -> true (on)
+  beaconsOn:true,
+  beacons:[],
+  stateAgg:null,           // {totals, top} for grain
+  zipCache:{},             // grain|ST -> rows
+  map:null, markers:[], beaconMarkers:[], zoomTier:'', lastFetchSeq:0
+};
+
+// ------------------------- api -------------------------
+function deskKey(){ try{return localStorage.getItem('desk_key')||''}catch(e){return ''} }
+function api(params){
+  var h={'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON};
+  var k=deskKey(); if(k) h['x-desk-key']=k;
+  return fetch(EP,{method:'POST',headers:h,body:JSON.stringify(params)}).then(function(r){
+    if(r.status===401||r.status===403){ showGate(true); throw new Error('auth'); }
+    return r.json();
+  });
+}
+
+// ------------------------- gate -------------------------
+function showGate(bad){ $('gate').style.display='flex'; $('gate-err').style.display=bad&&deskKey()?'block':'none'; }
+$('gate-go').onclick=function(){
+  var v=$('gate-key').value.trim(); if(!v) return;
+  try{localStorage.setItem('desk_key',v)}catch(e){}
+  api({mode:'status'}).then(function(){ $('gate').style.display='none'; boot(); })
+    .catch(function(){ $('gate-err').style.display='block'; });
+};
+$('gate-key').addEventListener('keydown',function(e){ if(e.key==='Enter') $('gate-go').onclick(); });
+
+// ------------------------- boot -------------------------
+var booted=false;
+function boot(){
+  if(booted) return; booted=true;
+  Promise.all([api({mode:'catalog'}),api({mode:'beacons'}),api({mode:'state_agg',grain:S.grain})])
+  .then(function(rs){
+    S.catalog=rs[0]; S.beacons=rs[1].beacons||[]; S.stateAgg=rs[2];
+    (S.catalog.states||[]).forEach(function(r){ if(r.state) S.states[r.state]=true; });
+    applyGrain(S.grain,true);
+    readUrl();
+    buildStatePanel(); buildPeoPanel(); drawBeacons(); scheduleRender(); updateStats();
+  }).catch(function(e){ if(String(e.message)!=='auth') console.error(e); });
+}
+
+function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
+function applyGrain(g,init){
+  S.grain=g; S.colors={}; S.displays={};
+  catRows().forEach(function(r){ S.colors[r.slug]=r.hex||null; S.displays[r.slug]=r.display||r.slug; });
+  if(init||!Object.keys(S.sel).length){ S.sel={}; catRows().forEach(function(r){ S.sel[r.slug]=true; }); }
+  $('g-family').className=g==='family'?'on':''; $('g-brand').className=g==='brand'?'on':'';
+}
+$('g-family').onclick=function(){ switchGrain('family') };
+$('g-brand').onclick=function(){ switchGrain('brand') };
+function switchGrain(g){
+  if(S.grain===g) return;
+  S.zipCache={}; S.stateAgg=null; S.sel={};
+  applyGrain(g,true); buildPeoPanel();
+  api({mode:'state_agg',grain:g}).then(function(r){ S.stateAgg=r; scheduleRender(); });
+  drawBeacons(); scheduleRender(); updateStats(); writeUrl();
+}
+
+// ------------------------- panels -------------------------
+function buildStatePanel(){
+  var host=$('states'); host.innerHTML='';
+  var byN={}; (S.catalog.states||[]).forEach(function(r){ byN[r.state]=Number(r.n)||0; });
+  var sts=Object.keys(S.states).sort();
+  sts.forEach(function(st){
+    var d=document.createElement('div'); d.className='st '+(S.states[st]?'on':'off'); d.textContent=st;
+    d.title=(STATE_NAMES[st]||st)+' — '+(byN[st]||0).toLocaleString()+' clients';
+    d.onclick=function(){ S.states[st]=!S.states[st]; d.className='st '+(S.states[st]?'on':'off'); scheduleRender(); updateStats(); writeUrl(); };
+    host.appendChild(d);
+  });
+  $('st-count').textContent='('+sts.length+')';
+  $('st-all').onclick=function(){ sts.forEach(function(s){S.states[s]=true}); buildStatePanel(); scheduleRender(); updateStats(); writeUrl(); };
+  $('st-none').onclick=function(){ sts.forEach(function(s){S.states[s]=false}); buildStatePanel(); scheduleRender(); updateStats(); writeUrl(); };
+}
+
+function buildPeoPanel(){
+  var host=$('peo-list'); host.innerHTML='';
+  var q=($('peo-search').value||'').toLowerCase();
+  var rows=catRows();
+  $('peo-count').textContent='('+rows.length+')';
+  rows.forEach(function(r){
+    if(q && String(r.display||r.slug).toLowerCase().indexOf(q)<0) return;
+    var on=!!S.sel[r.slug];
+    var d=document.createElement('div'); d.className='peo-row '+(on?'on':'off');
+    var sw=document.createElement('span'); sw.className='sw'; sw.style.background=r.hex||OTHER;
+    var nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.display||r.slug; nm.title=(r.display||r.slug)+' · slug: '+r.slug;
+    var ct=document.createElement('span'); ct.className='ct'; ct.textContent=Number(r.n_clients).toLocaleString();
+    var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
+    so.onclick=function(e){ e.stopPropagation(); Object.keys(S.sel).forEach(function(k){S.sel[k]=false}); S.sel[r.slug]=true; buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
+    d.onclick=function(){ S.sel[r.slug]=!S.sel[r.slug]; buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
+    d.appendChild(sw); d.appendChild(nm); d.appendChild(ct); d.appendChild(so);
+    host.appendChild(d);
+  });
+}
+$('peo-search').addEventListener('input',buildPeoPanel);
+$('peo-all').onclick=function(){ catRows().forEach(function(r){S.sel[r.slug]=true}); buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
+$('peo-none').onclick=function(){ catRows().forEach(function(r){S.sel[r.slug]=false}); buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
+$('peo-top').onclick=function(){ catRows().forEach(function(r){S.sel[r.slug]=!!r.hex}); buildPeoPanel(); scheduleRender(); updateStats(); writeUrl(); };
+$('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; drawBeacons(); writeUrl(); };
+
+function updateStats(){
+  var nSel=0,total=0;
+  catRows().forEach(function(r){ if(S.sel[r.slug]){ nSel++; total+=Number(r.n_clients)||0; } });
+  var stOn=Object.keys(S.states).filter(function(s){return S.states[s]}).length;
+  $('stats').textContent=nSel+' PEOs · '+stOn+' states · ~'+total.toLocaleString()+' clients selected';
+}
+
+// ------------------------- url state -------------------------
+function writeUrl(){
+  try{
+    var p=new URLSearchParams();
+    p.set('grain',S.grain);
+    var off=catRows().filter(function(r){return !S.sel[r.slug]}).map(function(r){return r.slug});
+    var on=catRows().filter(function(r){return S.sel[r.slug]}).map(function(r){return r.slug});
+    if(on.length<=40) p.set('on',on.join(',')); else if(off.length<=40) p.set('off',off.join(','));
+    var stOff=Object.keys(S.states).filter(function(s){return !S.states[s]});
+    if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
+    if(!S.beaconsOn) p.set('b','0');
+    if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
+    history.replaceState(null,'','map.html?'+p.toString());
+  }catch(e){}
+}
+function readUrl(){
+  try{
+    var p=new URLSearchParams(location.search);
+    if(p.get('grain')==='brand'){ applyGrain('brand',true); }
+    if(p.get('on')){ Object.keys(S.sel).forEach(function(k){S.sel[k]=false}); p.get('on').split(',').forEach(function(s){ if(s in S.sel) S.sel[s]=true; }); }
+    else if(p.get('off')){ p.get('off').split(',').forEach(function(s){ if(s in S.sel) S.sel[s]=false; }); }
+    if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
+    if(p.get('b')==='0'){ S.beaconsOn=false; $('beacons-on').checked=false; }
+    S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
+  }catch(e){}
+}
+$('permalink').onclick=function(){
+  writeUrl();
+  try{ navigator.clipboard.writeText(location.href); $('permalink').textContent='Copied!'; setTimeout(function(){$('permalink').textContent='Copy view link'},1400); }catch(e){}
+};
+
+// ------------------------- google map -------------------------
+var DARK_STYLE=[
+ {elementType:'geometry',stylers:[{color:'#0d141b'}]},
+ {elementType:'labels.text.fill',stylers:[{color:'#71808b'}]},
+ {elementType:'labels.text.stroke',stylers:[{color:'#070b0f'}]},
+ {featureType:'administrative',elementType:'geometry.stroke',stylers:[{color:'#2e3e4a'}]},
+ {featureType:'administrative.province',elementType:'geometry.stroke',stylers:[{color:'#3a4e5e'},{weight:1.2}]},
+ {featureType:'landscape',elementType:'geometry',stylers:[{color:'#0d141b'}]},
+ {featureType:'poi',stylers:[{visibility:'off'}]},
+ {featureType:'road',elementType:'geometry',stylers:[{color:'#131c25'}]},
+ {featureType:'road',elementType:'labels',stylers:[{visibility:'simplified'}]},
+ {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#223039'}]},
+ {featureType:'transit',stylers:[{visibility:'off'}]},
+ {featureType:'water',elementType:'geometry',stylers:[{color:'#070b0f'}]}
+];
+window.initMap=function(){
+  var z=isFinite(S._urlZ)?S._urlZ:4.6;
+  var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
+  S.map=new google.maps.Map($('map'),{center:c,zoom:z,styles:DARK_STYLE,backgroundColor:'#070b0f',
+    disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
+    mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
+  S.map.addListener('idle',function(){ scheduleRender(); writeUrl(); });
+  drawBeacons();
+};
+function loadGmaps(){
+  var s=document.createElement('script');
+  s.src='https://maps.googleapis.com/maps/api/js?key='+GMAPS_KEY+'&v=weekly&loading=async&callback=initMap';
+  s.async=true; document.head.appendChild(s);
+}
+
+// ------------------------- rendering -------------------------
+var renderTimer=null;
+function scheduleRender(){ if(renderTimer) clearTimeout(renderTimer); renderTimer=setTimeout(render,350); }
+function clearMarkers(){ S.markers.forEach(function(m){m.setMap(null)}); S.markers=[]; }
+function tierFor(z){ return z<5.5?'state':(z<10.5?'zip':'pin'); }
+function selectedSlugs(){ return Object.keys(S.sel).filter(function(k){return S.sel[k]}); }
+function slugOf(r){ return S.grain==='brand'?(r.brand_slug||r.family_slug):(r.family_slug); }
+function colorOf(slug){ return S.colors[slug]||OTHER; }
+function visibleStates(){
+  if(!S.map) return [];
+  var b=S.map.getBounds(); if(!b) return [];
+  return Object.keys(S.states).filter(function(st){ return S.states[st]; });
+}
+function statesInView(){
+  // ON states whose centroid falls inside the current viewport, padded ~3.5°, nearest-center first
+  if(!S.map) return [];
+  var b=S.map.getBounds(); if(!b) return visibleStates();
+  var ne=b.getNorthEast(), sw=b.getSouthWest(), pad=3.5;
+  var cLat=(ne.lat()+sw.lat())/2, cLng=(ne.lng()+sw.lng())/2;
+  return visibleStates().filter(function(st){
+    var c=STATE_CENTROIDS[st]; if(!c) return false;
+    return c[0]>sw.lat()-pad && c[0]<ne.lat()+pad && c[1]>sw.lng()-pad && c[1]<ne.lng()+pad;
+  }).sort(function(a,b2){
+    var A=STATE_CENTROIDS[a],B=STATE_CENTROIDS[b2];
+    return (Math.pow(A[0]-cLat,2)+Math.pow(A[1]-cLng,2))-(Math.pow(B[0]-cLat,2)+Math.pow(B[1]-cLng,2));
+  });
+}
+function loading(on){ $('loading').style.display=on?'block':'none'; }
+
+function render(){
+  if(!S.map||!S.catalog) return;
+  var z=S.map.getZoom(); var tier=tierFor(z); var seq=++S.lastFetchSeq;
+  if(tier==='state'){ renderStateBubbles(); return; }
+  var b=S.map.getBounds(); if(!b) return;
+  var ne=b.getNorthEast(), sw=b.getSouthWest();
+  var sel=selectedSlugs(); if(!sel.length){ clearMarkers(); return; }
+  if(tier==='zip'){ renderZipDots(seq); }
+  else { renderPins(seq,{minLat:sw.lat(),maxLat:ne.lat(),minLng:sw.lng(),maxLng:ne.lng()}); }
+}
+
+// --- national: one bubble per ON state
+function renderStateBubbles(){
+  clearMarkers(); closeTip();
+  if(!S.stateAgg){ api({mode:'state_agg',grain:S.grain}).then(function(r){S.stateAgg=r; renderStateBubbles();}); return; }
+  var topBy={}; (S.stateAgg.top||[]).forEach(function(r){ (topBy[r.state]=topBy[r.state]||[]).push(r); });
+  var cent=STATE_CENTROIDS;
+  (S.stateAgg.totals||[]).forEach(function(r){
+    var st=r.state; if(!S.states[st]||!cent[st]) return;
+    var n=Number(r.n)||0; if(!n) return;
+    var lead=(topBy[st]||[])[0];
+    var col=lead?colorOf(lead.slug):OTHER;
+    var m=new google.maps.Marker({position:{lat:cent[st][0],lng:cent[st][1]},map:S.map,
+      icon:{path:google.maps.SymbolPath.CIRCLE,scale:Math.max(7,Math.min(26,Math.sqrt(n)/9)),fillColor:col,fillOpacity:.75,strokeColor:'#070b0f',strokeWeight:1.5},
+      label:{text:st,color:'#ecf1f4',fontSize:'10px',fontWeight:'650'},zIndex:5});
+    m.addListener('mouseover',function(ev){ tipState(st,n,topBy[st]||[],ev.domEvent); });
+    m.addListener('mouseout',closeTip);
+    m.addListener('click',function(){ openSharePanel(st); S.map.setZoom(6.2); S.map.panTo({lat:cent[st][0],lng:cent[st][1]}); });
+    S.markers.push(m);
+  });
+}
+
+// --- state zoom: zip dots
+function renderZipDots(seq){
+  var sts=statesInView(); var sel=selectedSlugs(); var selSet={}; sel.forEach(function(s){selSet[s]=1});
+  var b=S.map.getBounds(); var ne=b.getNorthEast(), sw=b.getSouthWest();
+  var need=sts.filter(function(st){ return !S.zipCache[S.grain+'|'+st]; });
+  var fetches=need.slice(0,6).map(function(st){
+    return api({mode:'zip_agg',grain:S.grain,state:st}).then(function(r){ S.zipCache[S.grain+'|'+st]=r.rows||[]; });
+  });
+  if(fetches.length) loading(true);
+  Promise.all(fetches).then(function(){
+    loading(false);
+    if(seq!==S.lastFetchSeq) return;
+    clearMarkers();
+    var byZip={};
+    sts.forEach(function(st){
+      (S.zipCache[S.grain+'|'+st]||[]).forEach(function(r){
+        if(!selSet[r.slug]) return;
+        if(r.lat<sw.lat()||r.lat>ne.lat()||r.lng<sw.lng()||r.lng>ne.lng()) return;
+        var k=st+'|'+r.zip;
+        var e=byZip[k]||(byZip[k]={zip:r.zip,st:st,lat:r.lat,lng:r.lng,n:0,parts:[]});
+        e.n+=r.n; e.parts.push(r);
+      });
+    });
+    var keys=Object.keys(byZip);
+    keys.forEach(function(k){
+      var e=byZip[k];
+      e.parts.sort(function(a,b){return b.n-a.n});
+      var col=colorOf(e.parts[0].slug);
+      var m=new google.maps.Marker({position:{lat:e.lat,lng:e.lng},map:S.map,
+        icon:{path:google.maps.SymbolPath.CIRCLE,scale:Math.max(3.4,Math.min(13,2.6+Math.sqrt(e.n)*0.9)),fillColor:col,fillOpacity:.8,strokeColor:'#070b0f',strokeWeight:1},zIndex:6});
+      m.addListener('mouseover',function(ev){ tipZip(e,ev.domEvent); });
+      m.addListener('mouseout',closeTip);
+      m.addListener('click',function(){ S.map.setZoom(11.2); S.map.panTo({lat:e.lat,lng:e.lng}); });
+      S.markers.push(m);
+    });
+  });
+}
+
+// --- deep zoom: true client pins
+function renderPins(seq,box){
+  var sts=statesInView(); var sel=selectedSlugs();
+  loading(true);
+  var perState=sts.slice(0,4).map(function(st){
+    return api({mode:'pins',grain:S.grain,state:st,slugs:sel.length<=120?sel:[],minLat:box.minLat,maxLat:box.maxLat,minLng:box.minLng,maxLng:box.maxLng,limit:2000});
+  });
+  Promise.all(perState).then(function(rs){
+    loading(false);
+    if(seq!==S.lastFetchSeq) return;
+    clearMarkers();
+    var selSet={}; sel.forEach(function(s){selSet[s]=1});
+    var total=0, shown=0;
+    rs.forEach(function(r){
+      total+=Number(r.total)||0;
+      (r.rows||[]).forEach(function(p){
+        var slug=slugOf(p); if(!selSet[slug]) return;
+        shown++;
+        var pos=jitter(p);
+        var m=new google.maps.Marker({position:pos,map:S.map,
+          icon:{path:google.maps.SymbolPath.CIRCLE,scale:6,fillColor:colorOf(slug),fillOpacity:.92,strokeColor:'#070b0f',strokeWeight:1.4},zIndex:7});
+        m.addListener('mouseover',function(ev){ tipPin(p,slug,ev.domEvent); });
+        m.addListener('mouseout',closeTip);
+        m.addListener('click',function(){ openCard(p,slug); });
+        S.markers.push(m);
+      });
+    });
+    if(total>shown) $('loading').textContent='showing '+shown.toLocaleString()+' of '+total.toLocaleString()+' in view — zoom in for the rest', $('loading').style.display='block';
+    else $('loading').textContent='loading…';
+  });
+}
+function jitter(p){
+  if(p.geo_precision!=='zip') return {lat:Number(p.lat),lng:Number(p.lng)};
+  var h=0,s=String(p.company_id);
+  for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; }
+  var ang=(h%360)*Math.PI/180, rad=0.0008+((h>>>9)%1000)/1000*0.0035;
+  return {lat:Number(p.lat)+Math.sin(ang)*rad,lng:Number(p.lng)+Math.cos(ang)*rad*1.25};
+}
+
+// ------------------------- beacons -------------------------
+function beaconIcon(kind,col){
+  if(kind==='administrative') return {path:'M 0,-11 L 9,0 L 0,11 L -9,0 Z',fillColor:col,fillOpacity:.95,strokeColor:'#070b0f',strokeWeight:1.6,scale:1.15};
+  var star='M 0,-13 L 3.6,-4.2 L 13,-3.6 L 5.8,2.6 L 8,12 L 0,6.8 L -8,12 L -5.8,2.6 L -13,-3.6 L -3.6,-4.2 Z';
+  return {path:star,fillColor:col,fillOpacity:kind==='hq_candidate'?.55:.95,strokeColor:kind==='hq_candidate'?col:'#070b0f',strokeWeight:1.6,scale:1.1};
+}
+function drawBeacons(){
+  S.beaconMarkers.forEach(function(m){m.setMap(null)}); S.beaconMarkers=[];
+  if(!S.map||!S.beaconsOn) return;
+  S.beacons.forEach(function(b){
+    if(b.kind==='po_box'||b.kind==='zip_beacon') return;      // advanced kinds stay off the visual layer v1
+    if(b.state && S.states[b.state]===false) return;
+    if(!S.sel[b.family_slug]) return;                          // beacons are family-grain; same-named brand slugs match too
+    var col=S.colors[b.family_slug]||OTHER;
+    var m=new google.maps.Marker({position:{lat:Number(b.lat),lng:Number(b.lng)},map:S.map,icon:beaconIcon(b.kind,col),zIndex:9999});
+    m.addListener('mouseover',function(ev){ tipBeacon(b,ev.domEvent); });
+    m.addListener('mouseout',closeTip);
+    S.beaconMarkers.push(m);
+  });
+}
+
+// ------------------------- tooltips & cards -------------------------
+function tipShow(html,ev){
+  var t=$('tip'); t.innerHTML=html; t.style.display='block';
+  var x=(ev&&ev.clientX||0)+14, y=(ev&&ev.clientY||0)+12;
+  if(x+300>innerWidth) x=innerWidth-310; if(y+140>innerHeight) y=innerHeight-150;
+  t.style.left=x+'px'; t.style.top=y+'px';
+}
+function closeTip(){ $('tip').style.display='none'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}); }
+function tipPin(p,slug,ev){
+  var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' <span class="mut">('+esc(p.renewal_month_basis||'basis unknown')+')</span>':'<span class="mut">unknown</span>';
+  tipShow('<b>'+esc(p.company_display)+'</b><br>'+
+    '<span class="pe" style="color:'+colorOf(slug)+'">'+esc(S.displays[slug]||slug)+'</span><br>'+
+    esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||'')+'<br>'+
+    'WC renewal: '+ren+'<br>'+
+    (p.wc_carrier?('Carrier: '+esc(p.wc_carrier)+'<br>'):'')+
+    (p.headcount_est?('~'+esc(p.headcount_est)+' employees<br>'):'')+
+    '<span class="mut">pin: '+esc(p.geo_precision)+' precision'+(p.is_multistate?' · multistate':'')+' · click for record</span>',ev);
+}
+function tipZip(e,ev){
+  var rows=e.parts.slice(0,4).map(function(r){ return '<span style="color:'+colorOf(r.slug)+'">●</span> '+esc(S.displays[r.slug]||r.slug)+' <span class="mut">'+r.n+'</span>'; }).join('<br>');
+  tipShow('<b>ZIP '+esc(e.zip)+' · '+e.n+' clients</b><br>'+rows+(e.parts.length>4?'<br><span class="mut">+'+(e.parts.length-4)+' more…</span>':'')+'<br><span class="mut">click to zoom to pins</span>',ev);
+}
+function tipState(st,n,top,ev){
+  var rows=top.slice(0,3).map(function(r){ return '<span style="color:'+colorOf(r.slug)+'">●</span> '+esc(r.display)+' <span class="mut">'+r.share_pct+'%</span>'; }).join('<br>');
+  tipShow('<b>'+esc(STATE_NAMES[st]||st)+' · '+n.toLocaleString()+' clients</b><br>'+rows+'<br><span class="mut">click to zoom in + full share</span>',ev);
+}
+function tipBeacon(b,ev){
+  var kinds={hq:'Headquarters',administrative:'Administrative beacon',hq_candidate:'HQ (candidate)'};
+  tipShow('<b>'+esc(b.peo_display||b.family_slug)+'</b><br>'+esc(kinds[b.kind]||b.kind)+'<br>'+
+    esc((b.city||'')+', '+(b.state||''))+'<br><span class="mut">'+esc(b.basis)+' · '+esc(b.geo_precision)+' precision'+
+    (b.company_count?' · '+b.company_count+' co-located clients':'')+'</span>',ev);
+}
+function openCard(p,slug){
+  var c=$('card');
+  var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(p.renewal_month_basis||'basis unknown')+')':'unknown';
+  var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(p.peo_current_since_basis||'basis unknown')+')':'unknown';
+  c.innerHTML='<div class="hd"><span class="sw" style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px"></span>'+
+    '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(S.displays[slug]||slug)+'</div></div>'+
+    '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
+    '<div class="bd">'+
+    kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
+    kv('WC renewal',ren)+
+    kv('WC carrier',esc(p.wc_carrier||'—'))+
+    kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
+    kv('With PEO since',since)+
+    kv('Multistate',p.is_multistate?'yes':'no')+
+    kv('Pin precision',esc(p.geo_precision)+(p.geocoded_at?' · as of '+String(p.geocoded_at).slice(0,10):''))+
+    '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase — this card will link straight to it.</div>'+
+    '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
+    '</div>';
+  c.style.display='block';
+}
+function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
+function openSharePanel(st){
+  api({mode:'state_share',grain:S.grain,state:st}).then(function(r){
+    var p=$('sharepanel');
+    var rows=(r.rows||[]).map(function(x){
+      return '<tr><td><span style="color:'+colorOf(x.slug)+'">●</span> '+esc(x.display)+'</td><td class="r">'+Number(x.n).toLocaleString()+'</td><td class="r">'+x.share_pct+'%</td></tr>';
+    }).join('');
+    p.innerHTML='<div class="hd"><b>'+esc(STATE_NAMES[st]||st)+'</b> — market share ('+esc(r.grain)+' view) '+
+      '<button class="x" style="float:right;background:none;border:0;color:var(--muted);cursor:pointer" onclick="document.getElementById(\'sharepanel\').style.display=\'none\'">×</button></div>'+
+      '<table>'+rows+'</table>';
+    p.style.display='block';
+  });
+}
+
+// ------------------------- state centroids (approx, for national bubbles) -------------------------
+var STATE_CENTROIDS={AL:[32.8,-86.8],AK:[64.0,-152.0],AZ:[34.2,-111.6],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.3,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.1,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[47.0,-109.6],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.5,-79.4],ND:[47.4,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[43.9,-120.6],PA:[40.9,-77.8],PR:[18.2,-66.4],RI:[41.7,-71.6],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.8,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.5],WV:[38.6,-80.6],WI:[44.6,-89.7],WY:[43.0,-107.6],VI:[18.34,-64.9],GU:[13.44,144.79]};
+
+// ------------------------- start -------------------------
+loadGmaps();
+if(!deskKey()){ showGate(false); } else { boot(); }
+</script>
+</body>
+</html>
