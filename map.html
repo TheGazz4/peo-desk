@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.1 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.2 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.2: multi-state operator filter (data-gated: 100% footprint coverage verified, 46,070 known multi-state —
+     label is honest: "observed in 2+ states"; ms[] rides the detail wave, snapshots rebaked); collapsible left
+     panel (☰, map resizes); mobile-responsive (drawer panel, greedy gestures, tap-friendly, full-width dock/card).
      v3.1: live THIS-VIEW legend (viewport market report), search-and-fly (companies/cities/ZIPs via mode=search),
      AI dock (mode=ai copilot: grounded answers + applies filter_spec + flies the map; brain-spend governed).
      v3.0: renderer rewritten container-fixed (fixes the ghost/offset pin duplicates seen in Gazz's screenshot —
@@ -91,6 +94,21 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #gate .err{color:#f2ada4;font-size:12px;margin-top:8px;display:none}
 #loading{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:30;background:var(--surface2);border:1px solid var(--border);
   border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
+#panel-toggle{font-size:15px;padding:4px 10px}
+#panel.off{display:none}
+@media (max-width:760px){
+  header{flex-wrap:wrap;gap:8px;padding:8px 10px}
+  header .stamp, header a{display:none}
+  #stats{display:none}
+  #searchwrap{width:100%;order:5}
+  #panel{position:fixed;top:0;bottom:0;left:0;width:min(320px,86vw);z-index:70;box-shadow:8px 0 30px rgba(0,0,0,.5);
+    transform:translateX(-106%);transition:transform .18s ease}
+  #panel.off{display:flex;transform:translateX(-106%)}
+  #panel.open{transform:none}
+  #card{width:calc(100vw - 24px);max-width:360px}
+  #aidock{width:calc(100vw - 24px);max-width:360px;bottom:12px}
+  #sharepanel{width:calc(100vw - 24px);max-width:340px}
+}
 #searchwrap{position:relative;width:250px}
 #q{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:6px 9px;font-size:12.5px}
 #q-drop{position:absolute;top:32px;left:0;right:0;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:8px;
@@ -127,7 +145,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <body>
 <div id="app">
   <header>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.1 · 2026-08-27</span>
+    <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.2 · 2026-08-27</span>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
     <span id="stats">loading…</span>
@@ -143,6 +162,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div class="seg"><button id="cm-cluster" class="on">Clusters</button><button id="cm-all">All pins</button></div>
         <h2 style="margin-top:10px">Pin placement</h2>
         <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
+        <h2 style="margin-top:10px" title="Multi-state = observed operating in 2+ states in our footprint data">Operators</h2>
+        <div class="seg"><button id="ms-all" class="on">All clients</button><button id="ms-multi" title="Only clients observed operating in 2+ states">Multi-state</button></div>
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
       </div>
       <div class="sec">
@@ -204,7 +225,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 
 // ------------------------- state -------------------------
 var S={
-  grain:'family', placement:'address', clusterMode:'cluster',
+  grain:'family', placement:'address', clusterMode:'cluster', msOnly:false, panelOpen:true,
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
   sel:{family:null,brand:null}, states:{},
   beaconsOn:true, beacons:[],
@@ -319,7 +340,7 @@ function loadDetail(st){
       mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);   // ZIP view: everything at its ZIP center, jittered
     }
     d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
-    d.detail={ids:r.ids||[],names:r.names||[],cities:r.cities||[],street:r.street||[]};
+    d.detail={ids:r.ids||[],names:r.names||[],cities:r.cities||[],street:r.street||[],ms:r.ms||[]};
     d.lat0=null; d.lng0=null;
     S.detLoaded++; bump(); progress(); scheduleDraw(); pump();
   }).catch(function(){ S.detLoaded++; progress(); pump(); });
@@ -334,7 +355,7 @@ function progress(){
 window.initMap=function(){
   var z=isFinite(S._urlZ)?S._urlZ:4.6;
   var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
-  S.map=new google.maps.Map($('map'),{center:c,zoom:z,
+  S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
     disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
     mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT}});
   S.map.addListener('center_changed',scheduleDraw);
@@ -403,6 +424,7 @@ function rebuildClusters(z){
     var vis=[]; for(var k=0;k<slugArr.length;k++){ vis[k]=sel[slugArr[k]]!==false; }
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
+      if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       var key=Math.floor(MX[i]/cell)+'_'+Math.floor(MY[i]/cell);
       var e=cells[key];
       if(!e){ e=cells[key]={n:0,sx:0,sy:0,slugs:{},members:[]}; }
@@ -470,6 +492,7 @@ function draw(){
       var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=sel[slugArr2[k2]]!==false; }
       for(var i2=0;i2<d2.n;i2++){
         if(!vis2[IDX2[i2]]) continue;
+        if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
         var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
         if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
         var sp2=sprite('pin',S.colors[S.grain][slugArr2[IDX2[i2]]]||OTHER,ps);
@@ -551,7 +574,7 @@ function onClick(e){
     S.map.panTo({lat:lat,lng:lng}); S.map.setZoom(Math.min(16,S.map.getZoom()+2));
     return;
   }
-  if(h.kind==='beacon') return;
+  if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }   // tap-friendly: click/tap a star shows the logo tooltip
   var d=S.pinData[h.st]; if(!d||!d.detail) return;
   var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
   var slug=slugArr[IDX[h.i]];
@@ -639,6 +662,28 @@ function setPlacement(pm){
 }
 $('cm-cluster').onclick=function(){ setClusterMode('cluster') };
 $('cm-all').onclick=function(){ setClusterMode('all') };
+$('ms-all').onclick=function(){ setMsOnly(false) };
+$('ms-multi').onclick=function(){ setMsOnly(true) };
+function setMsOnly(v){
+  if(S.msOnly===v) return;
+  S.msOnly=v;
+  $('ms-all').className=v?'':'on'; $('ms-multi').className=v?'on':'';
+  bump(); scheduleDraw(); updateStats(); writeUrl();
+}
+// ---- panel collapse (desktop hide / mobile drawer) ----
+function isMobile(){ return window.matchMedia('(max-width:760px)').matches; }
+function applyPanel(){
+  var p=$('panel');
+  if(isMobile()){ p.className=S.panelOpen?'open':'off'; }
+  else { p.className=S.panelOpen?'':'off'; }
+  if(S.map){ try{ google.maps.event.trigger(S.map,'resize'); }catch(e){} }
+  scheduleDraw(); scheduleViewLegend();
+}
+$('panel-toggle').onclick=function(){ S.panelOpen=!S.panelOpen; applyPanel(); };
+window.addEventListener('resize',applyPanel);
+document.addEventListener('click',function(e){
+  if(isMobile()&&S.panelOpen&&!$('panel').contains(e.target)&&e.target!==$('panel-toggle')) { S.panelOpen=false; applyPanel(); }
+});
 function setClusterMode(cm){
   if(S.clusterMode===cm) return;
   S.clusterMode=cm;
@@ -709,6 +754,7 @@ function writeUrl(){
     if(!S.beaconsOn) p.set('b','0');
     if(S.placement==='zip') p.set('pm','zip');
     if(S.clusterMode==='all') p.set('cm','all');
+    if(S.msOnly) p.set('ms','1');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
     history.replaceState(null,'','map.html?'+p.toString());
   }catch(e){}
@@ -724,6 +770,7 @@ function readUrl(){
     if(p.get('b')==='0'){ S.beaconsOn=false; $('beacons-on').checked=false; }
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
     if(p.get('cm')==='all'){ S.clusterMode='all'; $('cm-cluster').className=''; $('cm-all').className='on'; }
+    if(p.get('ms')==='1'){ S.msOnly=true; $('ms-all').className=''; $('ms-multi').className='on'; }
     S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
   }catch(e){}
 }
@@ -749,6 +796,7 @@ function computeViewLegend(){
     var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
+      if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
       var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
     }
@@ -846,6 +894,8 @@ function applyFilterSpec(fs){
 }
 
 // ------------------------- start -------------------------
+S.panelOpen=!isMobile();          // mobile: map first, drawer on ☰
+applyPanel();
 loadGmaps();
 if(!deskKey()){ showGate(false); } else { boot(); }
 </script>
