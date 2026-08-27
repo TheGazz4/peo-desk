@@ -4,7 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.4 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.5 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.5 (claim 105): HISTORICAL LAYER — "Former clients (departures)" toggle, DEFAULT OFF, gated by the
+     server-side map_feature_flags.historical_layer row (monetize later = flip that row; toggle only renders
+     when the flag is on). Own clean channel: v_map_pins_historical (switch ledger + departure ledger events;
+     switches win over open-market rows; noncompete-fenced both directions) served as ONE national gzip
+     snapshot (mode=pins_hist, lazy-loaded on first toggle-on). Ring pins (hollow circle, from-family color,
+     never clustered) = "was here"; hover carries kind (switched / departed-confirmed / departed-ASSUMED),
+     as-of month, and the PER-ROW source label (multi-source by owner doctrine — never framed 5500-exclusive).
+     Record card gains a FORMER banner + full departure/switch history rows (mode=company historical fallback).
+     THIS VIEW legend counts stay current-only; historical shown as its own line. AI dock now labeled
+     "Claude (Anthropic)" (owner asked: our own Claude, never a Google model). URL: hist=1.
      v3.4 (Gazz 6-point feedback, claim 104): PIN-VANISH FIX — paired-wave loader now verifies detail bake_key
      AND array length against the lite wave; on any mismatch it refetches BOTH waves cache-busted and commits
      them atomically (never a mixed pair — the old path committed mismatched detail over cached lite, yielding
@@ -175,7 +185,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.4 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.5 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -197,6 +207,10 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <h2 style="margin-top:10px" title="Renewal heat colors every pin by how soon its renewal month comes up — health/benefits renewal is the primary trigger; WC is secondary">Color by</h2>
         <div class="seg"><button id="lens-peo" class="on">PEO</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health renewal</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC renewal</button></div>
         <label class="chk" style="margin-top:8px"><input type="checkbox" id="beacons-on" checked> HQ ★ + administrative ◆ beacons</label>
+        <div id="histsec" style="display:none">
+          <h2 style="margin-top:10px" title="Departure and switch events from our ledgers — every ring pin carries its own source and as-of date. Default off.">Historical</h2>
+          <label class="chk"><input type="checkbox" id="hist-on"> Former clients — departures ◯</label>
+        </div>
       </div>
       <div class="sec">
         <h2>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
@@ -225,7 +239,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
       <div id="lenslegend"></div>
       <div id="terr"></div>
       <div id="aidock" class="min">
-        <div class="hd" id="ai-hd">✦ Ask the map <span class="min" id="ai-min">▴</span></div>
+        <div class="hd" id="ai-hd">✦ Ask the map <span style="font-weight:500;font-size:10.5px;color:var(--muted)">Claude (Anthropic)</span> <span class="min" id="ai-min">▴</span></div>
         <div class="bd">
           <div id="ai-ans"></div>
           <div id="ai-row"><input id="ai-q" placeholder="e.g. show Insperity in Florida…"><button id="ai-send">Ask</button></div>
@@ -261,6 +275,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 var S={
   grain:'family', placement:'address', clusterMode:'cluster', msOnly:false, panelOpen:true,
   lens:'peo', terr:null, drawMode:false, _drawStart:null,
+  hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
   sel:{family:null,brand:null}, states:{},
   beaconsOn:true, beacons:[],
@@ -322,6 +337,11 @@ function boot(){
     S.beacons=(rs[1].beacons||[]).filter(function(b){ return b.kind!=='po_box'&&b.kind!=='zip_beacon'; });
     S.beacons.forEach(function(b){ b._mx=mercX(Number(b.lng)); b._my=mercY(Number(b.lat)); });
     readUrl();
+    S.flags=S.catalog.flags||{};
+    if(S.flags.historical_layer){
+      $('histsec').style.display='block';
+      if(S.hist){ $('hist-on').checked=true; loadHist(); }
+    } else { S.hist=false; }
     buildStatePanel(); buildPeoPanel(); updateStats();
     startPinLoads(); scheduleDraw();
   }).catch(function(e){ if(String(e.message)!=='auth') console.error(e); });
@@ -405,6 +425,30 @@ function loadDetail(st,retried){
     S.detLoaded++; bump(); progress(); scheduleDraw(); pump();
   }).catch(function(){ S.detLoaded++; progress(); pump(); });
 }
+// historical layer: one national payload, self-contained bake (no pairing), loaded on first toggle-on
+function loadHist(){
+  if(S.histData||S.histLoading) return;
+  S.histLoading=true;
+  apiGet('mode=pins_hist').then(function(r){
+    var n=r.n||0;
+    var mxA=new Float64Array(n), myA=new Float64Array(n), mxZ=new Float64Array(n), myZ=new Float64Array(n);
+    for(var i=0;i<n;i++){
+      var la=Number(r.lat[i]), ln=Number(r.lng[i]);
+      if(!isFinite(la)||!isFinite(ln)){ la=0; ln=0; }
+      var j=jit(r.ids[i]||'');
+      var street=(r.street&&r.street[i])?1:0;
+      var aLat=la, aLng=ln; if(!street){ aLat+=j[0]; aLng+=j[1]; }
+      mxA[i]=mercX(aLng); myA[i]=mercY(aLat);
+      var zLat=(street&&r.zlat&&r.zlat[i]!=null)?r.zlat[i]:la;
+      var zLng=(street&&r.zlng&&r.zlng[i]!=null)?r.zlng[i]:ln;
+      mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);
+    }
+    S.histData={n:n,fams:r.fams||[],fis:r.fis||[],mxA:mxA,myA:myA,mxZ:mxZ,myZ:myZ,
+      ids:r.ids||[],cids:r.cids||[],names:r.names||[],cities:r.cities||[],sts:r.sts||[],
+      kind:r.kind||[],asof:r.asof||[],src:r.src||[],toS:r.toS||[]};
+    S.histLoading=false; bump(); scheduleDraw(); try{ computeViewLegend(); }catch(_){}
+  }).catch(function(){ S.histLoading=false; });
+}
 function progress(){
   $('loading').style.display='block';
   $('loading').textContent='pins '+S.liteLoaded+'/'+S.toLoad+' · details '+S.detLoaded+'/'+S.toLoad;
@@ -449,6 +493,7 @@ function sprite(kind,hex,ps){
   var w,h,ax,ay;
   var c=document.createElement('canvas');
   if(kind==='pin'){ w=15*ps; h=21*ps; ax=7.5*ps; ay=20*ps; }
+  else if(kind==='ring'){ w=13*ps; h=13*ps; ax=6.5*ps; ay=6.5*ps; }
   else if(kind==='star'||kind==='starh'){ w=30; h=30; ax=15; ay=15; }
   else { w=24; h=24; ax=12; ay=12; }
   c.width=Math.ceil(w*dpr); c.height=Math.ceil(h*dpr);
@@ -458,6 +503,11 @@ function sprite(kind,hex,ps){
     x.beginPath(); x.arc(7.5,6.6,5.7,Math.PI*0.82,Math.PI*0.18); x.lineTo(7.5,20); x.closePath();
     x.fillStyle=hex; x.fill(); x.lineWidth=1.25; x.strokeStyle='#463f38'; x.stroke();
     x.beginPath(); x.arc(7.5,6.6,2.05,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.92)'; x.fill();
+  } else if(kind==='ring'){
+    x.scale(ps,ps);
+    x.beginPath(); x.arc(6.5,6.5,4.6,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.35)'; x.fill();
+    x.beginPath(); x.arc(6.5,6.5,4.6,0,Math.PI*2); x.lineWidth=2; x.strokeStyle=hex; x.stroke();
+    x.beginPath(); x.arc(6.5,6.5,1.15,0,Math.PI*2); x.fillStyle=hex; x.fill();
   } else if(kind==='star'||kind==='starh'){
     x.translate(15,15); x.beginPath();
     for(var i=0;i<10;i++){ var r=(i%2===0)?13:5.6, a=-Math.PI/2+i*Math.PI/5; x[i===0?'moveTo':'lineTo'](Math.cos(a)*r,Math.sin(a)*r); }
@@ -573,6 +623,21 @@ function draw(){
         ctx.drawImage(sp2.img,0,0,sp2.img.width,sp2.img.height,sx3-sp2.ax,sy3-sp2.ay,sp2.w,sp2.h);
         if(hits.length<80000) hits.push({x:sx3,y:sy3-8*ps,r:11,kind:'pin',st:st2,i:i2});
       }
+    }
+  }
+  // historical ring pins (never clustered; family color = the PEO they LEFT; drawn under beacons)
+  if(S.hist&&S.histData){
+    var hd=S.histData;
+    var HMX=(S.placement==='zip')?hd.mxZ:hd.mxA, HMY=(S.placement==='zip')?hd.myZ:hd.myA;
+    for(var hi=0;hi<hd.n;hi++){
+      var hst=hd.sts[hi]; if(hst&&S.states[hst]===false) continue;
+      var hsl=hd.fams[hd.fis[hi]]||'unattributed';
+      if(sel[hsl]===false) continue;
+      var hx=(HMX[hi]-cx)*scale+W/2, hy=(HMY[hi]-cy)*scale+H/2;
+      if(hx<-14||hx>W+14||hy<-14||hy>H+14) continue;
+      var hsp=sprite('ring',S.colors.family[hsl]||OTHER,ps);
+      ctx.drawImage(hsp.img,0,0,hsp.img.width,hsp.img.height,hx-hsp.ax,hy-hsp.ay,hsp.w,hsp.h);
+      if(hits.length<90000) hits.push({x:hx,y:hy,r:9,kind:'hist',i:hi});
     }
   }
   // territory circle (preview while drawing, persistent after)
@@ -718,6 +783,7 @@ function onMove(e){
     S.hover=h;
     if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }
     if(h.kind==='cluster'){ tipCluster(h.cl,e); return; }
+    if(h.kind==='hist'){ tipHist(h.i,e); return; }
     var d=S.pinData[h.st];
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
     var slug=slugArr[IDX[h.i]];
@@ -738,9 +804,29 @@ function onMove(e){
       '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
   });
 }
+var HKIND=['Switched','Departed — confirmed open market','Departed — ASSUMED (pending confirmation)'];
+function famDisp(s){ return S.displays.family[s]||s; }
+function tipHist(i,e){
+  var hd=S.histData; if(!hd) return;
+  var sl=hd.fams[hd.fis[i]]||'unattributed';
+  var when=hd.asof[i]?(' ~'+hd.asof[i]):'';
+  var line2=(hd.kind[i]===0&&hd.toS[i])?('Switched to '+esc(famDisp(hd.toS[i]))+when):(HKIND[hd.kind[i]]||'Departed')+when;
+  tipShow('<b>'+esc(hd.names[i]||'—')+'</b> <span class="mut">· FORMER client</span><br>'+
+    '<span style="color:'+(S.colors.family[sl]||OTHER)+';font-weight:650">'+esc(famDisp(sl))+'</span><br>'+
+    esc((hd.cities[i]||'')+(hd.cities[i]?', ':'')+(hd.sts[i]||''))+'<br>'+
+    line2+'<br>'+
+    '<span class="mut">source: '+esc(hd.src[i]||'unrecorded')+' · click for details</span>',e);
+}
 function onClick(e){
   if(S.drawMode) return;
   var h=pick(e); if(!h) return;
+  if(h.kind==='hist'){
+    var hd2=S.histData; if(!hd2) return;
+    var hsl2=hd2.fams[hd2.fis[h.i]]||'unattributed';
+    var cid=hd2.cids[h.i];
+    if(cid) api({mode:'company',id:cid}).then(function(r){ if(r.company) openCard(r.company,hsl2,r.history); });
+    return;
+  }
   if(h.kind==='cluster'){
     var lat=invLat(h.cl.my), lng=invLng(h.cl.mx);
     S.map.panTo({lat:lat,lng:lng}); S.map.setZoom(Math.min(16,S.map.getZoom()+2));
@@ -751,7 +837,7 @@ function onClick(e){
   var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
   var slug=slugArr[IDX[h.i]];
   var id=d.detail.ids[h.i];
-  if(id) api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slug); });
+  if(id) api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slug,r.history); });
 }
 function tipCluster(K,ev){
   var rows=K.top.slice(0,5).map(function(t){
@@ -816,6 +902,12 @@ $('peo-search').addEventListener('input',buildPeoPanel);
 $('peo-all').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=true}); afterSel(); };
 $('peo-none').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=false}); afterSel(); };
 $('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
+$('hist-on').onchange=function(){
+  S.hist=$('hist-on').checked;
+  if(S.hist) loadHist();
+  bump(); scheduleDraw(); writeUrl();
+  try{ computeViewLegend(); }catch(_){}
+};
 $('g-family').onclick=function(){ switchGrain('family') };
 $('g-brand').onclick=function(){ switchGrain('brand') };
 function switchGrain(g){
@@ -900,23 +992,30 @@ function tipShow(html,ev){
 function closeTip(){ $('tip').style.display='none'; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}); }
 function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
-function openCard(p,slug){
+function openCard(p,slug,history){
   var c=$('card');
   var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(p.renewal_month_basis||'basis unknown')+')':'unknown';
+  var histRows='';
+  (history||[]).forEach(function(ev){
+    var what=ev.hist_kind==='switched'?('Switched '+esc(famDisp(ev.from_family))+' → '+esc(famDisp(ev.to_family_slug||'?'))):
+      ((ev.hist_kind==='departed_confirmed'?'Departed (confirmed) from ':'Departed (assumed) from ')+esc(famDisp(ev.from_family)));
+    histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+
+      '<br><span style="opacity:.8">source: '+esc(ev.source_label||'unrecorded')+'</span></div>';
+  });
+  var formerBanner=p.historical?'<div class="note" style="margin-top:0;margin-bottom:6px;font-weight:650">FORMER PEO client — shown from the historical layer</div>':'';
   var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(p.health_renewal_basis||'basis unknown')+')':'unknown';
   var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(p.peo_current_since_basis||'basis unknown')+')':'unknown';
   c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
     '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div></div>'+
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
-    '<div class="bd">'+
+    '<div class="bd">'+formerBanner+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
-    kv('Health renewal',hren)+
-    kv('WC renewal',ren)+
+    (p.historical?'':(kv('Health renewal',hren)+kv('WC renewal',ren)))+
     kv('WC carrier',esc(p.wc_carrier||'—'))+
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
-    kv('With PEO since',since)+
-    kv('Multistate',p.is_multistate?'yes':'no')+
+    (p.historical?'':(kv('With PEO since',since)+kv('Multistate',p.is_multistate?'yes':'no')))+
     kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
+    histRows+
     '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase.</div>'+
     '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
     '</div>';
@@ -950,6 +1049,7 @@ function writeUrl(){
     if(S.clusterMode==='all') p.set('cm','all');
     if(S.msOnly) p.set('ms','1');
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
+    if(S.hist) p.set('hist','1');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
     history.replaceState(null,'','map.html?'+p.toString());
   }catch(e){}
@@ -969,6 +1069,7 @@ function readUrl(){
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
     else if(lz==='wc'){ S.lens='wc'; syncLensButtons(); renderLensLegend(); }
+    if(p.get('hist')==='1'){ S.hist=true; }   // honored only if the flag renders the toggle (boot)
     S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
   }catch(e){}
 }
@@ -1000,7 +1101,17 @@ function computeViewLegend(){
     }
   }
   var top=Object.keys(counts).map(function(s){return [s,counts[s]]}).sort(function(a,b2){return b2[1]-a[1]}).slice(0,8);
-  S._vlSummary={total:total, top:top.map(function(t){return {slug:t[0], name:dispOf(t[0]), n:t[1]}})};
+  var histN=0;
+  if(S.hist&&S.histData){
+    var hd=S.histData; var HMX=(S.placement==='zip')?hd.mxZ:hd.mxA, HMY=(S.placement==='zip')?hd.myZ:hd.myA;
+    for(var hj=0;hj<hd.n;hj++){
+      if(hd.sts[hj]&&S.states[hd.sts[hj]]===false) continue;
+      if(sel[hd.fams[hd.fis[hj]]]===false) continue;
+      if(HMX[hj]<x1||HMX[hj]>x2||HMY[hj]<y1||HMY[hj]>y2) continue;
+      histN++;
+    }
+  }
+  S._vlSummary={total:total, top:top.map(function(t){return {slug:t[0], name:dispOf(t[0]), n:t[1]}}), historical_in_view:(S.hist&&S.histData)?histN:undefined};
   var visSel=catRows().filter(function(r){return selMap()[r.slug]!==false});
   if(visSel.length===2&&total>0){
     var a=counts[visSel[0].slug]||0, b3=counts[visSel[1].slug]||0;
@@ -1008,6 +1119,7 @@ function computeViewLegend(){
   } else {
     $('vl-total').textContent=total?total.toLocaleString()+' clients in this view':'no clients in this view';
   }
+  if(S.hist&&S.histData&&histN>0){ $('vl-total').innerHTML+=' <span style="color:var(--muted);font-weight:500">· '+histN.toLocaleString()+' former (historical)</span>'; }
   var host=$('viewlegend'); host.innerHTML='';
   top.forEach(function(t){
     var pct=total?Math.round(100*t[1]/total):0;
@@ -1040,7 +1152,7 @@ function runSearch(v){
         var slug=(S.grain==='brand')?(c.brand_slug||c.family_slug):c.family_slug;
         row('<span class="dot" style="background:'+colorOf(slug)+'"></span>'+esc(c.company_display)+'<span class="sub">'+esc((c.city||'')+', '+(c.state||''))+'</span>',
           function(){ $('q-drop').style.display='none'; flyTo(c.lat,c.lng,14.5);
-            api({mode:'company',id:c.company_id}).then(function(rr){ if(rr.company) openCard(rr.company,slug); }).catch(function(){}); });
+            api({mode:'company',id:c.company_id}).then(function(rr){ if(rr.company) openCard(rr.company,slug,rr.history); }).catch(function(){}); });
       });
     }
     if((r.cities||[]).length){ hd('Places');
