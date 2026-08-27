@@ -239,7 +239,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.10 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.10.1 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -568,6 +568,12 @@ function progress(){
 
 // ------------------------- google map -------------------------
 window.initMap=function(){
+  // v3.10.1: read z/c straight from the URL here too — initMap can fire before boot()'s readUrl
+  // (a race that made shared links sometimes open at the default view instead of the linked one)
+  try{ var qp=new URLSearchParams(location.search);
+    if(!isFinite(S._urlZ)&&qp.get('z')) S._urlZ=parseFloat(qp.get('z'));
+    if((!S._urlC||!isFinite(S._urlC[0]))&&qp.get('c')) S._urlC=qp.get('c').split(',').map(Number);
+  }catch(_){}
   var z=isFinite(S._urlZ)?S._urlZ:4.6;
   var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
   S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
