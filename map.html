@@ -4,7 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.10 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.11 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.11 (claim 118 — owner: logos STILL stacked): two fan-out correctness bugs fixed. (1) The
+     layout cache key ignored mark SIZE — the first layout ran while logos were still decoding
+     (marks = 18px stars), then the 44px chips swapped in and REUSED the star-sized offsets, so
+     chips overlapped exactly where piles were densest. Key now includes per-mark size; the chip
+     swap-in triggers a proper relayout. (2) Circle-distance separation let SQUARE chips overlap
+     diagonally — spacing is now 1.42x diagonal-safe. Travel clamp widened (max(90, 3.2x size)) so
+     the Florida pile can ring out fully; leader lines slightly bolder (1.4px @ .75) and drawn from
+     5px displacement. Result: every logo fully visible at national zoom, each tied by a line to
+     its exact HQ location.
+     v3.10 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.10 (claim 116): BEACON FAN-OUT — overlapping HQ logo chips/stars no longer stack: a
      deterministic repulsion layout displaces them just enough that ALL are visible simultaneously,
      each displaced mark tied to its TRUE location by a leader line + white/brown anchor dot (owner
@@ -239,7 +249,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.10.1 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.11 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -794,8 +804,8 @@ function draw(){
     for(var e1=0;e1<bDraw.length;e1++){   // pass 1: leader lines + true-location anchor dots
       var e=bDraw[e1];
       var ddx=e.dx-e.tx, ddy=e.dy-e.ty;
-      if(ddx*ddx+ddy*ddy>36){
-        ctx.beginPath(); ctx.lineWidth=1.25; ctx.strokeStyle='rgba(70,63,56,.6)';
+      if(ddx*ddx+ddy*ddy>25){
+        ctx.beginPath(); ctx.lineWidth=1.4; ctx.strokeStyle='rgba(70,63,56,.75)';
         ctx.moveTo(e.tx,e.ty); ctx.lineTo(e.dx,e.dy); ctx.stroke();
         ctx.beginPath(); ctx.fillStyle='#ffffff'; ctx.arc(e.tx,e.ty,3.4,0,Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.fillStyle='#463f38'; ctx.arc(e.tx,e.ty,2,0,Math.PI*2); ctx.fill();
@@ -822,7 +832,9 @@ var beaconLayoutCache={key:'',off:{}};
 function layoutBeacons(list,z){
   if(!list.length) return;
   list.sort(function(a,b){ return a.id<b.id?-1:(a.id>b.id?1:0); });
-  var key=(Math.round(z*4)/4)+'|'+S.rev+'|'+list.map(function(e){return e.id}).join(',');
+  // v3.11: key includes each mark's SIZE — when logos finish decoding, star-sized offsets must not
+  // be reused for 44px chips (that stale cache was why chips still stacked at national zoom)
+  var key=(Math.round(z*4)/4)+'|'+S.rev+'|'+list.map(function(e){return e.id+'~'+Math.round(e.s)}).join(',');
   if(beaconLayoutCache.key===key){
     for(var k0=0;k0<list.length;k0++){ var o=beaconLayoutCache.off[list[k0].id]||[0,0]; list[k0].dx=list[k0].tx+o[0]; list[k0].dy=list[k0].ty+o[1]; }
     return;
@@ -832,7 +844,7 @@ function layoutBeacons(list,z){
     var moved=false;
     for(var i=0;i<list.length;i++){
       for(var j=i+1;j<list.length;j++){
-        var need=(list[i].s+list[j].s)/2+4;
+        var need=((list[i].s+list[j].s)/2)*1.42+3;   // v3.11: 1.42 = diagonal-safe for SQUARE chips (circle math let corners overlap)
         var dx=P[j].x-P[i].x, dy=P[j].y-P[i].y;
         var d=Math.sqrt(dx*dx+dy*dy);
         if(d<need){
@@ -848,7 +860,7 @@ function layoutBeacons(list,z){
     }
     for(var c=0;c<list.length;c++){
       var e=list[c]; var hx=P[c].x-e.tx, hy=P[c].y-e.ty; var hd=Math.sqrt(hx*hx+hy*hy);
-      var mx2=Math.max(70,e.s*2.4);
+      var mx2=Math.max(90,e.s*3.2);   // v3.11: wider travel so big piles (FL) can ring out fully
       if(hd>mx2){ P[c].x=e.tx+hx/hd*mx2; P[c].y=e.ty+hy/hd*mx2; }
     }
     if(!moved) break;
