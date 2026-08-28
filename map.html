@@ -10,6 +10,9 @@
      while KEEPING the pronounced state/country outlines law (now light warm strokes on the dark
      ground). Canvas layers adapted: leader lines light, halo'd dot names flip to light-text/dark-
      halo, hqdot ring light. One DARK flag at the top of the script reverts the whole theme.
+     v3.15.1: map backgroundColor matches the theme (dark loading underlay — no pale flash) and
+     kickMap adds an imperceptible zoom nudge so the raster compositor swaps in loaded tiles at
+     fractional zooms without waiting for the first user interaction.
      map v3.14 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.14 (claim 121): NAME UNDER LOGO (owner: "underneath the peo logos, include the peo name
      unless the logo is obvious like ADP or CoAd"). Each HQ chip now carries the PEO's display name
@@ -276,7 +279,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.15 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.15.1 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -616,6 +619,7 @@ window.initMap=function(){
   var z=isFinite(S._urlZ)?S._urlZ:4.6;
   var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
   S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
+    backgroundColor:DARK?'#1f2125':'#e8e6e1',   // v3.15.1: loading underlay matches the theme (no pale flash on dark)
     disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
     mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT},
     // v3.10 (owner): state outlines more pronounced than Google's faint dotted default.
@@ -685,6 +689,10 @@ function kickMap(){
     var c=S.map.getCenter();
     google.maps.event.trigger(S.map,'resize');
     if(c) S.map.setCenter(c);
+    // v3.15.1: imperceptible zoom nudge forces the raster compositor to swap in loaded tiles —
+    // at fractional zooms the pale loading underlay could linger until the first interaction
+    // (invisible on the light theme, glaring on dark).
+    var zz=S.map.getZoom(); if(isFinite(zz)) S.map.setZoom(zz+(S._kickFlip?-0.0004:0.0004)); S._kickFlip=!S._kickFlip;
   }catch(_){}
   scheduleDraw();
 }
