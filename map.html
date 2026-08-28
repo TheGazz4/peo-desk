@@ -4,7 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.12 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.13 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.13 (claim 120): LEADER-LINE REFINEMENT (owner: "each PEO HQ does not need a star — just a
+     direct line to its precise HQ location; the further the zoom, the shorter the line"). The
+     white/brown anchor dots at the true spot are GONE — the leader line's tip IS the precise HQ
+     location. Fan-out travel is now zoom-scaled: full ring-out at national (every logo visible),
+     tightening as you zoom in so lines shorten and vanish as chips settle onto their true spots.
+     HQ beacons without a logo (9 of 48) no longer draw as big stars — small brand-color dots.
+     map v3.12 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.12 (claim 118 cont.): LARGER PINS for real — teardrop ramp now 1.25/1.6/1.95/2.3 past z9.5
      (owner escalated; v3.9's 1.15-1.55 was too timid), dot sprites and density squares bumped too.
      WIDE-LOGO PILL CHIPS: wordmark logos (aspect >1.6, e.g. Nextep's full "nextep" mark, owner-
@@ -255,7 +262,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.12.1 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.13 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -671,6 +678,7 @@ function sprite(kind,hex,ps){
   else if(kind==='ring'){ w=13*ps; h=13*ps; ax=6.5*ps; ay=6.5*ps; }
   else if(kind==='dot'){ w=8; h=8; ax=4; ay=4; }
   else if(kind==='star'||kind==='starh'){ w=30*ps; h=30*ps; ax=15*ps; ay=15*ps; }
+  else if(kind==='hqdot'){ w=14; h=14; ax=7; ay=7; }
   else { w=24*ps; h=24*ps; ax=12*ps; ay=12*ps; }
   c.width=Math.ceil(w*dpr); c.height=Math.ceil(h*dpr);
   var x=c.getContext('2d'); x.scale(dpr,dpr);
@@ -694,6 +702,9 @@ function sprite(kind,hex,ps){
     x.closePath();
     x.fillStyle=hex; x.globalAlpha=kind==='starh'?0.6:1; x.fill(); x.globalAlpha=1;
     x.lineWidth=1.6; x.strokeStyle=kind==='starh'?hex:'#463f38'; x.stroke();
+  } else if(kind==='hqdot'){   // v3.13: logo-less HQ = small brand-color dot (owner: no stars)
+    x.beginPath(); x.arc(7,7,5,0,Math.PI*2); x.fillStyle=hex; x.fill();
+    x.lineWidth=1.4; x.strokeStyle='#463f38'; x.stroke();
   } else {
     x.scale(ps,ps);
     x.translate(12,12); x.beginPath(); x.moveTo(0,-10); x.lineTo(9,0); x.lineTo(0,10); x.lineTo(-9,0); x.closePath();
@@ -782,8 +793,9 @@ function draw(){
     ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
     ctx.beginPath(); ctx.fillStyle='rgba(99,144,238,.07)'; ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.fill();
   }
-  // beacons on top (v3.6: zoom-decluttered — admin ◆ / candidate ✩ only from z≥6, smaller stars when
-  // zoomed out; "HQ logo pins" renders the PEO's actual logo as a white chip at its HQ, ★ fallback)
+  // beacons on top (v3.6: zoom-decluttered — admin ◆ / candidate ✩ only from z≥6; "HQ logo pins"
+  // renders the PEO's actual logo as a white chip at its HQ, small brand-dot fallback — v3.13,
+  // owner: no stars)
   if(S.beaconsOn||S.hqLogos){
     var bps=z<6?0.7:1;
     var bDraw=[];   // v3.10: collect first, fan out overlaps, THEN render with leader lines
@@ -807,19 +819,17 @@ function draw(){
         }
       }
       bDraw.push({id:String(b.beacon_id||(b.family_slug+':'+b.kind)), b:b, tx:bx, ty:by,
-                  chip:asChip, im:im, cw:cw, ch:ch, s:asChip?Math.max(cw,ch):26*bps, bps:bps,
+                  chip:asChip, im:im, cw:cw, ch:ch, s:asChip?Math.max(cw,ch):(isHq?12:26*bps), bps:bps,
                   col:b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER,
-                  kind:b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star')});
+                  kind:b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'hqdot')});
     }
     layoutBeacons(bDraw, z);
-    for(var e1=0;e1<bDraw.length;e1++){   // pass 1: leader lines + true-location anchor dots
-      var e=bDraw[e1];
+    for(var e1=0;e1<bDraw.length;e1++){   // pass 1: leader lines ONLY (v3.13, owner: no anchor
+      var e=bDraw[e1];                    // star/dot — the line's tip IS the precise HQ location)
       var ddx=e.dx-e.tx, ddy=e.dy-e.ty;
       if(ddx*ddx+ddy*ddy>25){
-        ctx.beginPath(); ctx.lineWidth=1.4; ctx.strokeStyle='rgba(70,63,56,.75)';
+        ctx.beginPath(); ctx.lineWidth=1.4; ctx.strokeStyle='rgba(70,63,56,.8)';
         ctx.moveTo(e.tx,e.ty); ctx.lineTo(e.dx,e.dy); ctx.stroke();
-        ctx.beginPath(); ctx.fillStyle='#ffffff'; ctx.arc(e.tx,e.ty,3.4,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.fillStyle='#463f38'; ctx.arc(e.tx,e.ty,2,0,Math.PI*2); ctx.fill();
       }
     }
     for(var e2=0;e2<bDraw.length;e2++){   // pass 2: marks at their fanned-out positions
@@ -830,15 +840,16 @@ function draw(){
       } else {
         var sp3=sprite(m.kind,m.col,m.bps);
         ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,m.dx-sp3.ax,m.dy-sp3.ay,sp3.w,sp3.h);
-        hits.push({x:m.dx,y:m.dy,r:14*m.bps,kind:'beacon',b:m.b});
+        hits.push({x:m.dx,y:m.dy,r:(m.kind==='hqdot'?9:14*m.bps),kind:'beacon',b:m.b});
       }
     }
   }
 }
 // v3.10 BEACON FAN-OUT (owner: "icons are stacked on top of one another — I want to see them ALL,
 // with a line to specifically where they are located"). Deterministic pairwise repulsion pushes
-// overlapping marks apart (bounded travel); each displaced mark gets a leader line + anchor dot at
-// its TRUE spot. Offsets are screen-relative, so panning reuses them; zoom buckets recompute.
+// overlapping marks apart (bounded, ZOOM-SCALED travel — v3.13, owner: "the further the zoom, the
+// shorter the line"); each displaced mark gets a leader line whose tip is its TRUE spot (no anchor
+// dot). Offsets are screen-relative, so panning reuses them; zoom buckets recompute.
 var beaconLayoutCache={key:'',off:{}};
 function layoutBeacons(list,z){
   if(!list.length) return;
@@ -851,6 +862,9 @@ function layoutBeacons(list,z){
     return;
   }
   var P=list.map(function(e){ return {x:e.tx,y:e.ty}; });
+  // v3.13 (owner): the deeper the zoom, the SHORTER the leader line — full ring-out at national so
+  // every logo stays visible, then travel tightens so chips hug their precise HQ spots zooming in.
+  var zt=z<=4.5?1:(z>=9?0:(9-z)/4.5), tvMult=1.1+2.1*zt, tvFloor=30+60*zt;
   for(var it=0;it<40;it++){
     var moved=false;
     for(var i=0;i<list.length;i++){
@@ -871,7 +885,7 @@ function layoutBeacons(list,z){
     }
     for(var c=0;c<list.length;c++){
       var e=list[c]; var hx=P[c].x-e.tx, hy=P[c].y-e.ty; var hd=Math.sqrt(hx*hx+hy*hy);
-      var mx2=Math.max(90,e.s*3.2);   // v3.11: wider travel so big piles (FL) can ring out fully
+      var mx2=Math.max(tvFloor,e.s*tvMult);   // v3.11 wide ring-out, v3.13 zoom-scaled
       if(hd>mx2){ P[c].x=e.tx+hx/hd*mx2; P[c].y=e.ty+hy/hd*mx2; }
     }
     if(!moved) break;
