@@ -13,6 +13,10 @@
      v3.15.1: map backgroundColor matches the theme (dark loading underlay — no pale flash) and
      kickMap adds an imperceptible zoom nudge so the raster compositor swaps in loaded tiles at
      fractional zooms without waiting for the first user interaction.
+     v3.15.2 ROOT FIX: isFractionalZoomEnabled:true — raster maps default it OFF, so the fractional
+     default zoom (4.6) never composited real tiles on first paint (pale stretched fallback under
+     the pins until the first interaction quantized zoom). Also the deep cause of v3.8's "loads
+     displaced" symptom. With it on, tiles and the canvas finally agree at every fractional zoom.
      map v3.14 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.14 (claim 121): NAME UNDER LOGO (owner: "underneath the peo logos, include the peo name
      unless the logo is obvious like ADP or CoAd"). Each HQ chip now carries the PEO's display name
@@ -279,7 +283,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.15.1 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.15.2 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -619,6 +623,11 @@ window.initMap=function(){
   var z=isFinite(S._urlZ)?S._urlZ:4.6;
   var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
   S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
+    // v3.15.2 ROOT FIX: raster maps default to isFractionalZoomEnabled:false, so our fractional
+    // default zoom (4.6) could never composite real tiles — the pale stretched world fallback sat
+    // under the pins until the first interaction quantized the zoom (near-invisible on the light
+    // theme, glaring on dark; also the true culprit behind v3.8's "loads displaced" reports).
+    isFractionalZoomEnabled:true,
     backgroundColor:DARK?'#1f2125':'#e8e6e1',   // v3.15.1: loading underlay matches the theme (no pale flash on dark)
     disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
     mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT},
