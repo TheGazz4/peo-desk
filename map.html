@@ -255,7 +255,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.12 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.12.1 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -410,7 +410,7 @@ function boot(){
     S.beacons.forEach(function(b){ b._mx=mercX(Number(b.lng)); b._my=mercY(Number(b.lat)); });
     readUrl();
     S._topFams={}; (S.catalog.families||[]).slice(0,40).forEach(function(r){ S._topFams[r.slug]=true; });
-    apiGet('mode=logos_all').then(function(r){   // one request warms every HQ logo chip
+    apiGet('mode=logos_all&d='+new Date().toISOString().slice(0,10)).then(function(r){   // one request warms every HQ logo chip (daily-versioned URL so logo updates land same-day)
       var L=(r&&r.logos)||{};
       Object.keys(L).forEach(function(slug){
         if(S.logoImgs[slug]!==undefined) return;
