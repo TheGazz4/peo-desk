@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.17 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.18 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.18 (claim 131): the States filter culls client pins and admin beacons but NEVER the HQ logo chips — they are a
+     national reference layer governed only by their own toggle + the PEO filter (owner: States→None wiped the logos).
+     Upstream same claim: v_map_beacons draws ONE HQ chip per displayed family (Vensure was split across two slugs).
      v3.17 (claim 126 — CLIENT LOCATION AT THE CORE): the PEO list shows clients PLACED on the map; a dotted count means
      some clients are location-pending (their record carried the PEO sponsor's address/zip — 0588 stubs them, never draws
      them at the PEO's zip; the Serper Places + Census lanes resolve their real addresses). Hover the count for the split.
@@ -298,7 +301,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.17 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.18 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -869,9 +872,9 @@ function draw(){
     var bDraw=[];   // v3.10: collect first, fan out overlaps, THEN render with leader lines
     for(var b2=0;b2<S.beacons.length;b2++){
       var b=S.beacons[b2];
-      if(b.state && S.states[b.state]===false) continue;
-      if(sel[b.family_slug]===false) continue;
       var isHq=b.kind==='hq';
+      if(!isHq && b.state && S.states[b.state]===false) continue;   // v3.18: States culls pins+admin beacons, never HQ chips (owner: None wiped the logos)
+      if(sel[b.family_slug]===false) continue;
       if(isHq){ if(!S.hqLogos) continue; }                       // "PEO HQ pins (logos)" governs headquarters
       else { if(!S.beaconsOn||z<6) continue; }                   // admin ◆ + candidates ✩: opt-in, z≥6 only
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
