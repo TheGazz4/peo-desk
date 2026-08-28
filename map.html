@@ -4,7 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.11 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.12 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.12 (claim 118 cont.): LARGER PINS for real — teardrop ramp now 1.25/1.6/1.95/2.3 past z9.5
+     (owner escalated; v3.9's 1.15-1.55 was too timid), dot sprites and density squares bumped too.
+     WIDE-LOGO PILL CHIPS: wordmark logos (aspect >1.6, e.g. Nextep's full "nextep" mark, owner-
+     supplied) render as wide rounded pills instead of being crammed into squares; fan-out spacing
+     uses the pill's true width. drawLogoChip now takes w,h.
+     v3.11 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.11 (claim 118 — owner: logos STILL stacked): two fan-out correctness bugs fixed. (1) The
      layout cache key ignored mark SIZE — the first layout ran while logos were still decoding
      (marks = 18px stars), then the 44px chips swapped in and REUSED the star-sized offsets, so
@@ -249,7 +255,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.11 · 2026-08-27</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.12 · 2026-08-27</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -650,8 +656,8 @@ function movePump(){
     if(performance.now()-_pumpLast<350){ requestAnimationFrame(frame); } else { _pumpOn=false; }
   });
 }
-// v3.9: pins GROW as you zoom in (owner: teardrops were too small at street level)
-function pinScale(z){ return z<5.5?0.6:(z<8?0.75:(z<9.5?0.85:(z<11?0.95:(z<12.5?1.15:(z<14?1.35:1.55))))); }
+// v3.12: pins UNMISTAKABLY bigger zoomed in (owner escalated — v3.9's ramp was too timid)
+function pinScale(z){ return z<5.5?0.6:(z<8?0.78:(z<9.5?0.9:(z<11?1.25:(z<12.5?1.6:(z<14?1.95:2.3))))); }
 // v3.9: HQ logo chips are LARGE zoomed out (the brand layer of the national view) and SHRINK as
 // you zoom in, ceding the stage to the client teardrops (owner directive).
 function chipSize(z){ return z<5?44:(z<6.5?38:(z<9?30:(z<11?24:20))); }
@@ -679,8 +685,8 @@ function sprite(kind,hex,ps){
     x.beginPath(); x.arc(6.5,6.5,4.6,0,Math.PI*2); x.lineWidth=2; x.strokeStyle=hex; x.stroke();
     x.beginPath(); x.arc(6.5,6.5,1.15,0,Math.PI*2); x.fillStyle=hex; x.fill();
   } else if(kind==='dot'){
-    x.beginPath(); x.arc(4,4,3.3,0,Math.PI*2); x.fillStyle=hex; x.fill();
-    x.lineWidth=0.75; x.strokeStyle='rgba(70,63,56,.45)'; x.stroke();
+    x.beginPath(); x.arc(4,4,3.8,0,Math.PI*2); x.fillStyle=hex; x.fill();
+    x.lineWidth=0.8; x.strokeStyle='rgba(70,63,56,.45)'; x.stroke();
   } else if(kind==='star'||kind==='starh'){
     x.scale(ps,ps);
     x.translate(15,15); x.beginPath();
@@ -723,7 +729,7 @@ function draw(){
   // 6.5 ≤ z < 9.5: round dot sprites (a touch larger, antialiased).
   // z ≥ 9.5: classic teardrop pins (what Gazz asked for up close). Always one mark per client.
   var dotMode = z<9.5;
-  var dsz = z<5 ? 2 : (z<6.5 ? 2.6 : 0);   // fillRect size; 0 = use dot sprite
+  var dsz = z<5 ? 2.3 : (z<6.5 ? 3 : 0);   // fillRect size; 0 = use dot sprite (v3.12: bumped)
   var buckets = dsz ? {} : null;
   for(var st2 in S.pinData){
     if(S.states[st2]===false) continue;
@@ -790,13 +796,18 @@ function draw(){
       else { if(!S.beaconsOn||z<6) continue; }                   // admin ◆ + candidates ✩: opt-in, z≥6 only
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
       if(bx<-200||bx>W+200||by<-200||by>H+200) continue;   // wide cull margin keeps the fan-out stable near edges
-      var asChip=false, im=null, chs=0;
+      var asChip=false, im=null, chs=0, cw=0, ch=0;
       if(isHq&&b.has_logo&&(z>=5||!S._topFams||S._topFams[b.family_slug])){
         im=beaconLogo(b.family_slug);
-        if(im){ asChip=true; chs=chipSize(z); }
+        if(im){
+          asChip=true; chs=chipSize(z);
+          var asp=(im.width||1)/(im.height||1);
+          if(asp>1.6){ cw=Math.min(asp*0.8,2.7)*chs*0.82; ch=chs*0.68; }   // v3.12: wide wordmark logos get a PILL chip (owner: use the entire logo & name)
+          else { cw=chs; ch=chs; }
+        }
       }
       bDraw.push({id:String(b.beacon_id||(b.family_slug+':'+b.kind)), b:b, tx:bx, ty:by,
-                  chip:asChip, im:im, s:asChip?chs:26*bps, bps:bps,
+                  chip:asChip, im:im, cw:cw, ch:ch, s:asChip?Math.max(cw,ch):26*bps, bps:bps,
                   col:b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER,
                   kind:b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'star')});
     }
@@ -814,8 +825,8 @@ function draw(){
     for(var e2=0;e2<bDraw.length;e2++){   // pass 2: marks at their fanned-out positions
       var m=bDraw[e2];
       if(m.chip){
-        drawLogoChip(m.dx,m.dy,m.im,m.s);
-        hits.push({x:m.dx,y:m.dy,r:m.s*0.58,kind:'beacon',b:m.b});
+        drawLogoChip(m.dx,m.dy,m.im,m.cw,m.ch);
+        hits.push({x:m.dx,y:m.dy,r:Math.max(m.cw,m.ch)*0.58,kind:'beacon',b:m.b});
       } else {
         var sp3=sprite(m.kind,m.col,m.bps);
         ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,m.dx-sp3.ax,m.dy-sp3.ay,sp3.w,sp3.h);
@@ -884,16 +895,17 @@ function beaconLogo(slug){
   }).catch(function(){});
   return null;
 }
-function drawLogoChip(x,y,im,s){
-  var r=Math.max(4,s*0.24), h=s/2;
+function drawLogoChip(x,y,im,w,h){
+  if(!h) h=w;   // square fallback
+  var r=Math.max(4,Math.min(w,h)*0.24), hw=w/2, hh=h/2;
   ctx.beginPath();
-  ctx.moveTo(x-h+r,y-h); ctx.arcTo(x+h,y-h,x+h,y+h,r); ctx.arcTo(x+h,y+h,x-h,y+h,r);
-  ctx.arcTo(x-h,y+h,x-h,y-h,r); ctx.arcTo(x-h,y-h,x+h,y-h,r); ctx.closePath();
+  ctx.moveTo(x-hw+r,y-hh); ctx.arcTo(x+hw,y-hh,x+hw,y+hh,r); ctx.arcTo(x+hw,y+hh,x-hw,y+hh,r);
+  ctx.arcTo(x-hw,y+hh,x-hw,y-hh,r); ctx.arcTo(x-hw,y-hh,x+hw,y-hh,r); ctx.closePath();
   ctx.fillStyle='#ffffff'; ctx.fill();
   ctx.lineWidth=1.25; ctx.strokeStyle='#463f38'; ctx.stroke();
-  var pad=s*0.14, avail=s-2*pad;
-  var f=Math.min(avail/(im.width||1), avail/(im.height||1));
-  var dw=(im.width||avail)*f, dh=(im.height||avail)*f;
+  var pad=Math.min(w,h)*0.13, aw=w-2*pad, ah=h-2*pad;
+  var f=Math.min(aw/(im.width||1), ah/(im.height||1));
+  var dw=(im.width||aw)*f, dh=(im.height||ah)*f;
   try{ ctx.drawImage(im,x-dw/2,y-dh/2,dw,dh); }catch(_){ }
 }
 // ------------------------- hover / click -------------------------
