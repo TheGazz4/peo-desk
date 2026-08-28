@@ -4,7 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.14 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.15 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.15 (claim 122): DARK BASEMAP (owner: "try taking Google Maps back to a dark background").
+     Full dark Google style set — warm near-black land, darker water, POI/transit clutter off —
+     while KEEPING the pronounced state/country outlines law (now light warm strokes on the dark
+     ground). Canvas layers adapted: leader lines light, halo'd dot names flip to light-text/dark-
+     halo, hqdot ring light. One DARK flag at the top of the script reverts the whole theme.
+     map v3.14 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.14 (claim 121): NAME UNDER LOGO (owner: "underneath the peo logos, include the peo name
      unless the logo is obvious like ADP or CoAd"). Each HQ chip now carries the PEO's display name
      in a band under the logo, inside the same chip. Exempt: wordmark pills (aspect>1.6, e.g.
@@ -270,7 +276,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.14 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.15 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -359,6 +365,7 @@ var STATE_CENTROIDS={AL:[32.8,-86.8],AK:[64.0,-152.0],AZ:[34.2,-111.6],AR:[34.9,
 var MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ------------------------- state -------------------------
+var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
   grain:'family', placement:'address', msOnly:false, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null,
@@ -611,8 +618,26 @@ window.initMap=function(){
   S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
     disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
     mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT},
-    // v3.10 (owner): state outlines more pronounced than Google's faint dotted default
-    styles:[
+    // v3.10 (owner): state outlines more pronounced than Google's faint dotted default.
+    // v3.15 (owner): dark basemap — warm near-black ground, clutter off; outlines law kept (light strokes).
+    styles:DARK?[
+      {elementType:'geometry',stylers:[{color:'#1f2125'}]},
+      {elementType:'labels.text.fill',stylers:[{color:'#8f959e'}]},
+      {elementType:'labels.text.stroke',stylers:[{color:'#15171a'}]},
+      {elementType:'labels.icon',stylers:[{visibility:'off'}]},
+      {featureType:'poi',stylers:[{visibility:'off'}]},
+      {featureType:'transit',stylers:[{visibility:'off'}]},
+      {featureType:'landscape.natural',elementType:'geometry',stylers:[{color:'#22252a'}]},
+      {featureType:'road',elementType:'geometry',stylers:[{color:'#2a2d33'}]},
+      {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#343841'}]},
+      {featureType:'road',elementType:'labels.text.fill',stylers:[{color:'#7c828c'}]},
+      {featureType:'water',elementType:'geometry',stylers:[{color:'#101318'}]},
+      {featureType:'water',elementType:'labels.text.fill',stylers:[{color:'#4d5560'}]},
+      {featureType:'administrative.province',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#8e8672'},{weight:1.6}]},
+      {featureType:'administrative.country',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#a39a84'},{weight:1.8}]}
+    ]:[
       {featureType:'administrative.province',elementType:'geometry.stroke',
        stylers:[{visibility:'on'},{color:'#7d7466'},{weight:1.6}]},
       {featureType:'administrative.country',elementType:'geometry.stroke',
@@ -713,7 +738,7 @@ function sprite(kind,hex,ps){
     x.lineWidth=1.6; x.strokeStyle=kind==='starh'?hex:'#463f38'; x.stroke();
   } else if(kind==='hqdot'){   // v3.13: logo-less HQ = small brand-color dot (owner: no stars)
     x.beginPath(); x.arc(7,7,5,0,Math.PI*2); x.fillStyle=hex; x.fill();
-    x.lineWidth=1.4; x.strokeStyle='#463f38'; x.stroke();
+    x.lineWidth=1.4; x.strokeStyle=DARK?'#e8e4da':'#463f38'; x.stroke();
   } else {
     x.scale(ps,ps);
     x.translate(12,12); x.beginPath(); x.moveTo(0,-10); x.lineTo(9,0); x.lineTo(0,10); x.lineTo(-9,0); x.closePath();
@@ -850,7 +875,7 @@ function draw(){
       var e=bDraw[e1];                    // star/dot — the line's tip IS the precise HQ location)
       var ddx=e.dx-e.tx, ddy=e.dy-e.ty;
       if(ddx*ddx+ddy*ddy>25){
-        ctx.beginPath(); ctx.lineWidth=1.4; ctx.strokeStyle='rgba(70,63,56,.8)';
+        ctx.beginPath(); ctx.lineWidth=1.4; ctx.strokeStyle=DARK?'rgba(245,242,235,.6)':'rgba(70,63,56,.8)';
         ctx.moveTo(e.tx,e.ty); ctx.lineTo(e.dx,e.dy); ctx.stroke();
       }
     }
@@ -865,8 +890,8 @@ function draw(){
         if(m.kind==='hqdot'&&m.lbl){   // v3.14: halo'd name under the brand dot
           ctx.font='600 '+m.lfs+'px -apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif';
           ctx.textAlign='center'; ctx.textBaseline='top';
-          ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(m.lbl,m.dx,m.dy+8);
-          ctx.fillStyle='#463f38'; ctx.fillText(m.lbl,m.dx,m.dy+8);
+          ctx.lineWidth=3; ctx.strokeStyle=DARK?'rgba(18,19,22,.88)':'rgba(255,255,255,.92)'; ctx.strokeText(m.lbl,m.dx,m.dy+8);
+          ctx.fillStyle=DARK?'#e8e4da':'#463f38'; ctx.fillText(m.lbl,m.dx,m.dy+8);
           ctx.textAlign='start'; ctx.textBaseline='alphabetic';
         }
         hits.push({x:m.dx,y:m.dy,r:(m.kind==='hqdot'?9:14*m.bps),kind:'beacon',b:m.b});
