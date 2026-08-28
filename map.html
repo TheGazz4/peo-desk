@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.18 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.19 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.19 (claim 134): every HQ with a logo on file draws its logo CHIP at every zoom — the v3.6-era top-40-families
+     national-zoom declutter gate is gone (owner: "why do all the dots not have respective logos"). Remaining plain dots
+     are families with no usable logo in peo_logo_registry (no_website / fetch_failed / tiny); logo-refill lane fills them.
      v3.18 (claim 131): the States filter culls client pins and admin beacons but NEVER the HQ logo chips — they are a
      national reference layer governed only by their own toggle + the PEO filter (owner: States→None wiped the logos).
      Upstream same claim: v_map_beacons draws ONE HQ chip per displayed family (Vensure was split across two slugs).
@@ -301,7 +304,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.18 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.19 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -880,7 +883,7 @@ function draw(){
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
       if(bx<-200||bx>W+200||by<-200||by>H+200) continue;   // wide cull margin keeps the fan-out stable near edges
       var asChip=false, im=null, chs=0, cw=0, ch=0;
-      if(isHq&&b.has_logo&&(z>=5||!S._topFams||S._topFams[b.family_slug])){
+      if(isHq&&b.has_logo){   // v3.19: logo chips at EVERY zoom — top-40 national gate dropped (owner: dots should wear their logos)
         im=beaconLogo(b.family_slug);
         if(im){
           asChip=true; chs=chipSize(z);
