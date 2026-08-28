@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.16.1 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.17 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.17 (claim 126 — CLIENT LOCATION AT THE CORE): the PEO list shows clients PLACED on the map; a dotted count means
+     some clients are location-pending (their record carried the PEO sponsor's address/zip — 0588 stubs them, never draws
+     them at the PEO's zip; the Serper Places + Census lanes resolve their real addresses). Hover the count for the split.
      v3.16.1 (claim 124, hourly freshness): every map-data GET carries &cv=2 — a one-time cache-KEY bump so browsers
      drop the 12-hour snapshot copies they cached under map-data v2.9.5 headers. map-data v2.9.6 now serves
      Cache-Control max-age=60 + ETag 304s, and the server re-bakes snapshots hourly (0587 map_rebake_now).
@@ -183,6 +186,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .peo-row .nm{flex:1;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peo-row.on .nm{color:var(--ink)}
 .peo-row .ct{font-size:11px;color:var(--muted)}
+.peo-row .ct.pend{border-bottom:1px dotted var(--muted);cursor:help}
 .peo-row .solo{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden}
 .peo-row:hover .solo{visibility:visible}
 .peo-row.off .sw{opacity:.25}
@@ -294,7 +298,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.16.1 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.17 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1182,7 +1186,11 @@ function buildPeoPanel(){
     var d=document.createElement('div'); d.className='peo-row '+(on?'on':'off');
     var sw=document.createElement('span'); sw.className='sw'; sw.style.background=r.color_hex||OTHER;
     var nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.display||r.slug; nm.title=(r.display||r.slug)+' · slug: '+r.slug+(r.color_basis?' · color: '+r.color_basis:'');
-    var ct=document.createElement('span'); ct.className='ct'; ct.textContent=Number(r.n_clients).toLocaleString();
+    var ct=document.createElement('span'); ct.className='ct';
+    var unpl=Number(r.n_unplaced)||0, placed=Math.max(0, Number(r.n_clients)-unpl);   // v3.17: placed vs location-pending (0588)
+    ct.textContent=placed.toLocaleString();
+    ct.title=Number(r.n_clients).toLocaleString()+' clients attributed · '+placed.toLocaleString()+' placed on the map'+(unpl?' · '+unpl.toLocaleString()+' location pending (recorded at the PEO''s own address — real address being resolved)':'');
+    if(unpl) ct.className+=' pend';
     var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
     so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
     d.onclick=function(){ sel[r.slug]=sel[r.slug]===false?true:false; afterSel(); };
