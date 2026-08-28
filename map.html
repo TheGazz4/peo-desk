@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.16 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.16.1 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.16.1 (claim 124, hourly freshness): every map-data GET carries &cv=2 — a one-time cache-KEY bump so browsers
+     drop the 12-hour snapshot copies they cached under map-data v2.9.5 headers. map-data v2.9.6 now serves
+     Cache-Control max-age=60 + ETag 304s, and the server re-bakes snapshots hourly (0587 map_rebake_now).
      v3.16 (claim 123, owner reversal): PEO names show on HOVER ONLY — the printed name bands under
      HQ chips and the halo names under logo-less dots (v3.14) are removed; tipBeacon already serves
      logo + name + kind + city on hover/tap. Logo chips are now DYNAMICALLY sized: a continuous
@@ -291,7 +294,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.16 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.16.1 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -418,7 +421,7 @@ function api(params){
   });
 }
 function apiGet(qs){ // GET so the browser HTTP cache + ETag revalidation kick in for snapshots
-  return fetch(EP+'?'+qs,{method:'GET',headers:hdrs()}).then(function(r){
+  return fetch(EP+'?'+qs+'&cv=2',{method:'GET',headers:hdrs()}).then(function(r){
     if(r.status===401||r.status===403){ showGate(true); throw new Error('auth'); }
     return r.json();
   });
