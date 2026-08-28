@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.13 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.14 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.14 (claim 121): NAME UNDER LOGO (owner: "underneath the peo logos, include the peo name
+     unless the logo is obvious like ADP or CoAd"). Each HQ chip now carries the PEO's display name
+     in a band under the logo, inside the same chip. Exempt: wordmark pills (aspect>1.6, e.g.
+     Nextep) and logos flagged label_in_logo in peo_logo_registry (0586: ADP, CoAd. — the art IS
+     the name; flag ships in the logos_all payload as "lil", edge v2.9.5). Logo-less HQ brand dots
+     get a halo'd name under the dot too — a bare dot identifies nothing. Fan-out spacing uses the
+     labeled chip's true width/height (v3.11 law: layout keys on real geometry).
+     map v3.13 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.13 (claim 120): LEADER-LINE REFINEMENT (owner: "each PEO HQ does not need a star — just a
      direct line to its precise HQ location; the further the zoom, the shorter the line"). The
      white/brown anchor dots at the true spot are GONE — the leader line's tip IS the precise HQ
@@ -262,7 +270,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.13 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.14 · 2026-08-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -352,7 +360,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 
 // ------------------------- state -------------------------
 var S={
-  grain:'family', placement:'address', msOnly:false, panelOpen:true, hqLogos:true, logoImgs:{},
+  grain:'family', placement:'address', msOnly:false, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null,
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -417,8 +425,9 @@ function boot(){
     S.beacons.forEach(function(b){ b._mx=mercX(Number(b.lng)); b._my=mercY(Number(b.lat)); });
     readUrl();
     S._topFams={}; (S.catalog.families||[]).slice(0,40).forEach(function(r){ S._topFams[r.slug]=true; });
-    apiGet('mode=logos_all&d='+new Date().toISOString().slice(0,10)).then(function(r){   // one request warms every HQ logo chip (daily-versioned URL so logo updates land same-day)
+    apiGet('mode=logos_all&d=v314-'+new Date().toISOString().slice(0,10)).then(function(r){   // one request warms every HQ logo chip (page+day-versioned URL so logo/flag updates land same-day)
       var L=(r&&r.logos)||{};
+      S.logoLil=(r&&r.lil)||{};   // v3.14 (0586): logo art already reads as the brand name → no label under that chip
       Object.keys(L).forEach(function(slug){
         if(S.logoImgs[slug]!==undefined) return;
         S.logoImgs[slug]=null; S.logoCache[slug]=L[slug];
@@ -808,7 +817,7 @@ function draw(){
       else { if(!S.beaconsOn||z<6) continue; }                   // admin ◆ + candidates ✩: opt-in, z≥6 only
       var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
       if(bx<-200||bx>W+200||by<-200||by>H+200) continue;   // wide cull margin keeps the fan-out stable near edges
-      var asChip=false, im=null, chs=0, cw=0, ch=0;
+      var asChip=false, im=null, chs=0, cw=0, ch=0, lbl=null, lfs=0, lbh=0;
       if(isHq&&b.has_logo&&(z>=5||!S._topFams||S._topFams[b.family_slug])){
         im=beaconLogo(b.family_slug);
         if(im){
@@ -816,10 +825,23 @@ function draw(){
           var asp=(im.width||1)/(im.height||1);
           if(asp>1.6){ cw=Math.min(asp*0.8,2.7)*chs*0.82; ch=chs*0.68; }   // v3.12: wide wordmark logos get a PILL chip (owner: use the entire logo & name)
           else { cw=chs; ch=chs; }
+          // v3.14 (owner): the PEO name goes UNDER the logo, inside the same chip — unless the logo
+          // art already reads as the name (wordmark pill by shape, or 0586 label_in_logo: ADP, CoAd.)
+          if(asp<=1.6&&!S.logoLil[b.family_slug]){
+            lbl=S.displays.family[b.family_slug]||b.peo_display||b.family_slug;
+            lfs=Math.max(7,Math.round(chs*0.24)); lbh=lfs+5;
+            ctx.font='600 '+lfs+'px -apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif';
+            var maxw=chs*2.1, tw=ctx.measureText(lbl).width;
+            if(tw>maxw){ while(lbl.length>3&&ctx.measureText(lbl+'…').width>maxw){ lbl=lbl.slice(0,-1); } lbl+='…'; tw=ctx.measureText(lbl).width; }
+            cw=Math.max(cw,tw+10); ch=ch+lbh;
+          }
         }
       }
+      if(!asChip&&isHq){   // v3.14: logo-less HQ brand dots get the name too — a bare dot identifies nothing
+        lbl=S.displays.family[b.family_slug]||b.peo_display||b.family_slug; lfs=8;
+      }
       bDraw.push({id:String(b.beacon_id||(b.family_slug+':'+b.kind)), b:b, tx:bx, ty:by,
-                  chip:asChip, im:im, cw:cw, ch:ch, s:asChip?Math.max(cw,ch):(isHq?12:26*bps), bps:bps,
+                  chip:asChip, im:im, cw:cw, ch:ch, lbl:lbl, lfs:lfs, lbh:lbh, s:asChip?Math.max(cw,ch):(isHq?12:26*bps), bps:bps,
                   col:b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER,
                   kind:b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'hqdot')});
     }
@@ -835,11 +857,18 @@ function draw(){
     for(var e2=0;e2<bDraw.length;e2++){   // pass 2: marks at their fanned-out positions
       var m=bDraw[e2];
       if(m.chip){
-        drawLogoChip(m.dx,m.dy,m.im,m.cw,m.ch);
+        drawLogoChip(m.dx,m.dy,m.im,m.cw,m.ch,m.lbl,m.lfs,m.lbh);
         hits.push({x:m.dx,y:m.dy,r:Math.max(m.cw,m.ch)*0.58,kind:'beacon',b:m.b});
       } else {
         var sp3=sprite(m.kind,m.col,m.bps);
         ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,m.dx-sp3.ax,m.dy-sp3.ay,sp3.w,sp3.h);
+        if(m.kind==='hqdot'&&m.lbl){   // v3.14: halo'd name under the brand dot
+          ctx.font='600 '+m.lfs+'px -apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif';
+          ctx.textAlign='center'; ctx.textBaseline='top';
+          ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(m.lbl,m.dx,m.dy+8);
+          ctx.fillStyle='#463f38'; ctx.fillText(m.lbl,m.dx,m.dy+8);
+          ctx.textAlign='start'; ctx.textBaseline='alphabetic';
+        }
         hits.push({x:m.dx,y:m.dy,r:(m.kind==='hqdot'?9:14*m.bps),kind:'beacon',b:m.b});
       }
     }
@@ -909,7 +938,7 @@ function beaconLogo(slug){
   }).catch(function(){});
   return null;
 }
-function drawLogoChip(x,y,im,w,h){
+function drawLogoChip(x,y,im,w,h,lbl,lfs,lbh){
   if(!h) h=w;   // square fallback
   var r=Math.max(4,Math.min(w,h)*0.24), hw=w/2, hh=h/2;
   ctx.beginPath();
@@ -917,10 +946,16 @@ function drawLogoChip(x,y,im,w,h){
   ctx.arcTo(x-hw,y+hh,x-hw,y-hh,r); ctx.arcTo(x-hw,y-hh,x+hw,y-hh,r); ctx.closePath();
   ctx.fillStyle='#ffffff'; ctx.fill();
   ctx.lineWidth=1.25; ctx.strokeStyle='#463f38'; ctx.stroke();
-  var pad=Math.min(w,h)*0.13, aw=w-2*pad, ah=h-2*pad;
+  var bh=(lbl&&lbh)?lbh:0, lh2=h-bh;   // v3.14: name band under the logo, inside the chip
+  var pad=Math.min(w,lh2)*0.13, aw=w-2*pad, ah=lh2-2*pad;
   var f=Math.min(aw/(im.width||1), ah/(im.height||1));
   var dw=(im.width||aw)*f, dh=(im.height||ah)*f;
-  try{ ctx.drawImage(im,x-dw/2,y-dh/2,dw,dh); }catch(_){ }
+  try{ ctx.drawImage(im,x-dw/2,y-hh+(lh2-dh)/2,dw,dh); }catch(_){ }
+  if(bh){
+    ctx.font='600 '+lfs+'px -apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif';
+    ctx.textAlign='center'; ctx.fillStyle='#463f38'; ctx.fillText(lbl,x,y+hh-4);
+    ctx.textAlign='start';
+  }
 }
 // ------------------------- hover / click -------------------------
 function mapXY(e){ var r=$('mapwrap').getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
