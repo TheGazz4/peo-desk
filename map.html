@@ -1189,7 +1189,7 @@ function buildPeoPanel(){
     var ct=document.createElement('span'); ct.className='ct';
     var unpl=Number(r.n_unplaced)||0, placed=Math.max(0, Number(r.n_clients)-unpl);   // v3.17: placed vs location-pending (0588)
     ct.textContent=placed.toLocaleString();
-    ct.title=Number(r.n_clients).toLocaleString()+' clients attributed · '+placed.toLocaleString()+' placed on the map'+(unpl?' · '+unpl.toLocaleString()+' location pending (recorded at the PEO''s own address — real address being resolved)':'');
+    ct.title=Number(r.n_clients).toLocaleString()+' clients attributed · '+placed.toLocaleString()+' placed on the map'+(unpl?' · '+unpl.toLocaleString()+' location pending (recorded at the PEO’s own address — real address being resolved)':'');
     if(unpl) ct.className+=' pend';
     var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
     so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
