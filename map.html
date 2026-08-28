@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.19 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.20 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.20 (claim 133): the client card names a shared building — "Shared address: N businesses in our book at
+     this building" (v_map_pins.addr_share_n, 0589). A stack of pins on one office tower now explains itself.
+     Addresses that are NOT premises (private mailbox / registered agent / placeholder) never reach the pin
+     layer at all: 0589 marks them location-pending at the door and the location hunt resolves the real one.
+     v3.19 (claim 134): every HQ with a logo on file draws its logo CHIP at every zoom
      v3.19 (claim 134): every HQ with a logo on file draws its logo CHIP at every zoom — the v3.6-era top-40-families
      national-zoom declutter gate is gone (owner: "why do all the dots not have respective logos"). Remaining plain dots
      are families with no usable logo in peo_logo_registry (no_website / fetch_failed / tiny); logo-refill lane fills them.
@@ -1314,6 +1319,7 @@ function openCard(p,slug,history){
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
     (p.historical?'':(kv('With PEO since',since)+kv('Multistate',p.is_multistate?'yes':'no')))+
     kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
+    (Number(p.addr_share_n)>1?kv('Shared address',Number(p.addr_share_n).toLocaleString()+' businesses in our book at this building'):'')+
     histRows+
     '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase.</div>'+
     '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
