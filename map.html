@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.22 · 2026-09-06 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.23 · 2026-09-06 · Coverage Map (claude/coverage-map-spec)
+     v3.23: owner ruling — WC carrier is internal-only; the card row is gone (shelf 0743, map-data v2.11.1).
      v3.22 SOURCING LAW (owner ruling 2026-09-06: "sourcing is never something that would be displayed on the
      map — our sourcing is proprietary"): the page no longer names any source, hub, filing, book, or basis text
      anywhere. "Evidence" became "Confidence" (Any · Verified · Cross-verified; URL src=1|2 unchanged); hover and
@@ -324,7 +325,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.22 · 2026-09-06</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.23 · 2026-09-06</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1365,7 +1366,6 @@ function openCard(p,slug,history){
     '<div class="bd">'+formerBanner+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
     (p.historical?'':(kv('Health renewal',hren)+kv('WC renewal',ren)))+
-    kv('WC carrier',esc(p.wc_carrier||'—'))+
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
     (p.historical?'':(kv('With PEO since',since)+kv('Multistate',p.is_multistate?'yes':'no')))+
     (p.historical?'':kv('Confidence',(function(){
