@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.20 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.21 · 2026-09-05 · Coverage Map (claude/coverage-map-spec)
+     v3.21 (0726-0729 corroboration at the core): every pin now carries cs (how many independent source hubs
+     corroborate its CURRENT PEO attribution, family-group level: 0 = seed/legacy only, 1 = one hub,
+     2+ = cross-source proven) and cx (1 = a live hub still disagrees). Operators block gains an
+     "Evidence" filter (Any · 1+ sources · 2+ sources; URL src=1|2); hover and client card state the
+     source count, the hubs by name, and any open conflict. Reads map-data v2.9.9 detail bake; older bakes
+     without cs/cx degrade to "evidence pending" and the filter shows everything.
+     ---
+     map v3.20 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
      v3.20 (claim 133): the client card names a shared building — "Shared address: N businesses in our book at
      this building" (v_map_pins.addr_share_n, 0589). A stack of pins on one office tower now explains itself.
      Addresses that are NOT premises (private mailbox / registered agent / placeholder) never reach the pin
@@ -328,6 +336,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <label class="chk"><input type="checkbox" id="hqlogo-on" checked> PEO HQ pins (logos)</label>
         <label class="chk" title="Administrative offices ◆ and unverified HQ candidates ✩ — extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Administrative beacons ◆</label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
+        <h2 style="margin-top:10px" title="How many independent source hubs (state WC books, DOL 5500 filings, web fingerprint) corroborate the PEO shown on each pin. 2+ = proven across sources.">Evidence</h2>
+        <div class="seg"><button id="src-0" class="on" title="Show every pin, including seed/legacy attributions with no ledger evidence yet">Any</button><button id="src-1" title="At least one source hub corroborates the PEO shown">1+ sources</button><button id="src-2" title="Two or more independent hubs agree — cross-source proven">2+ sources</button></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events from our ledgers — every ring pin carries its own source and as-of date. Default off.">Historical</h2>
           <label class="chk"><input type="checkbox" id="hist-on"> Former clients — departures ◯</label>
@@ -400,7 +410,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'family', placement:'address', msOnly:false, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
+  grain:'family', placement:'address', msOnly:false, minSrc:0, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null,
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -587,9 +597,10 @@ function commitDetail(st,r){
     mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);   // ZIP view: everything at its ZIP center, jittered
   }
   var hOk=r.hrm&&r.hrm.length===n&&r.hrmb&&r.hrmb.length===n;
+  var cOk=r.cs&&r.cs.length===n&&r.cx&&r.cx.length===n;   // v3.21: corroboration (optional — older bakes)
   d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
   d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
-            hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null};
+            hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null};
   d.lat0=null; d.lng0=null;
 }
 function loadDetail(st,retried){
@@ -830,6 +841,7 @@ function draw(){
     for(var i2=0;i2<d2.n;i2++){
       if(!vis2[IDX2[i2]]) continue;
       if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
+      if(S.minSrc && d2.detail && d2.detail.cs && d2.detail.cs[i2]<S.minSrc) continue;
       var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
       if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
       if(dotMode){
@@ -1061,6 +1073,7 @@ function terrResults(){
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
+      if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       var dx=MX[i]-t.cmx, dy=MY[i]-t.cmy;
       if(dx*dx+dy*dy > t.rMerc*t.rMerc) continue;
       total++;
@@ -1118,6 +1131,7 @@ function onMove(e){
       else if(S.lens==='health'){ renLine+='<span class="mut">Health renewal month unknown</span><br>'; }
       if(d.detail.rm[h.i]){ renLine+='WC renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+RMB_LABELS[d.detail.rmb[h.i]]+')</span><br>'; }
       else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
+      renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
     }
     tipShow('<b>'+esc(nm)+'</b><br>'+
       '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
@@ -1264,6 +1278,15 @@ function setMsOnly(v){
   $('ms-only').checked=v;
   bump(); scheduleDraw(); updateStats(); writeUrl();
 }
+// v3.21 evidence filter (minimum corroborating sources)
+function syncSrcButtons(){ [0,1,2].forEach(function(k){ $('src-'+k).className=(S.minSrc===k)?'on':''; }); }
+function setMinSrc(v){
+  v=Math.max(0,Math.min(2,Number(v)||0));
+  if(S.minSrc===v) return;
+  S.minSrc=v; syncSrcButtons();
+  bump(); scheduleDraw(); updateStats(); writeUrl();
+}
+$('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ setMinSrc(1) }; $('src-2').onclick=function(){ setMinSrc(2) };
 // ---- panel collapse (desktop hide / mobile drawer) ----
 function isMobile(){ return window.matchMedia('(max-width:760px)').matches; }
 function applyPanel(){
@@ -1296,6 +1319,16 @@ function tipShow(html,ev){
 function closeTip(){ $('tip').style.display='none'; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}); }
 function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
+// v3.21 corroboration wording (cs = hubs agreeing with the shown PEO; cx = a live hub disagrees)
+var HUB_NAMES={efast_5500:'DOL Form 5500',tx_wc:'Texas WC book',fl_wc:'Florida WC book',az_wc:'Arizona WC book',fingerprint:'Web fingerprint',ca_sos:'California SOS'};
+function hubName(h){ return HUB_NAMES[h]||String(h||'').replace(/_/g,' '); }
+function evidenceLine(cs,cx){
+  if(cs==null) return '<span class="mut">Evidence: pending</span>';
+  var n=Number(cs)||0;
+  var t=n>=2?('<span style="font-weight:650">Evidence: '+n+' sources agree</span>'):(n===1?'Evidence: 1 source':'<span class="mut">Evidence: seed only — not yet corroborated</span>');
+  if(cx) t+=' <span style="color:#d9822b;font-weight:650">· a source disagrees</span>';
+  return t;
+}
 function openCard(p,slug,history){
   var c=$('card');
   var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(p.renewal_month_basis||'basis unknown')+')':'unknown';
@@ -1318,6 +1351,12 @@ function openCard(p,slug,history){
     kv('WC carrier',esc(p.wc_carrier||'—'))+
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
     (p.historical?'':(kv('With PEO since',since)+kv('Multistate',p.is_multistate?'yes':'no')))+
+    (p.historical?'':kv('Evidence',(function(){
+        var n=Number(p.peo_source_count)||0; var hubs=(p.peo_source_hubs||[]).map(hubName);
+        var t=n>=2?(n+' independent sources agree'):(n===1?'1 source':'seed attribution — no ledger evidence yet');
+        if(hubs.length) t+=' <span class="mut">('+esc(hubs.join(', '))+')</span>';
+        if(p.peo_source_conflict) t+='<br><span style="color:#d9822b;font-weight:650">A live source disagrees with the PEO shown — precedence law currently favors this attribution</span>';
+        return t; })()))+
     kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
     (Number(p.addr_share_n)>1?kv('Shared address',Number(p.addr_share_n).toLocaleString()+' businesses in our book at this building'):'')+
     histRows+
@@ -1358,6 +1397,7 @@ function buildUrl(){
     if(S.placement==='zip') p.set('pm','zip');
     if(!S.hqLogos) p.set('hl','0');
     if(S.msOnly) p.set('ms','1');
+    if(S.minSrc) p.set('src',String(S.minSrc));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.hist) p.set('hist','1');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
@@ -1375,6 +1415,7 @@ function readUrl(){
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
     if(p.get('hl')==='0'){ S.hqLogos=false; $('hqlogo-on').checked=false; }
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
+    if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
     if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
@@ -1405,6 +1446,7 @@ function computeViewLegend(){
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
+      if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
       var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
     }
@@ -1479,7 +1521,7 @@ $('ai-q').addEventListener('keydown',function(e){ if(e.key==='Enter') aiAsk(this
 $('ai-desc').onclick=function(){ aiAsk('Describe this view for me.'); };
 function viewContext(){
   var stOn=Object.keys(S.states).filter(function(s){return S.states[s]});
-  return { grain:S.grain, placement:S.placement, lens:S.lens,
+  return { grain:S.grain, placement:S.placement, lens:S.lens, min_sources:S.minSrc,
     states_on: stOn.length<=15?stOn:stOn.length+' states',
     zoom: S.map?Math.round(S.map.getZoom()*10)/10:null,
     center: S.map?{lat:Math.round(S.map.getCenter().lat()*100)/100,lng:Math.round(S.map.getCenter().lng()*100)/100}:null,
