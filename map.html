@@ -4,7 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.21 · 2026-09-05 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.22 · 2026-09-06 · Coverage Map (claude/coverage-map-spec)
+     v3.22 SOURCING LAW (owner ruling 2026-09-06: "sourcing is never something that would be displayed on the
+     map — our sourcing is proprietary"): the page no longer names any source, hub, filing, book, or basis text
+     anywhere. "Evidence" became "Confidence" (Any · Verified · Cross-verified; URL src=1|2 unchanged); hover and
+     card show a confidence TIER only, never a count of sources; historical hover/card drop the source line;
+     renewal/since basis fields are reduced to a tier word (basisWord). Reads map-data v2.10 which itself no
+     longer serves source names or raw basis text. Internal corroboration stays in the DB for accuracy work.
+     ---
      v3.21 (0726-0729 corroboration at the core): every pin now carries cs (how many independent source hubs
      corroborate its CURRENT PEO attribution, family-group level: 0 = seed/legacy only, 1 = one hub,
      2+ = cross-source proven) and cx (1 = a live hub still disagrees). Operators block gains an
@@ -142,7 +149,7 @@
      switches win over open-market rows; noncompete-fenced both directions) served as ONE national gzip
      snapshot (mode=pins_hist, lazy-loaded on first toggle-on). Ring pins (hollow circle, from-family color,
      never clustered) = "was here"; hover carries kind (switched / departed-confirmed / departed-ASSUMED),
-     as-of month, and the PER-ROW source label (multi-source by owner doctrine — never framed 5500-exclusive).
+     as-of month (per-row source label removed from display in v3.22 — sourcing law).
      Record card gains a FORMER banner + full departure/switch history rows (mode=company historical fallback).
      THIS VIEW legend counts stay current-only; historical shown as its own line. AI dock now labeled
      "Claude (Anthropic)" (owner asked: our own Claude, never a Google model). URL: hist=1.
@@ -317,7 +324,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.20 · 2026-08-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.22 · 2026-09-06</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -336,10 +343,10 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <label class="chk"><input type="checkbox" id="hqlogo-on" checked> PEO HQ pins (logos)</label>
         <label class="chk" title="Administrative offices ◆ and unverified HQ candidates ✩ — extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Administrative beacons ◆</label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
-        <h2 style="margin-top:10px" title="How many independent source hubs (state WC books, DOL 5500 filings, web fingerprint) corroborate the PEO shown on each pin. 2+ = proven across sources.">Evidence</h2>
-        <div class="seg"><button id="src-0" class="on" title="Show every pin, including seed/legacy attributions with no ledger evidence yet">Any</button><button id="src-1" title="At least one source hub corroborates the PEO shown">1+ sources</button><button id="src-2" title="Two or more independent hubs agree — cross-source proven">2+ sources</button></div>
+        <h2 style="margin-top:10px" title="How confident we are in the PEO shown on each pin. Cross-verified = independently confirmed.">Confidence</h2>
+        <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
         <div id="histsec" style="display:none">
-          <h2 style="margin-top:10px" title="Departure and switch events from our ledgers — every ring pin carries its own source and as-of date. Default off.">Historical</h2>
+          <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
           <label class="chk"><input type="checkbox" id="hist-on"> Former clients — departures ◯</label>
         </div>
         <details id="moreopts" style="margin-top:10px">
@@ -1150,7 +1157,7 @@ function tipHist(i,e){
     '<span style="color:'+(S.colors.family[sl]||OTHER)+';font-weight:650">'+esc(famDisp(sl))+'</span><br>'+
     esc((hd.cities[i]||'')+(hd.cities[i]?', ':'')+(hd.sts[i]||''))+'<br>'+
     line2+'<br>'+
-    '<span class="mut">source: '+esc(hd.src[i]||'unrecorded')+' · click for details</span>',e);
+    '<span class="mut">click for details</span>',e);
 }
 function onClick(e){
   if(S.drawMode) return;
@@ -1319,29 +1326,39 @@ function tipShow(html,ev){
 function closeTip(){ $('tip').style.display='none'; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}); }
 function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
-// v3.21 corroboration wording (cs = hubs agreeing with the shown PEO; cx = a live hub disagrees)
-var HUB_NAMES={efast_5500:'DOL Form 5500',tx_wc:'Texas WC book',fl_wc:'Florida WC book',az_wc:'Arizona WC book',fingerprint:'Web fingerprint',ca_sos:'California SOS'};
-function hubName(h){ return HUB_NAMES[h]||String(h||'').replace(/_/g,' '); }
+// v3.22 SOURCING LAW (owner 2026-09-06): sourcing is proprietary and is NEVER displayed. The page shows a
+// confidence TIER only (cs = internal corroboration count, cx = internal conflict flag) — never source names,
+// never counts of sources, never raw basis strings. basisWord() reduces any basis text to a tier word.
 function evidenceLine(cs,cx){
-  if(cs==null) return '<span class="mut">Evidence: pending</span>';
+  if(cs==null) return '<span class="mut">Confidence: pending</span>';
   var n=Number(cs)||0;
-  var t=n>=2?('<span style="font-weight:650">Evidence: '+n+' sources agree</span>'):(n===1?'Evidence: 1 source':'<span class="mut">Evidence: seed only — not yet corroborated</span>');
-  if(cx) t+=' <span style="color:#d9822b;font-weight:650">· a source disagrees</span>';
+  var t=n>=2?('<span style="font-weight:650">Confidence: cross-verified</span>'):(n===1?'Confidence: verified':'<span class="mut">Confidence: pending verification</span>');
+  if(cx) t+=' <span style="color:#d9822b;font-weight:650">· under review</span>';
   return t;
+}
+function basisWord(b){
+  if(b==null||b==='') return 'unverified';
+  if(typeof b==='number') return RMB_LABELS[b]||'unverified';
+  var s=String(b);
+  if(/VOIDED/i.test(s)) return 'unknown';
+  if(/VERIFIED/.test(s)) return 'verified';
+  if(/REASONED/.test(s)) return 'reasoned';
+  if(/_floor$|_precedence$|_ledger$/.test(s)) return 'verified';
+  return 'unverified';
 }
 function openCard(p,slug,history){
   var c=$('card');
-  var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(p.renewal_month_basis||'basis unknown')+')':'unknown';
+  // v3.22: basis fields arrive as tier words/classes from map-data v2.10 (never raw source text); basisWord() is the belt-and-braces.
+  var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(basisWord(p.renewal_month_basis))+')':'unknown';
   var histRows='';
   (history||[]).forEach(function(ev){
     var what=ev.hist_kind==='switched'?('Switched '+esc(famDisp(ev.from_family))+' → '+esc(famDisp(ev.to_family_slug||'?'))):
       ((ev.hist_kind==='departed_confirmed'?'Departed (confirmed) from ':'Departed (assumed) from ')+esc(famDisp(ev.from_family)));
-    histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+
-      '<br><span style="opacity:.8">source: '+esc(ev.source_label||'unrecorded')+'</span></div>';
+    histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+'</div>';
   });
   var formerBanner=p.historical?'<div class="note" style="margin-top:0;margin-bottom:6px;font-weight:650">FORMER PEO client — shown from the historical layer</div>':'';
-  var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(p.health_renewal_basis||'basis unknown')+')':'unknown';
-  var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(p.peo_current_since_basis||'basis unknown')+')':'unknown';
+  var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(basisWord(p.health_renewal_basis))+')':'unknown';
+  var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(basisWord(p.peo_current_since_basis))+')':'unknown';
   c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
     '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div></div>'+
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
@@ -1351,11 +1368,10 @@ function openCard(p,slug,history){
     kv('WC carrier',esc(p.wc_carrier||'—'))+
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
     (p.historical?'':(kv('With PEO since',since)+kv('Multistate',p.is_multistate?'yes':'no')))+
-    (p.historical?'':kv('Evidence',(function(){
-        var n=Number(p.peo_source_count)||0; var hubs=(p.peo_source_hubs||[]).map(hubName);
-        var t=n>=2?(n+' independent sources agree'):(n===1?'1 source':'seed attribution — no ledger evidence yet');
-        if(hubs.length) t+=' <span class="mut">('+esc(hubs.join(', '))+')</span>';
-        if(p.peo_source_conflict) t+='<br><span style="color:#d9822b;font-weight:650">A live source disagrees with the PEO shown — precedence law currently favors this attribution</span>';
+    (p.historical?'':kv('Confidence',(function(){
+        var n=Number(p.peo_source_count)||0;
+        var t=n>=2?'cross-verified':(n===1?'verified':'pending verification');
+        if(p.peo_source_conflict) t+='<br><span style="color:#d9822b;font-weight:650">Under review — the PEO shown is our current determination</span>';
         return t; })()))+
     kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
     (Number(p.addr_share_n)>1?kv('Shared address',Number(p.addr_share_n).toLocaleString()+' businesses in our book at this building'):'')+
