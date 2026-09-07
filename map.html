@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.24 · 2026-09-06 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.25 · 2026-09-07 · Coverage Map (claude/coverage-map-spec)
+     v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
      v3.24: owner ruling — client hover shows City, ST ZIP (never a street address; map-data v2.11.2 carries zips).
      v3.23: owner ruling — WC carrier is internal-only; the card row is gone (shelf 0743, map-data v2.11.1).
      v3.22 SOURCING LAW (owner ruling 2026-09-06: "sourcing is never something that would be displayed on the
@@ -326,7 +327,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.24 · 2026-09-06</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.25 · 2026-09-07</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1377,7 +1378,6 @@ function openCard(p,slug,history){
         if(p.peo_source_conflict) t+='<br><span style="color:#d9822b;font-weight:650">Under review — the PEO shown is our current determination</span>';
         return t; })()))+
     kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
-    (Number(p.addr_share_n)>1?kv('Shared address',Number(p.addr_share_n).toLocaleString()+' businesses in our book at this building'):'')+
     histRows+
     '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase.</div>'+
     '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
