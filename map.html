@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.25 · 2026-09-07 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.26 · 2026-09-07 · Coverage Map (claude/coverage-map-spec)
+     v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
+            hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
      v3.24: owner ruling — client hover shows City, ST ZIP (never a street address; map-data v2.11.2 carries zips).
      v3.23: owner ruling — WC carrier is internal-only; the card row is gone (shelf 0743, map-data v2.11.1).
@@ -327,7 +329,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.25 · 2026-09-07</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.26 · 2026-09-07</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -609,8 +611,7 @@ function commitDetail(st,r){
   var hOk=r.hrm&&r.hrm.length===n&&r.hrmb&&r.hrmb.length===n;
   var cOk=r.cs&&r.cs.length===n&&r.cx&&r.cx.length===n;   // v3.21: corroboration (optional — older bakes)
   d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
-  var zOk=r.zips&&r.zips.length===n;   // v3.24: ZIP on hover (optional — older bakes)
-  d.detail={ids:r.ids,names:r.names,cities:r.cities,zips:zOk?r.zips:null,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
+  d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
             hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null};
   d.lat0=null; d.lng0=null;
 }
@@ -1134,7 +1135,6 @@ function onMove(e){
     var slug=slugArr[IDX[h.i]];
     var nm=d.detail?(d.detail.names[h.i]||'—'):'Loading…';
     var city=d.detail?(d.detail.cities[h.i]||''):'';
-    var zip=(d.detail&&d.detail.zips)?(d.detail.zips[h.i]||''):'';
     var street=d.detail?!!d.detail.street[h.i]:false;
     var renLine='';
     if(d.detail){
@@ -1147,7 +1147,7 @@ function onMove(e){
     }
     tipShow('<b>'+esc(nm)+'</b><br>'+
       '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
-      esc(city+(city?', ':'')+h.st+(zip?' '+zip:''))+'<br>'+renLine+
+      esc(city+(city?', ':'')+h.st)+'<br>'+renLine+
       '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
   });
 }
