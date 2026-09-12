@@ -130,6 +130,8 @@
   .delta-up { color: var(--good); font-weight: 650; }
   .delta-dn { color: var(--serious); }
   .delta-0  { color: var(--ink-muted); }
+  .bookBtn { background: none; border: 1px solid var(--border); color: var(--ink-2); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: 11px; }
+  .bookBtn.on { border-color: var(--series-1); color: var(--ink-1); background: color-mix(in srgb, var(--series-1) 14%, transparent); }
   #tip { position: fixed; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
     border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink-1); z-index: 20;
     box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
@@ -169,6 +171,11 @@
   <section class="wide" id="scorecard">
     <h2>Mesh scorecard <small>— what changed since the last run, in plain English</small></h2>
     <div class="sc-head" id="scHead"></div>
+    <div class="sc-head" id="scBook"><span class="age cold">book:</span>
+      <button class="bookBtn" data-book="both">current + former</button>
+      <button class="bookBtn" data-book="current">current PEO users</button>
+      <button class="bookBtn" data-book="former">former PEO users</button>
+      <span class="age cold" id="scBookNote"></span></div>
     <p class="sc-narr" id="scNarr">waiting for the first scorecard run…</p>
     <div class="sc-tiles" id="scTiles"></div>
     <div class="sc-grid">
@@ -308,6 +315,13 @@ const DEMO = new URLSearchParams(location.search).has("demo");
 
 /* ================= state ================= */
 let deskKey = localStorage.getItem("desk_key") || "";
+let scBook = localStorage.getItem("desk_sc_book") || "both";
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest(".bookBtn");
+  if (!b) return;
+  scBook = b.dataset.book; localStorage.setItem("desk_sc_book", scBook);
+  if (latest) renderScorecard(latest);
+});
 let skewMs = 0;                    /* serverNow - clientNow */
 let lastPollAt = null;
 let latest = null;
@@ -685,7 +699,14 @@ function renderScorecard(d) {
     return `<div class="tile"><div class="k">${esc(k)}</div><div class="v" style="color:${color}">${esc(String(v))}</div><div class="d">${esc(dd)}</div></div>`;
   }).join("");
 
-  $("#tblScFields tbody").innerHTML = (m.fields || []).map((f) => {
+  document.querySelectorAll(".bookBtn").forEach((b) => b.classList.toggle("on", b.dataset.book === scBook));
+  const bookData = (scBook !== "both" && m.fields_by_book && m.fields_by_book[scBook]) ? m.fields_by_book[scBook] : null;
+  const bookMap = new Map((bookData?.fields || []).map((f) => [f.key, f]));
+  $("#scBookNote").textContent = m.book
+    ? (bookData ? `${fmtN(bookData.n)} ${scBook} PEO users` : `${fmtN(m.book.current)} current + ${fmtN(m.book.former)} former = ${fmtN(m.universe)}`)
+    : "";
+  $("#tblScFields tbody").innerHTML = (m.fields || []).map((f0) => {
+    const f = bookMap.has(f0.key) ? { ...f0, ...bookMap.get(f0.key), delta_filled: null } : f0;
     const pct = Number(f.pct) || 0;
     const meterCls = pct >= 60 ? "" : pct >= 30 ? "warn" : "critical";
     return `<tr title="${esc(f.why || "")}">
