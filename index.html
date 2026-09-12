@@ -662,7 +662,10 @@ function renderScorecard(d) {
     `<span class="age cold">run ${ageSpan(row.run_at, 90000)}</span>` +
     `<span class="age cold">window ${esc(String(m.hours ?? "?"))} h</span>` +
     `<span class="age cold">${fmtN(m.universe)} companies tracked</span>` +
-    ((m.verdict_reasons || []).length ? `<span class="age cold" style="white-space:normal">— ${esc(m.verdict_reasons.join("; "))}</span>` : "");
+    ((m.verdict_reasons || []).length ? `<span class="age cold" style="white-space:normal">— ${esc(m.verdict_reasons.join("; "))}</span>` : "") +
+    (row.last_attempt_ok === false ? `<span class="chip critical" style="white-space:normal">latest scheduled run FAILED ${ageSpan(row.last_attempt_at, 90000)} — ${esc(row.last_attempt_err || "")} (showing last good run)</span>` : "") +
+    (row.last_selftest_pass === false ? `<span class="chip critical" style="white-space:normal">self-test failing: ${esc(row.last_selftest_failed || "")}</span>` : "") +
+    (row.last_selftest_at && row.last_selftest_pass ? `<span class="age cold">self-test passed ${ageSpan(row.last_selftest_at, 700000)}</span>` : "");
   $("#scNarr").textContent = row.narrative || "";
 
   const tiles = [
