@@ -666,7 +666,8 @@ function renderScorecard(d) {
   $("#scNarr").textContent = row.narrative || "";
 
   const tiles = [
-    ["new PEO users", fmtN(L.entries), "newly identified this run", Number(L.entries) > 0 ? "good" : null],
+    ["records changed", fmtN(m.records_changed), `${fmtN(m.records_created)} brand new · ${fmtN(m.obs_landed)} data points`, Number(m.records_changed) > 0 ? "good" : null],
+    ["new PEO users", fmtN(L.entries), `${fmtN(L.entries_new_companies)} new to book · ${fmtN(L.entries_first_evidence_existing)} now source-backed`, Number(L.entries) > 0 ? "good" : null],
     ["switches", fmtN(L.switches), `${fmtN(L.switches_competitive)} competitive · ${fmtN(L.switches_dated_day)} dated to the day`, Number(L.switches) > 0 ? "good" : null],
     ["exits", fmtN(L.exits), "left the PEO model", null],
     ["2+ sources agree", fmtN(L.corroborated_total), `${L.corroborated_pct ?? "—"}% of book · +${fmtN(L.corroborated_new)} this run`, null],
