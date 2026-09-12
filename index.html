@@ -115,6 +115,21 @@
   #overlay .err { color: var(--critical); font-size: 12px; min-height: 16px; margin-top: 8px; }
   .hidden { display: none !important; }
 
+  /* ---- mesh scorecard ---- */
+  section.wide { grid-column: 1 / -1; }
+  .sc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 8px; }
+  .sc-narr { font-size: 13.5px; line-height: 1.6; color: var(--ink-1); max-width: 110ch; margin: 0 0 12px;
+    padding: 10px 14px; border-left: 3px solid var(--series-1); background: color-mix(in srgb, var(--series-1) 6%, transparent); border-radius: 0 8px 8px 0; }
+  .sc-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .sc-tiles .tile { min-width: 118px; padding: 8px 12px; }
+  .sc-tiles .tile .v { font-size: 19px; }
+  .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .sc-grid h3 { font-size: 11px; margin: 0 0 6px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+  .sc-grid td { white-space: normal; }
+  .sc-grid td.nw { white-space: nowrap; }
+  .delta-up { color: var(--good); font-weight: 650; }
+  .delta-dn { color: var(--serious); }
+  .delta-0  { color: var(--ink-muted); }
   #tip { position: fixed; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
     border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink-1); z-index: 20;
     box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
@@ -151,6 +166,41 @@
 <div id="strip"></div>
 
 <main>
+  <section class="wide" id="scorecard">
+    <h2>Mesh scorecard <small>— what changed since the last run, in plain English</small></h2>
+    <div class="sc-head" id="scHead"></div>
+    <p class="sc-narr" id="scNarr">waiting for the first scorecard run…</p>
+    <div class="sc-tiles" id="scTiles"></div>
+    <div class="sc-grid">
+      <div>
+        <h3>The 16 agreed fields — how full is the book</h3>
+        <table id="tblScFields"><thead><tr>
+          <th>#</th><th>field</th><th style="width:120px">filled</th><th class="num">pct</th><th class="num">strong</th><th class="num">Δ run</th><th class="num">landed</th><th>top source</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <h3>Who helped — sources this window</h3>
+        <table id="tblScSources"><thead><tr>
+          <th>source</th><th>kind</th><th class="num">companies</th><th class="num">fields</th><th class="num">accepted</th><th class="num">conflicting</th>
+        </tr></thead><tbody></tbody></table>
+        <h3 style="margin-top:14px">Last runs</h3>
+        <table id="tblScHist"><thead><tr>
+          <th class="num">run</th><th>verdict</th><th class="num">new users</th><th class="num">switches</th><th class="num">exits</th><th class="num">2+ sources</th><th class="num">accepted</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <h3>Most fully appended states</h3>
+        <table id="tblScStates"><thead><tr>
+          <th>state</th><th class="num">companies</th><th style="width:100px">complete</th><th class="num">pct</th><th class="num">Δ pts</th><th class="num">touched</th>
+        </tr></thead><tbody></tbody></table>
+        <h3 style="margin-top:14px">Most fully appended PEO books</h3>
+        <table id="tblScPeos"><thead><tr>
+          <th>peo</th><th class="num">companies</th><th style="width:100px">complete</th><th class="num">pct</th><th class="num">Δ pts</th><th class="num">touched</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
   <section>
     <h2>Ready plays <small>— the funnel to actionable</small></h2>
     <p class="blurb">Plays ready to fire: live, in timing window, not suppressed. Sendable = also has a contact.</p>
@@ -251,7 +301,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -593,7 +643,99 @@ function renderEnrich(d) {
     : "";
 }
 
+function renderScorecard(d) {
+  const row = (d.desk_mesh_scorecard?.rows || [])[0];
+  if (!row) { $("#scNarr").textContent = "no scorecard run yet — run select public.mesh_scorecard_run() or wait for the 10:20 UTC daily run"; return; }
+  const m = row.metrics || {};
+  const L = m.lifecycle || {}, F = m.flow || {}, C = m.cost || {};
+  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
+  const fmtD = (v, suffix = "") => {
+    if (v == null) return '<span class="delta-0">—</span>';
+    const n = Number(v);
+    if (n > 0) return `<span class="delta-up">+${n.toLocaleString()}${suffix}</span>`;
+    if (n < 0) return `<span class="delta-dn">${n.toLocaleString()}${suffix}</span>`;
+    return '<span class="delta-0">0</span>';
+  };
+  const vCls = { green: "ok", yellow: "warn", red: "critical" }[row.verdict] || "";
+  $("#scHead").innerHTML =
+    `<span class="chip ${vCls}">${esc(String(row.verdict || "?").toUpperCase())}</span>` +
+    `<span class="age cold">run ${ageSpan(row.run_at, 90000)}</span>` +
+    `<span class="age cold">window ${esc(String(m.hours ?? "?"))} h</span>` +
+    `<span class="age cold">${fmtN(m.universe)} companies tracked</span>` +
+    ((m.verdict_reasons || []).length ? `<span class="age cold" style="white-space:normal">— ${esc(m.verdict_reasons.join("; "))}</span>` : "");
+  $("#scNarr").textContent = row.narrative || "";
+
+  const tiles = [
+    ["new PEO users", fmtN(L.entries), "newly identified this run", Number(L.entries) > 0 ? "good" : null],
+    ["switches", fmtN(L.switches), `${fmtN(L.switches_competitive)} competitive · ${fmtN(L.switches_dated_day)} dated to the day`, Number(L.switches) > 0 ? "good" : null],
+    ["exits", fmtN(L.exits), "left the PEO model", null],
+    ["2+ sources agree", fmtN(L.corroborated_total), `${L.corroborated_pct ?? "—"}% of book · +${fmtN(L.corroborated_new)} this run`, null],
+    ["through the mesh", fmtN(L.through_mesh), `${fmtN(L.through_mesh_with_new_data)} came back with new data`, null],
+    ["contradictions", fmtN(L.contradictions), `${fmtN(L.contested_facts)} contested facts`, Number(L.contradictions) > 100 ? "warning" : null],
+    ["messages", fmtN(F.letters_sent), `${fmtN(F.accepted)} accepted · ${fmtN(F.conflicting)} conflicting`, null],
+    ["waiting unread", fmtN(F.unread_backlog), F.oldest_unread_hours != null ? `oldest ${F.oldest_unread_hours} h` : "", Number(F.oldest_unread_hours) > 24 ? "critical" : null],
+    ["cost", C.anthropic_usd != null ? "$" + Number(C.anthropic_usd).toFixed(2) : "—", C.usd_per_accepted_fact != null ? `$${C.usd_per_accepted_fact} per accepted fact` : `${fmtN(C.serper_credits)} search credits`, null],
+  ];
+  $("#scTiles").innerHTML = tiles.map(([k, v, dd, st]) => {
+    const color = st === "good" ? "var(--good)" : st === "critical" ? "var(--critical)" : st === "warning" ? "var(--warning)" : "var(--ink-1)";
+    return `<div class="tile"><div class="k">${esc(k)}</div><div class="v" style="color:${color}">${esc(String(v))}</div><div class="d">${esc(dd)}</div></div>`;
+  }).join("");
+
+  $("#tblScFields tbody").innerHTML = (m.fields || []).map((f) => {
+    const pct = Number(f.pct) || 0;
+    const meterCls = pct >= 60 ? "" : pct >= 30 ? "warn" : "critical";
+    return `<tr title="${esc(f.why || "")}">
+      <td class="num">${f.rank}</td>
+      <td class="nw">${esc(f.label)}</td>
+      <td><div class="meter ${meterCls}"><i style="width:${Math.max(pct, f.filled > 0 ? 1 : 0)}%"></i></div></td>
+      <td class="num">${pct.toFixed(1)}%</td>
+      <td class="num" title="${esc(f.strong_label || "")}">${f.strong_pct == null ? '<span class="age cold">—</span>' : Number(f.strong_pct).toFixed(1) + "%"}</td>
+      <td class="num">${fmtD(f.delta_filled)}</td>
+      <td class="num">${fmtN(f.obs_landed)}</td>
+      <td class="age cold">${esc(f.top_source || "—")}</td>
+    </tr>`;
+  }).join("");
+
+  $("#tblScSources tbody").innerHTML = (m.sources || []).slice(0, 12).map((s) => `<tr>
+      <td>${esc(s.display)}</td>
+      <td class="age cold">${esc(s.kind || "")}${s.state ? " · " + esc(s.state) : ""}</td>
+      <td class="num">${fmtN(s.subjects)}</td>
+      <td class="num">${fmtN(s.fields_touched)}</td>
+      <td class="num">${fmtN(s.letters_accepted)}</td>
+      <td class="num"${Number(s.letters_conflicting) > 0 ? ' style="color:var(--warning)"' : ""}>${fmtN(s.letters_conflicting)}</td>
+    </tr>`).join("") || '<tr><td colspan="6" class="age cold">no source delivered anything in this window</td></tr>';
+
+  const rank = (arr, key) => (arr || []).slice().sort((a, b) => Number(b.completeness_pct) - Number(a.completeness_pct)).slice(0, 10);
+  const rowsOf = (arr, key) => rank(arr, key).map((r) => {
+    const pct = Number(r.completeness_pct) || 0;
+    return `<tr>
+      <td>${esc(r[key])}</td>
+      <td class="num">${fmtN(r.companies)}</td>
+      <td><div class="meter"><i style="width:${pct}%"></i></div></td>
+      <td class="num">${pct.toFixed(1)}%</td>
+      <td class="num">${fmtD(r.delta_pts)}</td>
+      <td class="num">${fmtN(r.touched_in_window)}</td>
+    </tr>`;
+  }).join("");
+  $("#tblScStates tbody").innerHTML = rowsOf(m.states, "state") || '<tr><td colspan="6" class="age cold">—</td></tr>';
+  $("#tblScPeos tbody").innerHTML   = rowsOf(m.peos, "peo")     || '<tr><td colspan="6" class="age cold">—</td></tr>';
+
+  $("#tblScHist tbody").innerHTML = (row.history || []).slice(0, 7).map((h) => {
+    const cls = { green: "ok", yellow: "warn", red: "critical" }[h.verdict] || "";
+    return `<tr>
+      <td class="num">${ageSpan(h.run_at, 90000)}</td>
+      <td><span class="chip ${cls}">${esc(h.verdict || "?")}</span></td>
+      <td class="num">${fmtN(h.entries)}</td>
+      <td class="num">${fmtN(h.switches)}</td>
+      <td class="num">${fmtN(h.exits)}</td>
+      <td class="num">${fmtN(h.corroborated_total)}</td>
+      <td class="num">${fmtN(h.accepted)}</td>
+    </tr>`;
+  }).join("");
+}
+
 function renderAll(d) {
+  renderScorecard(d);
   renderStrip(d);
   renderPlays(d);
   renderEnrich(d);
@@ -657,6 +799,16 @@ function demoData() {
   const now = new Date().toISOString();
   const ago = (s) => new Date(Date.now() - s * 1000).toISOString();
   return {
+    desk_mesh_scorecard: { rows: [{ run_at: ago(3600), verdict: "yellow", narrative: "Since the last check (24.0 hours): 62,503 new data points were recorded on 33,894 companies out of 231,494 tracked. 14,260 companies were newly identified as PEO users (first spotted mostly by fl_wc). 1,097 switched PEOs. 16 left the PEO model entirely. Verdict: YELLOW — silent hubs: ca_sos.",
+      metrics: { hours: 24, universe: 231494, verdict: "yellow", verdict_reasons: ["silent hubs: ca_sos"],
+        lifecycle: { entries: 14260, switches: 1097, switches_competitive: 566, switches_dated_day: 0, exits: 16, corroborated_total: 8040, corroborated_pct: 3.5, corroborated_new: 1956, through_mesh: 381, through_mesh_with_new_data: 318, contradictions: 0, contested_facts: 0 },
+        flow: { letters_sent: 431, accepted: 356, conflicting: 70, unread_backlog: 5, oldest_unread_hours: 111 },
+        cost: { anthropic_usd: 10.14, serper_credits: 0, usd_per_accepted_fact: 0.0285 },
+        fields: [ { rank: 1, label: "Health renewal month", filled: 80009, pct: 34.6, strong_pct: null, delta_filled: 150, obs_landed: 0, top_source: null }, { rank: 9, label: "Domain", filled: 151902, pct: 65.6, strong_pct: 29.5, delta_filled: 20, obs_landed: 0, top_source: "enrichment" } ],
+        sources: [ { display: "FL WC data hub", kind: "state_wc", state: "FL", subjects: 20090, fields_touched: 5, letters_accepted: 200, letters_conflicting: 12 } ],
+        states: [ { state: "MO", companies: 3000, completeness_pct: 66.1, delta_pts: 0.2, touched_in_window: 40 } ],
+        peos: [ { peo: "adp_totalsource", companies: 20000, completeness_pct: 61.6, delta_pts: 0.1, touched_in_window: 300 } ] },
+      history: [ { run_at: ago(3600), verdict: "yellow", entries: 14260, switches: 1097, exits: 16, corroborated_total: 8040, accepted: 356 } ] }] },
     desk_status_board: { rows: [{ lanes_alive: 4, lanes_failing: 0, lanes_starving: 1, red_flags: 2, rulings_waiting: 1, domain_queue_pending: 66830, exhaust_queue_pending: 107865, companies_attributed: 8123 }] },
     desk_spend: { rows: [{ gate_open: false, spend_mtd_usd: 439.17, platform_cap_usd: 400 }] },
     desk_rate_limits: { rows: [
