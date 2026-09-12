@@ -1,0 +1,33 @@
+-- CONSTITUTIONAL COMPLIANCE
+-- Constitution read: YES
+-- Session claim: instanceA-0857-self-audit
+-- Articles implemented: XI.2 (no PUBLIC-executable SECURITY DEFINER), IX.2 prediction wall, XIII.1 (RLS everywhere),
+--   X.3 (a cron timing out every run is broken), XIV.4 (a play that is on must mint), XI.1 (taxonomy before data)
+-- Verification query attached: YES
+--
+-- Consolidated record of three migrations applied 2026-09-12 during the self-audit of 09-11/09-12 work.
+-- Each object's final state is live in the database; this file is the audit trail.
+--
+-- 0857_self_audit_locks_todays_doors
+--   * 16 SECURITY DEFINER functions I created (pushes, beacons, designation refresh, web-check RPCs, noncompete door
+--     trigger fns, root-map fns) were executable by PUBLIC. Revoked from public/anon; granted to service_role/postgres.
+--     Two of them were reachable by peo_predictor = prediction-wall breach. Closed.
+--   * RLS enabled on 5 tables I created without it: noncompete_purge_manifest, noncompete_purge_targets,
+--     alert_rollup_rules, noncompete_fence_lift_log, efast_identity_repair_log.
+--
+-- 0858_identity_repair_finisher_bounded_and_honest
+--   * efast_identity_repair_finish() timed out 18 runs straight (rescanned every repaired filing each call; the
+--     timeout rolled back step 1 so 324 loader-repaired rows still showed pending). Rewritten: 50 filings per call,
+--     per-filing markers (participants_rekeyed_at, identity_rekeyed_at, outcome), one survivor per natural key,
+--     collisions marked SUPERSEDED (DELETE forbidden). 179 rows reclassified confirmed_as_filed (provider-sponsored
+--     pooled plans - the main form really names the provider). 1 CSV header row removed from staging.
+--   * Final: 324 repaired, 179 confirmed as filed, 1 no main row; 1,030 participant rows re-keyed, 2,313 superseded;
+--     ein_identity_class refreshed (834 administrator EINs), profile EIN spine 202, downstream recomputed once.
+--
+-- 0859_angle_types_registered_for_todays_plays
+--   * peo_entity_change and peo_rebranded were switched on without rows in angle_taxonomy (FK on company_angles).
+--     mint_thesis_plays failed hourly and minted nothing. Registered; mint re-run: 722 peo_entity_change angles.
+--
+-- OPEN (not fixed here, recorded): 2,313 SUPERSEDED participant rows are not yet excluded by the 8 views that read
+-- form5500_mep_participants (mep_peo_book, peo_sponsor_ein_universe, v_peo_timeline, ...). They were duplicates
+-- before today too; counts were already inflated. Needs a view-level filter on identity_trust.
