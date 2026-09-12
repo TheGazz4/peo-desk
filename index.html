@@ -690,6 +690,8 @@ function renderScorecard(d) {
     ["exits", fmtN(L.exits), `${fmtN(L.exits_confirmed)} confirmed · ${fmtN(L.exits_assumed)} presumed`, null],
     ["2+ sources agree", fmtN(L.corroborated_total), `${L.corroborated_pct ?? "—"}% of book · ${fmtN(L.corroborated_public_total)} by public filings · +${fmtN(L.corroborated_new)} this run`, null],
     ["through the mesh", fmtN(L.through_mesh), `${fmtN(L.through_mesh_with_new_data)} came back with new data`, null],
+    ["unique EINs", FP.book_unique_eins != null ? fmtN(FP.book_unique_eins) : "—", FP.book != null ? `the count that counts · ${fmtN(FP.ein_pending)} locations known by name+address, EIN pending` : "", null],
+    ["self-healed (24h)", FP.heals_24h != null ? fmtN(FP.heals_24h) : "—", "collisions concluded by the healer: merges, EIN reroutes, address releases, ownership confirmations", Number(FP.heals_24h) > 0 ? "good" : null],
     ["fingerprint depth", FP.with_5_plus_fields != null ? `${(100 * Number(FP.with_5_plus_fields) / Math.max(1, Number(FP.book))).toFixed(1)}%` : "—", FP.book != null ? `of book known by 5+ facts · ${fmtN(FP.with_10_plus_fields)} by 10+ · ${fmtN(FP.with_2_plus_hubs)} by 2+ sources · ${fmtN(FP.harvested_7d)} harvested this week · avg ${FP.avg_fields_observed ?? "—"} facts` : "harvester has not reported yet", null],
     ["contradictions", fmtN(L.contradictions), `${fmtN(L.contested_facts)} contested facts`, Number(L.contradictions) > 100 ? "warning" : null],
     ["messages", fmtN(F.letters_sent), `${fmtN(F.accepted)} accepted · ${fmtN(F.conflicting)} conflicting`, null],
@@ -826,7 +828,7 @@ function demoData() {
   const now = new Date().toISOString();
   const ago = (s) => new Date(Date.now() - s * 1000).toISOString();
   return {
-    desk_mesh_scorecard: { rows: [{ run_at: ago(3600), verdict: "yellow", fingerprint: { book: 231494, with_5_plus_fields: 98040, with_10_plus_fields: 31200, with_2_plus_hubs: 44100, harvested_7d: 12800, avg_fields_observed: 6.4 }, narrative: "Since the last check (24.0 hours): 62,503 new data points were recorded on 33,894 companies out of 231,494 tracked. 14,260 companies were newly identified as PEO users (first spotted mostly by fl_wc). 1,097 switched PEOs. 16 left the PEO model entirely. Verdict: YELLOW — silent hubs: ca_sos.",
+    desk_mesh_scorecard: { rows: [{ run_at: ago(3600), verdict: "yellow", fingerprint: { book: 231494, with_5_plus_fields: 98040, with_10_plus_fields: 31200, with_2_plus_hubs: 44100, harvested_7d: 12800, avg_fields_observed: 6.4, book_unique_eins: 121855, ein_pending: 93200, heals_24h: 7081 }, narrative: "Since the last check (24.0 hours): 62,503 new data points were recorded on 33,894 companies out of 231,494 tracked. 14,260 companies were newly identified as PEO users (first spotted mostly by fl_wc). 1,097 switched PEOs. 16 left the PEO model entirely. Verdict: YELLOW — silent hubs: ca_sos.",
       metrics: { hours: 24, universe: 231494, verdict: "yellow", verdict_reasons: ["silent hubs: ca_sos"],
         lifecycle: { entries: 14260, switches: 1097, switches_competitive: 566, switches_dated_day: 0, exits: 16, corroborated_total: 8040, corroborated_pct: 3.5, corroborated_new: 1956, through_mesh: 381, through_mesh_with_new_data: 318, contradictions: 0, contested_facts: 0 },
         flow: { letters_sent: 431, accepted: 356, conflicting: 70, unread_backlog: 5, oldest_unread_hours: 111 },
