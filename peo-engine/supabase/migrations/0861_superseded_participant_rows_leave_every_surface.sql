@@ -1,0 +1,13 @@
+-- CONSTITUTIONAL COMPLIANCE
+-- Constitution read: YES
+-- Session claim: instanceA-0861-superseded-rows
+-- Articles implemented: XIV.6 (a surface never counts a row twice), IX.2 (one fact, one row)
+-- Verification query attached: YES
+--
+-- 2,313 form5500_mep_participants rows are SUPERSEDED duplicates (same employer under the filer's EIN and the real
+-- sponsor's EIN). DELETE is forbidden platform-wide, so the fix is at the read layer. mep_peo_book (15 dependents)
+-- plus the four views that read the base table directly - v_peo_timeline, v_open_pep_prospects,
+-- peo_sponsor_ein_universe, v_company_retirement_arrangement - now carry:
+--     AND (identity_trust IS NULL OR identity_trust NOT LIKE 'SUPERSEDED%')
+-- Definitions otherwise unchanged (column lists preserved; create or replace view). mv_peo_mep_stints refreshed.
+-- Result: mep_peo_book 134,083 -> 131,770 rows (2,313 excluded).
