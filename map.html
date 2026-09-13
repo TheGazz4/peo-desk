@@ -1,0 +1,1588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEO Coverage Map</title>
+<!-- map v3.26 · 2026-09-07 · Coverage Map (claude/coverage-map-spec)
+     v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
+            hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
+     v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
+     v3.24: owner ruling — client hover shows City, ST ZIP (never a street address; map-data v2.11.2 carries zips).
+     v3.23: owner ruling — WC carrier is internal-only; the card row is gone (shelf 0743, map-data v2.11.1).
+     v3.22 SOURCING LAW (owner ruling 2026-09-06: "sourcing is never something that would be displayed on the
+     map — our sourcing is proprietary"): the page no longer names any source, hub, filing, book, or basis text
+     anywhere. "Evidence" became "Confidence" (Any · Verified · Cross-verified; URL src=1|2 unchanged); hover and
+     card show a confidence TIER only, never a count of sources; historical hover/card drop the source line;
+     renewal/since basis fields are reduced to a tier word (basisWord). Reads map-data v2.10 which itself no
+     longer serves source names or raw basis text. Internal corroboration stays in the DB for accuracy work.
+     ---
+     v3.21 (0726-0729 corroboration at the core): every pin now carries cs (how many independent source hubs
+     corroborate its CURRENT PEO attribution, family-group level: 0 = seed/legacy only, 1 = one hub,
+     2+ = cross-source proven) and cx (1 = a live hub still disagrees). Operators block gains an
+     "Evidence" filter (Any · 1+ sources · 2+ sources; URL src=1|2); hover and client card state the
+     source count, the hubs by name, and any open conflict. Reads map-data v2.9.9 detail bake; older bakes
+     without cs/cx degrade to "evidence pending" and the filter shows everything.
+     ---
+     map v3.20 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.20 (claim 133): the client card names a shared building — "Shared address: N businesses in our book at
+     this building" (v_map_pins.addr_share_n, 0589). A stack of pins on one office tower now explains itself.
+     Addresses that are NOT premises (private mailbox / registered agent / placeholder) never reach the pin
+     layer at all: 0589 marks them location-pending at the door and the location hunt resolves the real one.
+     v3.19 (claim 134): every HQ with a logo on file draws its logo CHIP at every zoom
+     v3.19 (claim 134): every HQ with a logo on file draws its logo CHIP at every zoom — the v3.6-era top-40-families
+     national-zoom declutter gate is gone (owner: "why do all the dots not have respective logos"). Remaining plain dots
+     are families with no usable logo in peo_logo_registry (no_website / fetch_failed / tiny); logo-refill lane fills them.
+     v3.18 (claim 131): the States filter culls client pins and admin beacons but NEVER the HQ logo chips — they are a
+     national reference layer governed only by their own toggle + the PEO filter (owner: States→None wiped the logos).
+     Upstream same claim: v_map_beacons draws ONE HQ chip per displayed family (Vensure was split across two slugs).
+     v3.17 (claim 126 — CLIENT LOCATION AT THE CORE): the PEO list shows clients PLACED on the map; a dotted count means
+     some clients are location-pending (their record carried the PEO sponsor's address/zip — 0588 stubs them, never draws
+     them at the PEO's zip; the Serper Places + Census lanes resolve their real addresses). Hover the count for the split.
+     v3.16.1 (claim 124, hourly freshness): every map-data GET carries &cv=2 — a one-time cache-KEY bump so browsers
+     drop the 12-hour snapshot copies they cached under map-data v2.9.5 headers. map-data v2.9.6 now serves
+     Cache-Control max-age=60 + ETag 304s, and the server re-bakes snapshots hourly (0587 map_rebake_now).
+     v3.16 (claim 123, owner reversal): PEO names show on HOVER ONLY — the printed name bands under
+     HQ chips and the halo names under logo-less dots (v3.14) are removed; tipBeacon already serves
+     logo + name + kind + city on hover/tap. Logo chips are now DYNAMICALLY sized: a continuous
+     zoom curve (48px at national shrinking smoothly as you zoom in) replaces the stepped
+     44/38/30/24/20 sizes, with a HARD MINIMUM of 28px so logos never get smaller than that at
+     street zoom (owner: "have a minimum of how small they get"). label_in_logo/lil plumbing (0586,
+     edge v2.9.5) stays in place but dormant — re-enabling printed labels is a page-only change.
+     map v3.15 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.15 (claim 122): DARK BASEMAP (owner: "try taking Google Maps back to a dark background").
+     Full dark Google style set — warm near-black land, darker water, POI/transit clutter off —
+     while KEEPING the pronounced state/country outlines law (now light warm strokes on the dark
+     ground). Canvas layers adapted: leader lines light, halo'd dot names flip to light-text/dark-
+     halo, hqdot ring light. One DARK flag at the top of the script reverts the whole theme.
+     v3.15.1: map backgroundColor matches the theme (dark loading underlay — no pale flash) and
+     kickMap adds an imperceptible zoom nudge so the raster compositor swaps in loaded tiles at
+     fractional zooms without waiting for the first user interaction.
+     v3.15.2 ROOT FIX: isFractionalZoomEnabled:true — raster maps default it OFF, so the fractional
+     default zoom (4.6) never composited real tiles on first paint (pale stretched fallback under
+     the pins until the first interaction quantized zoom). Also the deep cause of v3.8's "loads
+     displaced" symptom. With it on, tiles and the canvas finally agree at every fractional zoom.
+     map v3.14 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.14 (claim 121): NAME UNDER LOGO (owner: "underneath the peo logos, include the peo name
+     unless the logo is obvious like ADP or CoAd"). Each HQ chip now carries the PEO's display name
+     in a band under the logo, inside the same chip. Exempt: wordmark pills (aspect>1.6, e.g.
+     Nextep) and logos flagged label_in_logo in peo_logo_registry (0586: ADP, CoAd. — the art IS
+     the name; flag ships in the logos_all payload as "lil", edge v2.9.5). Logo-less HQ brand dots
+     get a halo'd name under the dot too — a bare dot identifies nothing. Fan-out spacing uses the
+     labeled chip's true width/height (v3.11 law: layout keys on real geometry).
+     map v3.13 · 2026-08-28 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.13 (claim 120): LEADER-LINE REFINEMENT (owner: "each PEO HQ does not need a star — just a
+     direct line to its precise HQ location; the further the zoom, the shorter the line"). The
+     white/brown anchor dots at the true spot are GONE — the leader line's tip IS the precise HQ
+     location. Fan-out travel is now zoom-scaled: full ring-out at national (every logo visible),
+     tightening as you zoom in so lines shorten and vanish as chips settle onto their true spots.
+     HQ beacons without a logo (9 of 48) no longer draw as big stars — small brand-color dots.
+     map v3.12 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.12 (claim 118 cont.): LARGER PINS for real — teardrop ramp now 1.25/1.6/1.95/2.3 past z9.5
+     (owner escalated; v3.9's 1.15-1.55 was too timid), dot sprites and density squares bumped too.
+     WIDE-LOGO PILL CHIPS: wordmark logos (aspect >1.6, e.g. Nextep's full "nextep" mark, owner-
+     supplied) render as wide rounded pills instead of being crammed into squares; fan-out spacing
+     uses the pill's true width. drawLogoChip now takes w,h.
+     v3.11 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.11 (claim 118 — owner: logos STILL stacked): two fan-out correctness bugs fixed. (1) The
+     layout cache key ignored mark SIZE — the first layout ran while logos were still decoding
+     (marks = 18px stars), then the 44px chips swapped in and REUSED the star-sized offsets, so
+     chips overlapped exactly where piles were densest. Key now includes per-mark size; the chip
+     swap-in triggers a proper relayout. (2) Circle-distance separation let SQUARE chips overlap
+     diagonally — spacing is now 1.42x diagonal-safe. Travel clamp widened (max(90, 3.2x size)) so
+     the Florida pile can ring out fully; leader lines slightly bolder (1.4px @ .75) and drawn from
+     5px displacement. Result: every logo fully visible at national zoom, each tied by a line to
+     its exact HQ location.
+     v3.10 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.10 (claim 116): BEACON FAN-OUT — overlapping HQ logo chips/stars no longer stack: a
+     deterministic repulsion layout displaces them just enough that ALL are visible simultaneously,
+     each displaced mark tied to its TRUE location by a leader line + white/brown anchor dot (owner
+     directive). Offsets cached per zoom bucket (screen-relative → pans reuse them); hover/click
+     targets follow the displaced marks. PLUS: state outlines more pronounced than Google's faint
+     dotted default (styled administrative.province 1.6px / country 1.8px strokes, warm gray).
+     v3.9 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.9 (claim 113 — "still takes way too long to load"): NATIONAL BUNDLE LOADING. Cold load was
+     ~112 edge requests (55 states x 2 waves + catalog + beacons + ~40 lazy logo fetches); now ~5:
+     mode=pins_all paints EVERY state's pins in one request, mode=details_all streams all hover
+     detail in one background request (atomic bake_key pair, one cache-busted retry), mode=logos_all
+     warms every HQ chip at once, and mode=catalog serves a baked snapshot instead of recomputing the
+     heavy filter catalog per load (map-data v2.9, deploy v15; 0583 wave vocab + warm cron = 5 bundle
+     warms). Old per-state loader retained as automatic fallback. SIZING (owner): teardrop pins now
+     GROW as you zoom in (0.95 -> 1.55 by z14); HQ logo chips are LARGE zoomed out (44px national,
+     top-40 brands only below z5 to avoid chip soup) and SHRINK as you zoom in (20px at z11+),
+     ceding the stage to the client pins.
+     v3.8 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.8 (claim 112 — the "loads displaced" refresh bug, REPRODUCED live in owner Chrome + probed):
+     Google's raster tile layer can settle in a stale post-init render (probe proof: getZoom()=5 and
+     getBounds() span 61.9° = self-consistent, while the painted tiles spanned ~75°); our canvas
+     draws from the API state, so every mark sat radially expanded vs the tiles until ANY user
+     interaction forced Google to re-render (which is why it always self-corrected on zoom). FIX:
+     kickMap() = trigger('resize') + recenter + redraw, fired on first tilesloaded, at 1.2s/3s after
+     boot, on window resize, and via ResizeObserver on the map container. ALSO: the URL is no longer
+     continuously rewritten (history.replaceState removed) — a plain refresh ALWAYS loads the clean
+     default view (owner's refresh had inherited yesterday's lens=hea + zoom from the URL); the
+     Copy view link button builds the full-state URL on demand, and shared links restore via readUrl.
+     v3.7 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.7 (claim 111 — Gazz brainless-UI + tracking round): CONTINUOUS RENDER TRACKING — a rAF pump
+     redraws every frame during pan/zoom (350ms settle + idle seal), so pins move commensurate with
+     the map (owner's screenshot showed marks lagging the tiles mid-interaction). Panel restructured
+     for a brainless read: "Renewal heat  Off | Health | WC" (the confusing PEO-as-a-color choice is
+     gone — Off = brand colors); "Headquarters: PEO HQ pins (logos)" with chips slightly LARGER
+     (24/32px); "Administrative beacons ◆" now its OWN toggle, DEFAULT OFF (owner: option to see
+     them, not standard display — URL b=1); Operators seg → one "Multi-state clients only" checkbox;
+     Pin placement tucked under a collapsed "More options". TriNet stays purple (owner retracted
+     green). DATA: 0580/0581 — PEO Spectrum (competitor broker, 4 slugs incl. the Omaha beacon)
+     denylisted out of pins/beacons/catalog/historical + branding/logo stripped; coordinate sanity
+     fence excludes pins >9°/11° (lat/lng; AK 14/25) from their state centroid — killed the 28
+     Pacific-ocean strays; snapshots purged + rewarmed.
+     v3.6 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.6 (claim 108 — owner: "the clusters are obnoxious. find a better way"): DONUT CLUSTERS REMOVED.
+     Unified dot-density rendering — every client is always its own mark: z<6.5 batched color dots
+     (metros read as organic color fields; share visible spatially, zero abstraction, no grey rings),
+     6.5≤z<9.5 round dot markers, z≥9.5 classic teardrop pins. Beacons decluttered: admin ◆ and
+     candidate ✩ only from z≥6, stars scale down zoomed out. NEW "HQ logo pins" toggle (owner ask):
+     each PEO's actual logo rendered as a white chip at its HQ (★ fallback), lazy-loaded from
+     mode=logo. Owner color rulings live (0577): TriNet #5b2e90 purple, Engage #b8860b dark golden —
+     root causes were favicon-extraction picking near-black for TriNet and engage's registry row
+     holding CORNERSTONEPEO.COM's favicon (wrong company; de-poisoned, refetch queued). THIS VIEW
+     legend refreshes when loading completes (was stuck at "no clients in this view"). Pins seg +
+     cluster_mode URL/filter_spec retired (cm param ignored).
+     v3.5 · 2026-08-27 · Instance A · Coverage Map (claude/coverage-map-spec)
+     v3.5 (claim 105): HISTORICAL LAYER — "Former clients (departures)" toggle, DEFAULT OFF, gated by the
+     server-side map_feature_flags.historical_layer row (monetize later = flip that row; toggle only renders
+     when the flag is on). Own clean channel: v_map_pins_historical (switch ledger + departure ledger events;
+     switches win over open-market rows; noncompete-fenced both directions) served as ONE national gzip
+     snapshot (mode=pins_hist, lazy-loaded on first toggle-on). Ring pins (hollow circle, from-family color,
+     never clustered) = "was here"; hover carries kind (switched / departed-confirmed / departed-ASSUMED),
+     as-of month (per-row source label removed from display in v3.22 — sourcing law).
+     Record card gains a FORMER banner + full departure/switch history rows (mode=company historical fallback).
+     THIS VIEW legend counts stay current-only; historical shown as its own line. AI dock now labeled
+     "Claude (Anthropic)" (owner asked: our own Claude, never a Google model). URL: hist=1.
+     v3.4 (Gazz 6-point feedback, claim 104): PIN-VANISH FIX — paired-wave loader now verifies detail bake_key
+     AND array length against the lite wave; on any mismatch it refetches BOTH waves cache-busted and commits
+     them atomically (never a mixed pair — the old path committed mismatched detail over cached lite, yielding
+     NaN mercators that silently no-op'd drawImage, so pins vanished state-by-state as stale-cache users
+     interacted). Plus NaN guards at commit. HEALTH renewal lens: hrm/hrmb (health_renewal_month + basis class)
+     ride the detail wave; lens is now 3-way PEO | Health renewal | WC renewal — health is the primary renewal
+     heat per owner ruling (WC kept as secondary); hover + card show health first, WC after, basis class always
+     labeled (B.7). AI briefing (map-data v2.6) speaks "headquartered vs operating" and carries a GLOBAL
+     grounding rule: no fact from model memory, ever — plus weekly golden-question tripwires (migration 0573).
+     v3.3: renewal-heat lens (rm/rmb from detail wave; urgency ramp; basis CLASS labeled on hover per B.7 —
+     verified/reasoned/unverified, never silently merged); territory circle-draw with ON-SCREEN results only
+     (NO export — owner data-protection ruling 2026-08-27: no CSV anywhere on the platform for now);
+     head-to-head readout when exactly 2 PEOs visible; Coverage Map link added to ask.html tab bar.
+     Time slider DATA-GATED OUT this round: peo_current_since coverage 38.2% < owner reliability bar.
+     v3.2: multi-state operator filter (data-gated: 100% footprint coverage verified, 46,070 known multi-state —
+     label is honest: "observed in 2+ states"; ms[] rides the detail wave, snapshots rebaked); collapsible left
+     panel (☰, map resizes); mobile-responsive (drawer panel, greedy gestures, tap-friendly, full-width dock/card).
+     v3.1: live THIS-VIEW legend (viewport market report), search-and-fly (companies/cities/ZIPs via mode=search),
+     AI dock (mode=ai copilot: grounded answers + applies filter_spec + flies the map; brain-spend governed).
+     v3.0: renderer rewritten container-fixed (fixes the ghost/offset pin duplicates seen in Gazz's screenshot —
+     no google pane transforms; one canvas, own Mercator math, beacons drawn on the same canvas last/on top).
+     Composition clusters: PEO-colored donut rings that burst into real pins as you zoom (Clusters | All pins toggle);
+     no numbers on the map — cluster hover lists top PEOs (the readability exception Gazz allowed).
+     Two-wave loading from pre-baked gzip snapshots (map-data v2.0: pins_lite then pins_detail, browser-cached, ETag 304s):
+     dots appear in ~1-2s, names/hover/street precision attach as wave 2 lands. Viewport-first state order.
+     Logo colors per PEO (map_family_colors), logo on HQ hover, placement toggle (Actual address | ZIP area). -->
+<style>
+:root{
+  --bg:#070b0f; --surface:#0d141b; --surface2:#131c25; --ink:#ecf1f4; --ink2:#aebac3; --muted:#71808b;
+  --grid:#223039; --border:#2e3e4a; --accent:#6390ee; --accent-h:#4470c8; --other:#71808b; --ring:rgba(255,255,255,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+header h1{font-size:16px;font-weight:650}
+header .stamp{color:var(--muted);font-size:11px}
+header a{color:var(--accent);text-decoration:none;font-size:12px}
+.spacer{flex:1}
+#stats{font-size:12px;color:var(--ink2);white-space:nowrap}
+#main{display:flex;flex:1;min-height:0}
+#panel{width:280px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+#panel .sec{padding:10px 12px;border-bottom:1px solid var(--grid)}
+#panel h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px}
+.seg{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{flex:1;background:none;border:0;color:var(--ink2);padding:7px 0;font-size:12.5px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#0b1220;font-weight:650}
+.btnrow{display:flex;gap:6px;margin-top:8px}
+.btnrow button,.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:6px;padding:4px 9px;font-size:11.5px;cursor:pointer}
+.btnrow button:hover,.ghost:hover{border-color:var(--accent);color:var(--ink)}
+#peo-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12.5px;margin-bottom:8px}
+#peo-list{overflow-y:auto;flex:1;padding:4px 6px}
+.peo-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
+.peo-row:hover{background:rgba(99,144,238,.08)}
+.peo-row .sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--ring)}
+.peo-row .nm{flex:1;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peo-row.on .nm{color:var(--ink)}
+.peo-row .ct{font-size:11px;color:var(--muted)}
+.peo-row .ct.pend{border-bottom:1px dotted var(--muted);cursor:help}
+.peo-row .solo{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden}
+.peo-row:hover .solo{visibility:visible}
+.peo-row.off .sw{opacity:.25}
+#states{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;max-height:150px;overflow-y:auto}
+.st{font-size:10.5px;text-align:center;padding:4px 0;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);cursor:pointer;user-select:none}
+.st.on{background:rgba(99,144,238,.16);border-color:var(--accent);color:var(--ink)}
+.st.off{opacity:.35}
+.mapwrap{position:relative;flex:1;display:flex;min-width:0;overflow:hidden}
+#map{flex:1;min-width:0}
+#pincanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:5}
+.chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);cursor:pointer;padding:3px 0;user-select:none}
+.chk input{accent-color:var(--accent)}
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;font-size:12px;color:var(--ink2);max-width:300px;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none}
+#tip b{color:var(--ink);font-size:12.5px}
+#tip .mut{color:var(--muted);font-size:11px}
+#tip .logo{background:#fff;border-radius:6px;padding:5px;display:inline-block;margin-bottom:6px}
+#tip .logo img{display:block;width:56px;height:56px;object-fit:contain}
+#tip .bar{height:5px;border-radius:3px;margin:2px 0 5px}
+#card{position:absolute;top:12px;right:12px;z-index:40;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 10px 34px rgba(0,0,0,.55);display:none;max-height:calc(100% - 24px);overflow-y:auto}
+#card .hd{display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-bottom:1px solid var(--grid)}
+#card .hd b{font-size:14px;color:var(--ink)}
+#card .x{margin-left:auto;background:none;border:0;color:var(--muted);font-size:16px;cursor:pointer}
+#card .bd{padding:10px 14px}
+#card .kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12.5px}
+#card .kv .k{color:var(--muted)}
+#card .kv .v{color:var(--ink2);text-align:right}
+#card .note{margin-top:8px;padding:7px 9px;border-radius:7px;background:rgba(224,152,92,.12);color:#f0c9a6;font-size:11.5px}
+#card .lk{display:block;margin-top:10px;color:var(--accent);font-size:12.5px;text-decoration:none}
+#sharepanel{position:absolute;bottom:24px;right:12px;z-index:35;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:46%;overflow-y:auto}
+#sharepanel .hd{padding:10px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink)}
+#sharepanel table{width:100%;border-collapse:collapse;font-size:12px}
+#sharepanel td{padding:4px 12px;color:var(--ink2);border-bottom:1px solid var(--grid)}
+#sharepanel td.r{text-align:right;color:var(--muted)}
+#gate{position:fixed;inset:0;background:rgba(7,11,15,.92);z-index:100;display:flex;align-items:center;justify-content:center}
+#gate .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px;width:340px}
+#gate h2{font-size:15px;margin-bottom:6px}
+#gate p{font-size:12.5px;color:var(--ink2);margin-bottom:12px}
+#gate input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:9px 10px;font-size:13px}
+#gate button{margin-top:10px;width:100%;background:var(--accent);border:0;border-radius:7px;color:#0b1220;font-weight:650;padding:9px 0;cursor:pointer}
+#gate .err{color:#f2ada4;font-size:12px;margin-top:8px;display:none}
+#loading{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:30;background:var(--surface2);border:1px solid var(--border);
+  border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
+#panel-toggle{font-size:15px;padding:4px 10px}
+#panel.off{display:none}
+#lenslegend{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:33;display:none;gap:10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:6px 14px;font-size:11px;color:var(--ink2)}
+#lenslegend span{display:inline-flex;align-items:center;gap:5px;margin:0 4px}
+#lenslegend i{width:9px;height:9px;border-radius:3px;display:inline-block}
+#terr{position:absolute;bottom:24px;right:12px;z-index:37;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:52%;overflow:hidden;flex-direction:column}
+#terr .hd{padding:9px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink);font-weight:650}
+#terr .hd .x{float:right;background:none;border:0;color:var(--muted);cursor:pointer;font-size:15px}
+#terr .sub{padding:2px 12px 8px;font-size:11px;color:var(--muted)}
+#terr .tops{padding:0 12px 8px;border-bottom:1px solid var(--grid)}
+#terr .list{overflow-y:auto;flex:1;padding:4px 6px}
+#terr .tr{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:5px;font-size:12px;color:var(--ink2);cursor:pointer}
+#terr .tr:hover{background:rgba(99,144,238,.08);color:var(--ink)}
+#terr .dot{width:8px;height:8px;border-radius:2.5px;flex:none}
+#draw-btn.on{background:var(--accent);color:#0b1220;border-color:var(--accent)}
+@media (max-width:760px){ #terr{width:calc(100vw - 24px);max-width:340px} #lenslegend{bottom:78px;white-space:nowrap;overflow-x:auto;max-width:94vw} }
+@media (max-width:760px){
+  header{flex-wrap:wrap;gap:8px;padding:8px 10px}
+  header .stamp, header a{display:none}
+  #stats{display:none}
+  #searchwrap{width:100%;order:5}
+  #panel{position:fixed;top:0;bottom:0;left:0;width:min(320px,86vw);z-index:70;box-shadow:8px 0 30px rgba(0,0,0,.5);
+    transform:translateX(-106%);transition:transform .18s ease}
+  #panel.off{display:flex;transform:translateX(-106%)}
+  #panel.open{transform:none}
+  #card{width:calc(100vw - 24px);max-width:360px}
+  #aidock{width:calc(100vw - 24px);max-width:360px;bottom:12px}
+  #sharepanel{width:calc(100vw - 24px);max-width:340px}
+}
+#searchwrap{position:relative;width:250px}
+#q{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:6px 9px;font-size:12.5px}
+#q-drop{position:absolute;top:32px;left:0;right:0;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  box-shadow:0 8px 26px rgba(0,0,0,.5);display:none;max-height:320px;overflow-y:auto}
+.q-row{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12.5px;color:var(--ink2);cursor:pointer}
+.q-row:hover{background:rgba(99,144,238,.1)}
+.q-row .dot{width:9px;height:9px;border-radius:3px;flex:none}
+.q-row .sub{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
+.q-hd{padding:6px 10px 2px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+#viewlegend .vl-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;color:var(--ink2);cursor:pointer}
+#viewlegend .vl-row:hover{color:var(--ink)}
+#viewlegend .dot{width:9px;height:9px;border-radius:3px;flex:none}
+#viewlegend .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
+#viewlegend .bar{height:4px;border-radius:2px;flex:1;background:var(--grid);overflow:hidden}
+#viewlegend .bar i{display:block;height:100%}
+#viewlegend .ct{font-size:10.5px;color:var(--muted);min-width:38px;text-align:right}
+#vl-total{font-size:11px;color:var(--muted);margin-bottom:6px}
+#aidock{position:absolute;left:12px;bottom:24px;z-index:36;width:330px;background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:0 10px 34px rgba(0,0,0,.55)}
+#aidock .hd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink);font-weight:650;cursor:pointer}
+#aidock .hd .min{margin-left:auto;color:var(--muted);font-size:14px}
+#aidock .bd{padding:10px 12px;display:block}
+#aidock.min .bd{display:none}
+#ai-ans{font-size:12.5px;color:var(--ink2);margin-bottom:8px;max-height:150px;overflow-y:auto;white-space:pre-wrap}
+#ai-ans:empty{display:none}
+#ai-row{display:flex;gap:6px}
+#ai-q{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:7px 9px;font-size:12.5px}
+#ai-send{background:var(--accent);border:0;border-radius:7px;color:#0b1220;font-weight:650;padding:0 13px;cursor:pointer;font-size:12.5px}
+#ai-send:disabled{opacity:.5}
+#ai-desc{margin-top:7px;width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:7px;padding:5px 0;font-size:11.5px;cursor:pointer}
+#ai-desc:hover{border-color:var(--accent);color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.26 · 2026-09-07</span>
+    <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
+    <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
+    <span class="spacer"></span>
+    <span id="stats">loading…</span>
+    <a href="ask.html">← AI Data Desk</a>
+    <button class="ghost" id="permalink">Copy view link</button>
+  </header>
+  <div id="main">
+    <div id="panel">
+      <div class="sec">
+        <h2>View by</h2>
+        <div class="seg"><button id="g-family" class="on">Family brand</button><button id="g-brand">PEO specific</button></div>
+        <h2 style="margin-top:10px" title="Colors every pin by how soon its renewal month comes up — health/benefits is the trigger event that matters; WC is secondary. Off = each PEO's brand color.">Renewal heat</h2>
+        <div class="seg"><button id="lens-peo" class="on">Off</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC</button></div>
+        <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">Headquarters</h2>
+        <label class="chk"><input type="checkbox" id="hqlogo-on" checked> PEO HQ pins (logos)</label>
+        <label class="chk" title="Administrative offices ◆ and unverified HQ candidates ✩ — extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Administrative beacons ◆</label>
+        <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
+        <h2 style="margin-top:10px" title="How confident we are in the PEO shown on each pin. Cross-verified = independently confirmed.">Confidence</h2>
+        <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
+        <div id="histsec" style="display:none">
+          <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
+          <label class="chk"><input type="checkbox" id="hist-on"> Former clients — departures ◯</label>
+        </div>
+        <details id="moreopts" style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">More options</summary>
+          <h2 style="margin-top:8px">Pin placement</h2>
+          <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
+        </details>
+      </div>
+      <div class="sec">
+        <h2>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
+        <div id="states"></div>
+        <div class="btnrow"><button id="st-all">All</button><button id="st-none">None</button></div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:6px">double-click a state for its market share</div>
+      </div>
+      <div class="sec">
+        <h2>This view</h2>
+        <div id="vl-total">move the map…</div>
+        <div id="viewlegend"></div>
+      </div>
+      <div class="sec" style="flex:1;display:flex;flex-direction:column;min-height:120px;border-bottom:0">
+        <h2>PEOs <span id="peo-count" style="color:var(--muted);font-weight:400"></span></h2>
+        <input id="peo-search" placeholder="Search PEOs…">
+        <div class="btnrow" style="margin:0 0 6px"><button id="peo-all">All</button><button id="peo-none">None</button></div>
+        <div id="peo-list"></div>
+      </div>
+    </div>
+    <div class="mapwrap" id="mapwrap">
+      <div id="map"></div>
+      <canvas id="pincanvas"></canvas>
+      <div id="loading">loading…</div>
+      <div id="card"></div>
+      <div id="sharepanel"></div>
+      <div id="lenslegend"></div>
+      <div id="terr"></div>
+      <div id="aidock" class="min">
+        <div class="hd" id="ai-hd">✦ Ask the map <span style="font-weight:500;font-size:10.5px;color:var(--muted)">Claude (Anthropic)</span> <span class="min" id="ai-min">▴</span></div>
+        <div class="bd">
+          <div id="ai-ans"></div>
+          <div id="ai-row"><input id="ai-q" placeholder="e.g. show Insperity in Florida…"><button id="ai-send">Ask</button></div>
+          <button id="ai-desc">Describe this view</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="tip"></div>
+<div id="gate" style="display:none">
+  <div class="box">
+    <h2>PEO_Engine — Coverage Map</h2>
+    <p>Enter the desk key (same key as the AI Data Desk).</p>
+    <input id="gate-key" type="password" placeholder="Desk key">
+    <button id="gate-go">Enter</button>
+    <div class="err" id="gate-err">That key was refused.</div>
+  </div>
+</div>
+<script>
+'use strict';
+// ------------------------- config -------------------------
+var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-data';
+var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
+var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE';
+var OTHER='#71808b';
+var $=function(id){return document.getElementById(id)};
+var STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'D.C.',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',PR:'Puerto Rico',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',VI:'Virgin Islands',GU:'Guam'};
+var STATE_CENTROIDS={AL:[32.8,-86.8],AK:[64.0,-152.0],AZ:[34.2,-111.6],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.3,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.1,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[47.0,-109.6],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.5,-79.4],ND:[47.4,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[43.9,-120.6],PA:[40.9,-77.8],PR:[18.2,-66.4],RI:[41.7,-71.6],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.8,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.5],WV:[38.6,-80.6],WI:[44.6,-89.7],WY:[43.0,-107.6],VI:[18.34,-64.9],GU:[13.44,144.79]};
+var MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// ------------------------- state -------------------------
+var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
+var S={
+  grain:'family', placement:'address', msOnly:false, minSrc:0, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
+  lens:'peo', terr:null, drawMode:false, _drawStart:null,
+  hist:false, histData:null, histLoading:false, flags:{},
+  catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
+  sel:{family:null,brand:null}, states:{},
+  beaconsOn:false, beacons:[],
+  pinData:{},            // ST -> {fams,brds,mxA,myA,mxZ,myZ,n,detail:{ids,names,cities,street}|null}
+  liteLoaded:0, detLoaded:0, toLoad:0,
+  map:null, logoCache:{}, hover:null, rev:0
+};
+function bump(){ S.rev++; }
+function selMap(){ if(!S.sel[S.grain]){ var m={}; catRows().forEach(function(r){m[r.slug]=true}); m['unattributed']=true; S.sel[S.grain]=m; } return S.sel[S.grain]; }
+function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
+function colorOf(slug){ return S.colors[S.grain][slug]||OTHER; }
+function dispOf(slug){ return S.displays[S.grain][slug]||slug; }
+function mercX(lng){ return (lng+180)/360; }
+function mercY(lat){ var s=Math.sin(lat*Math.PI/180); s=Math.max(-0.9999,Math.min(0.9999,s)); return 0.5-Math.log((1+s)/(1-s))/(4*Math.PI); }
+function invLat(my){ return Math.asin(Math.tanh((0.5-my)*2*Math.PI))*180/Math.PI; }
+function invLng(mx){ return mx*360-180; }
+function jit(id){
+  var h=0; for(var i=0;i<id.length;i++){ h=(h*31+id.charCodeAt(i))>>>0; }
+  var ang=(h%360)*Math.PI/180, rad=0.0008+((h>>>9)%1000)/1000*0.0035;
+  return [Math.sin(ang)*rad, Math.cos(ang)*rad*1.25];
+}
+
+// ------------------------- api -------------------------
+function deskKey(){ try{return localStorage.getItem('desk_key')||''}catch(e){return ''} }
+function hdrs(){ var h={'apikey':ANON,'Authorization':'Bearer '+ANON}; var k=deskKey(); if(k) h['x-desk-key']=k; return h; }
+function api(params){
+  var h=hdrs(); h['Content-Type']='application/json';
+  return fetch(EP,{method:'POST',headers:h,body:JSON.stringify(params)}).then(function(r){
+    if(r.status===401||r.status===403){ showGate(true); throw new Error('auth'); }
+    return r.json();
+  });
+}
+function apiGet(qs){ // GET so the browser HTTP cache + ETag revalidation kick in for snapshots
+  return fetch(EP+'?'+qs+'&cv=2',{method:'GET',headers:hdrs()}).then(function(r){
+    if(r.status===401||r.status===403){ showGate(true); throw new Error('auth'); }
+    return r.json();
+  });
+}
+function showGate(bad){ $('gate').style.display='flex'; $('gate-err').style.display=bad&&deskKey()?'block':'none'; }
+$('gate-go').onclick=function(){
+  var v=$('gate-key').value.trim(); if(!v) return;
+  try{localStorage.setItem('desk_key',v)}catch(e){}
+  api({mode:'status'}).then(function(){ $('gate').style.display='none'; boot(); })
+    .catch(function(){ $('gate-err').style.display='block'; });
+};
+$('gate-key').addEventListener('keydown',function(e){ if(e.key==='Enter') $('gate-go').onclick(); });
+
+// ------------------------- boot -------------------------
+var booted=false;
+function boot(){
+  if(booted) return; booted=true;
+  Promise.all([api({mode:'catalog'}),api({mode:'beacons'})]).then(function(rs){
+    S.catalog=rs[0];
+    ['families','brands'].forEach(function(k){
+      var g=k==='families'?'family':'brand';
+      (S.catalog[k]||[]).forEach(function(r){ S.colors[g][r.slug]=r.color_hex||null; S.displays[g][r.slug]=r.display||r.slug; });
+    });
+    (S.catalog.states||[]).forEach(function(r){ if(r.state && !(r.state in S.states)) S.states[r.state]=true; });
+    S.beacons=(rs[1].beacons||[]).filter(function(b){ return b.kind!=='po_box'&&b.kind!=='zip_beacon'; });
+    S.beacons.forEach(function(b){ b._mx=mercX(Number(b.lng)); b._my=mercY(Number(b.lat)); });
+    readUrl();
+    S._topFams={}; (S.catalog.families||[]).slice(0,40).forEach(function(r){ S._topFams[r.slug]=true; });
+    apiGet('mode=logos_all&d=v314-'+new Date().toISOString().slice(0,10)).then(function(r){   // one request warms every HQ logo chip (page+day-versioned URL so logo/flag updates land same-day)
+      var L=(r&&r.logos)||{};
+      S.logoLil=(r&&r.lil)||{};   // 0586 label_in_logo flags — DORMANT since v3.16 (names moved to hover); kept for easy re-enable
+      Object.keys(L).forEach(function(slug){
+        if(S.logoImgs[slug]!==undefined) return;
+        S.logoImgs[slug]=null; S.logoCache[slug]=L[slug];
+        var img=new Image();
+        img.onload=function(){ S.logoImgs[slug]=img; scheduleDraw(); };
+        img.src=L[slug];
+      });
+    }).catch(function(){});
+    S.flags=S.catalog.flags||{};
+    if(S.flags.historical_layer){
+      $('histsec').style.display='block';
+      if(S.hist){ $('hist-on').checked=true; loadHist(); }
+    } else { S.hist=false; }
+    buildStatePanel(); buildPeoPanel(); updateStats();
+    startPinLoads(); scheduleDraw();
+  }).catch(function(e){ if(String(e.message)!=='auth') console.error(e); });
+}
+
+// ------------------------- two-wave loading (viewport-first) -------------------------
+var liteQ=[], detQ=[];
+// v3.9 BUNDLE LOADER: the whole country in TWO requests (pins_all -> full first paint;
+// details_all in the background), atomic pair by shared bake_key with one cache-busted retry.
+// The old 110-request per-state loader remains below as the fallback path.
+function startPinLoads(){
+  S.toLoad=4; S.liteLoaded=0; S.detLoaded=0; progress();
+  var fellBack=false;
+  [1,2,3,4].forEach(function(part){
+    apiGet('mode=pins_all&part='+part).then(function(r){
+      if(!r||!r.states) throw new Error('no bundle');
+      (r.states||[]).forEach(function(sd){ commitLiteState(sd, r.bake_key); });
+      S.liteLoaded++; progress(); bump(); scheduleDraw();
+      function takeDetail(d, bake, retried){
+        if(!d||d.bake_key!==bake){
+          if(retried){ S.detLoaded++; progress(); return; }
+          return apiGet('mode=pins_all&part='+part+'&b='+Date.now()).then(function(r2){
+            (r2.states||[]).forEach(function(sd){ commitLiteState(sd, r2.bake_key); });
+            bump(); scheduleDraw();
+            return apiGet('mode=details_all&part='+part+'&b='+Date.now()).then(function(d2){ takeDetail(d2, r2.bake_key, true); });
+          }).catch(function(){ S.detLoaded++; progress(); });
+        }
+        commitDetailAll(d);
+        S.detLoaded++; progress(); bump(); scheduleDraw();
+      }
+      apiGet('mode=details_all&part='+part).then(function(d){ takeDetail(d, r.bake_key, false); })
+        .catch(function(){ S.detLoaded++; progress(); });
+    }).catch(function(){
+      if(!fellBack){ fellBack=true; startPinLoadsLegacy(); }
+      else { S.liteLoaded++; S.detLoaded++; progress(); }
+    });
+  });
+}
+function commitLiteState(sd, bake){
+  var n=sd.n||0, pins=sd.pins||[];
+  var mxA=new Float64Array(n), myA=new Float64Array(n), fis=new Int16Array(n), bis=new Int16Array(n);
+  for(var i=0;i<n;i++){ var p=pins[i]; mxA[i]=mercX(p[1]); myA[i]=mercY(p[0]); fis[i]=p[2]; bis[i]=p[3]; }
+  S.pinData[sd.st]={fams:sd.fams||[],brds:sd.brds||[],n:n,mxA:mxA,myA:myA,mxZ:mxA,myZ:myA,fis:fis,bis:bis,lat0:pins.map(function(p){return p[0]}),lng0:pins.map(function(p){return p[1]}),bake:bake,detail:null};
+}
+function commitDetailAll(d){
+  (d.states||[]).forEach(function(sd){
+    var dd=S.pinData[sd.st]; if(!dd||sd.n!==dd.n) return;
+    commitDetail(sd.st, sd);
+  });
+}
+function startPinLoadsLegacy(){
+  var byN={}; (S.catalog.states||[]).forEach(function(r){ byN[r.state]=Number(r.n)||0; });
+  var c=S.map?S.map.getCenter():null;
+  var cl=c?c.lat():38.5, cg=c?c.lng():-96.5;
+  var order=(S.catalog.states||[]).map(function(r){return r.state}).filter(Boolean).sort(function(a,b){
+    var A=STATE_CENTROIDS[a]||[0,0], B=STATE_CENTROIDS[b]||[0,0];
+    var da=Math.pow(A[0]-cl,2)+Math.pow(A[1]-cg,2), db=Math.pow(B[0]-cl,2)+Math.pow(B[1]-cg,2);
+    if(Math.abs(da-db)>4) return da-db;
+    return (byN[b]||0)-(byN[a]||0);
+  });
+  S.toLoad=order.length; liteQ=order.slice(); detQ=[];
+  for(var i=0;i<3;i++) pump();
+}
+function pump(){
+  if(liteQ.length){ loadLite(liteQ.shift()); }
+  else if(detQ.length){ loadDetail(detQ.shift()); }
+  else if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad){ $('loading').style.display='none'; }
+}
+// PAIRED-WAVE LOADER (v3.4 vanish fix). The two waves of one state MUST come from the same bake:
+// detail commits ONLY when its bake_key matches the lite wave AND every array is exactly n long.
+// On any mismatch (stale browser-cached lite + fresh detail, or vice versa) BOTH waves are refetched
+// cache-busted and committed atomically. Never a mixed pair, never a NaN written to a mercator array.
+function commitLite(st,r){
+  var n=r.n||0, pins=r.pins||[];
+  var mxA=new Float64Array(n), myA=new Float64Array(n), fis=new Int16Array(n), bis=new Int16Array(n);
+  for(var i=0;i<n;i++){ var p=pins[i]; mxA[i]=mercX(p[1]); myA[i]=mercY(p[0]); fis[i]=p[2]; bis[i]=p[3]; }
+  S.pinData[st]={fams:r.fams||[],brds:r.brds||[],n:n,mxA:mxA,myA:myA,mxZ:mxA,myZ:myA,fis:fis,bis:bis,lat0:pins.map(function(p){return p[0]}),lng0:pins.map(function(p){return p[1]}),bake:r.bake_key,detail:null};
+}
+function loadLite(st){
+  apiGet('mode=pins_lite&state='+st).then(function(r){
+    commitLite(st,r);
+    S.liteLoaded++; detQ.push(st); bump(); progress(); scheduleDraw(); pump();
+  }).catch(function(){ S.liteLoaded++; progress(); pump(); });
+}
+function detailMatches(d,r){
+  if(!d||r.bake_key!==d.bake) return false;
+  var n=d.n;
+  var arrs=[r.ids,r.names,r.cities,r.street,r.ms,r.rm,r.rmb,r.zlat,r.zlng];
+  for(var k=0;k<arrs.length;k++){ if(!arrs[k]||arrs[k].length!==n) return false; }
+  return true;   // hrm/hrmb checked separately: optional (older bakes), but if present must be n long
+}
+function commitDetail(st,r){
+  var d=S.pinData[st], n=d.n;
+  var mxA=new Float64Array(n), myA=new Float64Array(n), mxZ=new Float64Array(n), myZ=new Float64Array(n);
+  for(var i=0;i<n;i++){
+    var lat=d.lat0[i], lng=d.lng0[i];
+    if(!isFinite(lat)||!isFinite(lng)){ mxA[i]=d.mxA[i]; myA[i]=d.myA[i]; mxZ[i]=d.mxA[i]; myZ[i]=d.myA[i]; continue; }
+    var id=r.ids[i]||''; var j=jit(id);
+    var street=r.street[i]?1:0;
+    var aLat=lat, aLng=lng; if(!street){ aLat+=j[0]; aLng+=j[1]; }
+    mxA[i]=mercX(aLng); myA[i]=mercY(aLat);
+    var zLat=(street&&r.zlat[i]!=null)?r.zlat[i]:lat;
+    var zLng=(street&&r.zlng[i]!=null)?r.zlng[i]:lng;
+    mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);   // ZIP view: everything at its ZIP center, jittered
+  }
+  var hOk=r.hrm&&r.hrm.length===n&&r.hrmb&&r.hrmb.length===n;
+  var cOk=r.cs&&r.cs.length===n&&r.cx&&r.cx.length===n;   // v3.21: corroboration (optional — older bakes)
+  d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
+  d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
+            hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null};
+  d.lat0=null; d.lng0=null;
+}
+function loadDetail(st,retried){
+  apiGet('mode=pins_detail&state='+st+(retried?'&b='+Date.now():'')).then(function(r){
+    var d=S.pinData[st]; if(!d){ S.detLoaded++; progress(); pump(); return; }
+    if(!detailMatches(d,r)){
+      if(retried){ S.detLoaded++; progress(); pump(); return; }   // give up: keep lite-only pins (still drawn, just no hover detail) — never commit a mixed pair
+      apiGet('mode=pins_lite&state='+st+'&b='+Date.now()).then(function(lr){   // refetch BOTH waves cache-busted, commit atomically
+        commitLite(st,lr); bump(); scheduleDraw();
+        loadDetail(st,true);
+      }).catch(function(){ S.detLoaded++; progress(); pump(); });
+      return;
+    }
+    commitDetail(st,r);
+    S.detLoaded++; bump(); progress(); scheduleDraw(); pump();
+  }).catch(function(){ S.detLoaded++; progress(); pump(); });
+}
+// historical layer: one national payload, self-contained bake (no pairing), loaded on first toggle-on
+function loadHist(){
+  if(S.histData||S.histLoading) return;
+  S.histLoading=true;
+  apiGet('mode=pins_hist').then(function(r){
+    var n=r.n||0;
+    var mxA=new Float64Array(n), myA=new Float64Array(n), mxZ=new Float64Array(n), myZ=new Float64Array(n);
+    for(var i=0;i<n;i++){
+      var la=Number(r.lat[i]), ln=Number(r.lng[i]);
+      if(!isFinite(la)||!isFinite(ln)){ la=0; ln=0; }
+      var j=jit(r.ids[i]||'');
+      var street=(r.street&&r.street[i])?1:0;
+      var aLat=la, aLng=ln; if(!street){ aLat+=j[0]; aLng+=j[1]; }
+      mxA[i]=mercX(aLng); myA[i]=mercY(aLat);
+      var zLat=(street&&r.zlat&&r.zlat[i]!=null)?r.zlat[i]:la;
+      var zLng=(street&&r.zlng&&r.zlng[i]!=null)?r.zlng[i]:ln;
+      mxZ[i]=mercX(zLng+j[1]); myZ[i]=mercY(zLat+j[0]);
+    }
+    S.histData={n:n,fams:r.fams||[],fis:r.fis||[],mxA:mxA,myA:myA,mxZ:mxZ,myZ:myZ,
+      ids:r.ids||[],cids:r.cids||[],names:r.names||[],cities:r.cities||[],sts:r.sts||[],
+      kind:r.kind||[],asof:r.asof||[],src:r.src||[],toS:r.toS||[]};
+    S.histLoading=false; bump(); scheduleDraw(); try{ computeViewLegend(); }catch(_){}
+  }).catch(function(){ S.histLoading=false; });
+}
+function progress(){
+  $('loading').style.display='block';
+  if(S.toLoad===4){ $('loading').textContent=S.liteLoaded<4?('loading the map… '+S.liteLoaded+'/4'):'pins live · loading hover detail…'; }
+  else { $('loading').textContent='pins '+S.liteLoaded+'/'+S.toLoad+' · details '+S.detLoaded+'/'+S.toLoad; }
+  if(S.liteLoaded>=S.toLoad&&S.detLoaded>=S.toLoad){ $('loading').style.display='none'; try{ computeViewLegend(); }catch(_){ } }
+}
+
+// ------------------------- google map -------------------------
+window.initMap=function(){
+  // v3.10.1: read z/c straight from the URL here too — initMap can fire before boot()'s readUrl
+  // (a race that made shared links sometimes open at the default view instead of the linked one)
+  try{ var qp=new URLSearchParams(location.search);
+    if(!isFinite(S._urlZ)&&qp.get('z')) S._urlZ=parseFloat(qp.get('z'));
+    if((!S._urlC||!isFinite(S._urlC[0]))&&qp.get('c')) S._urlC=qp.get('c').split(',').map(Number);
+  }catch(_){}
+  var z=isFinite(S._urlZ)?S._urlZ:4.6;
+  var c=(S._urlC&&isFinite(S._urlC[0]))?{lat:S._urlC[0],lng:S._urlC[1]}:{lat:38.5,lng:-96.5};
+  S.map=new google.maps.Map($('map'),{center:c,zoom:z,gestureHandling:'greedy',
+    // v3.15.2 ROOT FIX: raster maps default to isFractionalZoomEnabled:false, so our fractional
+    // default zoom (4.6) could never composite real tiles — the pale stretched world fallback sat
+    // under the pins until the first interaction quantized the zoom (near-invisible on the light
+    // theme, glaring on dark; also the true culprit behind v3.8's "loads displaced" reports).
+    isFractionalZoomEnabled:true,
+    backgroundColor:DARK?'#1f2125':'#e8e6e1',   // v3.15.1: loading underlay matches the theme (no pale flash on dark)
+    disableDefaultUI:false,streetViewControl:false,mapTypeControl:true,fullscreenControl:true,
+    mapTypeControlOptions:{position:google.maps.ControlPosition.TOP_LEFT},
+    // v3.10 (owner): state outlines more pronounced than Google's faint dotted default.
+    // v3.15 (owner): dark basemap — warm near-black ground, clutter off; outlines law kept (light strokes).
+    styles:DARK?[
+      {elementType:'geometry',stylers:[{color:'#1f2125'}]},
+      {elementType:'labels.text.fill',stylers:[{color:'#8f959e'}]},
+      {elementType:'labels.text.stroke',stylers:[{color:'#15171a'}]},
+      {elementType:'labels.icon',stylers:[{visibility:'off'}]},
+      {featureType:'poi',stylers:[{visibility:'off'}]},
+      {featureType:'transit',stylers:[{visibility:'off'}]},
+      {featureType:'landscape.natural',elementType:'geometry',stylers:[{color:'#22252a'}]},
+      {featureType:'road',elementType:'geometry',stylers:[{color:'#2a2d33'}]},
+      {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#343841'}]},
+      {featureType:'road',elementType:'labels.text.fill',stylers:[{color:'#7c828c'}]},
+      {featureType:'water',elementType:'geometry',stylers:[{color:'#101318'}]},
+      {featureType:'water',elementType:'labels.text.fill',stylers:[{color:'#4d5560'}]},
+      {featureType:'administrative.province',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#8e8672'},{weight:1.6}]},
+      {featureType:'administrative.country',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#a39a84'},{weight:1.8}]}
+    ]:[
+      {featureType:'administrative.province',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#7d7466'},{weight:1.6}]},
+      {featureType:'administrative.country',elementType:'geometry.stroke',
+       stylers:[{visibility:'on'},{color:'#6b6255'},{weight:1.8}]}
+    ]});
+  // v3.7: continuous render tracking — during any pan/zoom interaction a rAF pump redraws EVERY
+  // frame (reading live center/zoom), so pins move commensurate with the map instead of lagging
+  // behind the tile animation. Pump self-stops 350ms after the last movement event; idle seals it.
+  S.map.addListener('center_changed',movePump);
+  S.map.addListener('zoom_changed',movePump);
+  S.map.addListener('bounds_changed',movePump);
+  S.map.addListener('drag',movePump);
+  S.map.addListener('idle',function(){ scheduleDraw(); scheduleViewLegend(); });
+  // v3.8: TILE-RENDER KICK — root cause of the "loads displaced" screenshot: Google's raster layer
+  // can settle in a stale post-init state (tiles rendered for pre-layout metrics) while the API
+  // reports the correct zoom/bounds; our marks (drawn from the API) then sit misaligned until any
+  // interaction forces Google to re-render. Kicking resize+recenter after boot, on first tiles,
+  // shortly after, and on ANY container resize forces tiles and marks to agree with no interaction.
+  google.maps.event.addListenerOnce(S.map,'tilesloaded',function(){ kickMap(); });
+  setTimeout(kickMap,1200); setTimeout(kickMap,3000);
+  window.addEventListener('resize',function(){ kickMap(); });
+  try{ new ResizeObserver(function(){ kickMap(); }).observe($('mapwrap')); }catch(_){}
+  var mapDiv=$('map');
+  mapDiv.addEventListener('mousemove',onMove);
+  mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
+  mapDiv.addEventListener('click',onClick);
+  mapDiv.addEventListener('mousedown',onDrawDown,true);
+  mapDiv.addEventListener('mouseup',onDrawUp,true);
+  window.addEventListener('resize',scheduleDraw);
+  scheduleDraw();
+};
+function loadGmaps(){
+  var s=document.createElement('script');
+  s.src='https://maps.googleapis.com/maps/api/js?key='+GMAPS_KEY+'&v=weekly&loading=async&callback=initMap';
+  s.async=true; document.head.appendChild(s);
+}
+
+// ------------------------- renderer v3 (container-fixed canvas; no google panes) -------------------------
+var cvs=$('pincanvas'), ctx=cvs.getContext('2d'), spriteCache={}, drawScheduled=false;
+var hits=[];                 // rebuilt each draw: {x,y,r,kind:'pin'|'beacon'|'hist', ...}
+function scheduleDraw(){ if(drawScheduled) return; drawScheduled=true; requestAnimationFrame(function(){ drawScheduled=false; draw(); }); }
+function kickMap(){
+  if(!S.map) return;
+  try{
+    var c=S.map.getCenter();
+    google.maps.event.trigger(S.map,'resize');
+    if(c) S.map.setCenter(c);
+    // v3.15.1: imperceptible zoom nudge forces the raster compositor to swap in loaded tiles —
+    // at fractional zooms the pale loading underlay could linger until the first interaction
+    // (invisible on the light theme, glaring on dark).
+    var zz=S.map.getZoom(); if(isFinite(zz)) S.map.setZoom(zz+(S._kickFlip?-0.0004:0.0004)); S._kickFlip=!S._kickFlip;
+  }catch(_){}
+  scheduleDraw();
+}
+var _pumpLast=0,_pumpOn=false;
+function movePump(){
+  _pumpLast=performance.now();
+  if(_pumpOn) return; _pumpOn=true;
+  requestAnimationFrame(function frame(){
+    draw();
+    if(performance.now()-_pumpLast<350){ requestAnimationFrame(frame); } else { _pumpOn=false; }
+  });
+}
+// v3.12: pins UNMISTAKABLY bigger zoomed in (owner escalated — v3.9's ramp was too timid)
+function pinScale(z){ return z<5.5?0.6:(z<8?0.78:(z<9.5?0.9:(z<11?1.25:(z<12.5?1.6:(z<14?1.95:2.3))))); }
+// v3.9: HQ logo chips are LARGE zoomed out (the brand layer of the national view) and SHRINK as
+// you zoom in, ceding the stage to the client teardrops (owner directive).
+// v3.16 (owner): DYNAMIC sizing — a continuous curve (no steps), large at national and shrinking
+// smoothly as you zoom in, with a HARD MINIMUM so logos never drop below 28px at street zoom.
+function chipSize(z){ return Math.max(28, Math.min(48, 48-4.4*(z-4.3))); }
+function sprite(kind,hex,ps){
+  var key=kind+'|'+hex+'|'+ps;
+  if(spriteCache[key]) return spriteCache[key];
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  var w,h,ax,ay;
+  var c=document.createElement('canvas');
+  if(kind==='pin'){ w=15*ps; h=21*ps; ax=7.5*ps; ay=20*ps; }
+  else if(kind==='ring'){ w=13*ps; h=13*ps; ax=6.5*ps; ay=6.5*ps; }
+  else if(kind==='dot'){ w=8; h=8; ax=4; ay=4; }
+  else if(kind==='star'||kind==='starh'){ w=30*ps; h=30*ps; ax=15*ps; ay=15*ps; }
+  else if(kind==='hqdot'){ w=14; h=14; ax=7; ay=7; }
+  else { w=24*ps; h=24*ps; ax=12*ps; ay=12*ps; }
+  c.width=Math.ceil(w*dpr); c.height=Math.ceil(h*dpr);
+  var x=c.getContext('2d'); x.scale(dpr,dpr);
+  if(kind==='pin'){
+    x.scale(ps,ps);
+    x.beginPath(); x.arc(7.5,6.6,5.7,Math.PI*0.82,Math.PI*0.18); x.lineTo(7.5,20); x.closePath();
+    x.fillStyle=hex; x.fill(); x.lineWidth=1.25; x.strokeStyle='#463f38'; x.stroke();
+    x.beginPath(); x.arc(7.5,6.6,2.05,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.92)'; x.fill();
+  } else if(kind==='ring'){
+    x.scale(ps,ps);
+    x.beginPath(); x.arc(6.5,6.5,4.6,0,Math.PI*2); x.fillStyle='rgba(255,255,255,.35)'; x.fill();
+    x.beginPath(); x.arc(6.5,6.5,4.6,0,Math.PI*2); x.lineWidth=2; x.strokeStyle=hex; x.stroke();
+    x.beginPath(); x.arc(6.5,6.5,1.15,0,Math.PI*2); x.fillStyle=hex; x.fill();
+  } else if(kind==='dot'){
+    x.beginPath(); x.arc(4,4,3.8,0,Math.PI*2); x.fillStyle=hex; x.fill();
+    x.lineWidth=0.8; x.strokeStyle='rgba(70,63,56,.45)'; x.stroke();
+  } else if(kind==='star'||kind==='starh'){
+    x.scale(ps,ps);
+    x.translate(15,15); x.beginPath();
+    for(var i=0;i<10;i++){ var r=(i%2===0)?13:5.6, a=-Math.PI/2+i*Math.PI/5; x[i===0?'moveTo':'lineTo'](Math.cos(a)*r,Math.sin(a)*r); }
+    x.closePath();
+    x.fillStyle=hex; x.globalAlpha=kind==='starh'?0.6:1; x.fill(); x.globalAlpha=1;
+    x.lineWidth=1.6; x.strokeStyle=kind==='starh'?hex:'#463f38'; x.stroke();
+  } else if(kind==='hqdot'){   // v3.13: logo-less HQ = small brand-color dot (owner: no stars)
+    x.beginPath(); x.arc(7,7,5,0,Math.PI*2); x.fillStyle=hex; x.fill();
+    x.lineWidth=1.4; x.strokeStyle=DARK?'#e8e4da':'#463f38'; x.stroke();
+  } else {
+    x.scale(ps,ps);
+    x.translate(12,12); x.beginPath(); x.moveTo(0,-10); x.lineTo(9,0); x.lineTo(0,10); x.lineTo(-9,0); x.closePath();
+    x.fillStyle=hex; x.fill(); x.lineWidth=1.6; x.strokeStyle='#463f38'; x.stroke();
+  }
+  var o={img:c,w:w,h:h,ax:ax,ay:ay};
+  spriteCache[key]=o; return o;
+}
+// renewal-heat lens (v3.4: 3-way — health is the PRIMARY renewal trigger per owner; WC secondary).
+// B.7 law everywhere: basis class labeled, inferred timing never silently treated as known.
+var URG_COLORS=['#de6b5f','#e0985c','#bd8a35','#5b7f96','#9aa5ad'];
+var URG_LABELS=['Renews ≤2 mo','3–4 mo out','5–6 mo out','7+ mo out','Unknown'];
+var RMB_LABELS=['','unverified','reasoned','verified'];
+function renLens(){ return S.lens==='health'||S.lens==='wc'; }
+function lensMonth(d,i){ var dd=d.detail; if(!dd) return 0; return S.lens==='health'?((dd.hrm&&dd.hrm[i])||0):((dd.rm&&dd.rm[i])||0); }
+function urgClass(rm){ if(!rm) return 4; var mu=((rm-1)-(new Date().getMonth())+12)%12; return mu<=1?0:(mu<=3?1:(mu<=5?2:3)); }
+function pinColorAt(d,i,slug){ return renLens() ? URG_COLORS[urgClass(lensMonth(d,i))] : (S.colors[S.grain][slug]||OTHER); }
+function draw(){
+  if(!S.map) return;
+  var wrap=$('mapwrap'); var W=wrap.clientWidth, H=wrap.clientHeight;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  if(cvs.width!==Math.round(W*dpr)||cvs.height!==Math.round(H*dpr)){ cvs.width=Math.round(W*dpr); cvs.height=Math.round(H*dpr); cvs.style.width=W+'px'; cvs.style.height=H+'px'; }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  if(!S.catalog) return;
+  var z=S.map.getZoom(); var scale=256*Math.pow(2,z);
+  var ctr=S.map.getCenter(); var cx=mercX(ctr.lng()), cy=mercY(ctr.lat());
+  var sel=selMap(); var visCount=0; catRows().forEach(function(r){ if(sel[r.slug]!==false) visCount++; });
+  hits=[];
+  var ps=pinScale(z);
+  // v3.6 unified rendering — donut clusters are GONE (owner: "obnoxious").
+  // z < 6.5: dot-density — every client is a small square dot in its true color, batched per color
+  //          (metros read as organic color fields; market share is visible spatially, no abstraction).
+  // 6.5 ≤ z < 9.5: round dot sprites (a touch larger, antialiased).
+  // z ≥ 9.5: classic teardrop pins (what Gazz asked for up close). Always one mark per client.
+  var dotMode = z<9.5;
+  var dsz = z<5 ? 2.3 : (z<6.5 ? 3 : 0);   // fillRect size; 0 = use dot sprite (v3.12: bumped)
+  var buckets = dsz ? {} : null;
+  for(var st2 in S.pinData){
+    if(S.states[st2]===false) continue;
+    var d2=S.pinData[st2];
+    var MX2=(S.placement==='zip')?d2.mxZ:d2.mxA, MY2=(S.placement==='zip')?d2.myZ:d2.myA;
+    var slugArr2=(S.grain==='brand')?d2.brds:d2.fams; var IDX2=(S.grain==='brand')?d2.bis:d2.fis;
+    var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=sel[slugArr2[k2]]!==false; }
+    for(var i2=0;i2<d2.n;i2++){
+      if(!vis2[IDX2[i2]]) continue;
+      if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
+      if(S.minSrc && d2.detail && d2.detail.cs && d2.detail.cs[i2]<S.minSrc) continue;
+      var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
+      if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
+      if(dotMode){
+        var col=pinColorAt(d2,i2,slugArr2[IDX2[i2]]);
+        if(dsz){ var bk=buckets[col]||(buckets[col]=[]); bk.push(sx3,sy3); }
+        else { var spD=sprite('dot',col,1); ctx.drawImage(spD.img,0,0,spD.img.width,spD.img.height,sx3-spD.ax,sy3-spD.ay,spD.w,spD.h); }
+        if(hits.length<80000) hits.push({x:sx3,y:sy3,r:6,kind:'pin',st:st2,i:i2});
+      } else {
+        var sp2=sprite('pin',pinColorAt(d2,i2,slugArr2[IDX2[i2]]),ps);
+        ctx.drawImage(sp2.img,0,0,sp2.img.width,sp2.img.height,sx3-sp2.ax,sy3-sp2.ay,sp2.w,sp2.h);
+        if(hits.length<80000) hits.push({x:sx3,y:sy3-8*ps,r:11*ps,kind:'pin',st:st2,i:i2});
+      }
+    }
+  }
+  if(buckets){
+    ctx.globalAlpha=0.95;
+    var off=dsz/2;
+    for(var colK in buckets){ var arr=buckets[colK]; ctx.fillStyle=colK; for(var jj=0;jj<arr.length;jj+=2) ctx.fillRect(arr[jj]-off,arr[jj+1]-off,dsz,dsz); }
+    ctx.globalAlpha=1;
+  }
+  // historical ring pins (never clustered; family color = the PEO they LEFT; drawn under beacons)
+  if(S.hist&&S.histData){
+    var hd=S.histData;
+    var HMX=(S.placement==='zip')?hd.mxZ:hd.mxA, HMY=(S.placement==='zip')?hd.myZ:hd.myA;
+    for(var hi=0;hi<hd.n;hi++){
+      var hst=hd.sts[hi]; if(hst&&S.states[hst]===false) continue;
+      var hsl=hd.fams[hd.fis[hi]]||'unattributed';
+      if(sel[hsl]===false) continue;
+      var hx=(HMX[hi]-cx)*scale+W/2, hy=(HMY[hi]-cy)*scale+H/2;
+      if(hx<-14||hx>W+14||hy<-14||hy>H+14) continue;
+      var hsp=sprite('ring',S.colors.family[hsl]||OTHER,ps);
+      ctx.drawImage(hsp.img,0,0,hsp.img.width,hsp.img.height,hx-hsp.ax,hy-hsp.ay,hsp.w,hsp.h);
+      if(hits.length<90000) hits.push({x:hx,y:hy,r:9,kind:'hist',i:hi});
+    }
+  }
+  // territory circle (preview while drawing, persistent after)
+  if(S.terr){
+    var tx=(S.terr.cmx-cx)*scale+W/2, ty=(S.terr.cmy-cy)*scale+H/2, tr=S.terr.rMerc*scale;
+    ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle='rgba(99,144,238,.95)'; ctx.setLineDash([6,5]);
+    ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.fillStyle='rgba(99,144,238,.07)'; ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.fill();
+  }
+  // beacons on top (v3.6: zoom-decluttered — admin ◆ / candidate ✩ only from z≥6; "HQ logo pins"
+  // renders the PEO's actual logo as a white chip at its HQ, small brand-dot fallback — v3.13,
+  // owner: no stars)
+  if(S.beaconsOn||S.hqLogos){
+    var bps=z<6?0.7:1;
+    var bDraw=[];   // v3.10: collect first, fan out overlaps, THEN render with leader lines
+    for(var b2=0;b2<S.beacons.length;b2++){
+      var b=S.beacons[b2];
+      var isHq=b.kind==='hq';
+      if(!isHq && b.state && S.states[b.state]===false) continue;   // v3.18: States culls pins+admin beacons, never HQ chips (owner: None wiped the logos)
+      if(sel[b.family_slug]===false) continue;
+      if(isHq){ if(!S.hqLogos) continue; }                       // "PEO HQ pins (logos)" governs headquarters
+      else { if(!S.beaconsOn||z<6) continue; }                   // admin ◆ + candidates ✩: opt-in, z≥6 only
+      var bx=(b._mx-cx)*scale+W/2, by=(b._my-cy)*scale+H/2;
+      if(bx<-200||bx>W+200||by<-200||by>H+200) continue;   // wide cull margin keeps the fan-out stable near edges
+      var asChip=false, im=null, chs=0, cw=0, ch=0;
+      if(isHq&&b.has_logo){   // v3.19: logo chips at EVERY zoom — top-40 national gate dropped (owner: dots should wear their logos)
+        im=beaconLogo(b.family_slug);
+        if(im){
+          asChip=true; chs=chipSize(z);
+          var asp=(im.width||1)/(im.height||1);
+          if(asp>1.6){ cw=Math.min(asp*0.8,2.7)*chs*0.82; ch=chs*0.68; }   // v3.12: wide wordmark logos get a PILL chip (owner: use the entire logo & name)
+          else { cw=chs; ch=chs; }
+          // v3.16 (owner reversal): no printed name on the chip — the name lives on HOVER (tipBeacon).
+        }
+      }
+      bDraw.push({id:String(b.beacon_id||(b.family_slug+':'+b.kind)), b:b, tx:bx, ty:by,
+                  chip:asChip, im:im, cw:cw, ch:ch, s:asChip?Math.max(cw,ch):(isHq?12:26*bps), bps:bps,
+                  col:b.color_hex||b.brand_hex||S.colors.family[b.family_slug]||OTHER,
+                  kind:b.kind==='administrative'?'diamond':(b.kind==='hq_candidate'?'starh':'hqdot')});
+    }
+    layoutBeacons(bDraw, z);
+    for(var e1=0;e1<bDraw.length;e1++){   // pass 1: leader lines ONLY (v3.13, owner: no anchor
+      var e=bDraw[e1];                    // star/dot — the line's tip IS the precise HQ location)
+      var ddx=e.dx-e.tx, ddy=e.dy-e.ty;
+      if(ddx*ddx+ddy*ddy>25){
+        ctx.beginPath(); ctx.lineWidth=1.4; ctx.strokeStyle=DARK?'rgba(245,242,235,.6)':'rgba(70,63,56,.8)';
+        ctx.moveTo(e.tx,e.ty); ctx.lineTo(e.dx,e.dy); ctx.stroke();
+      }
+    }
+    for(var e2=0;e2<bDraw.length;e2++){   // pass 2: marks at their fanned-out positions
+      var m=bDraw[e2];
+      if(m.chip){
+        drawLogoChip(m.dx,m.dy,m.im,m.cw,m.ch);
+        hits.push({x:m.dx,y:m.dy,r:Math.max(m.cw,m.ch)*0.58,kind:'beacon',b:m.b});
+      } else {
+        var sp3=sprite(m.kind,m.col,m.bps);
+        ctx.drawImage(sp3.img,0,0,sp3.img.width,sp3.img.height,m.dx-sp3.ax,m.dy-sp3.ay,sp3.w,sp3.h);
+        hits.push({x:m.dx,y:m.dy,r:(m.kind==='hqdot'?9:14*m.bps),kind:'beacon',b:m.b});
+      }
+    }
+  }
+}
+// v3.10 BEACON FAN-OUT (owner: "icons are stacked on top of one another — I want to see them ALL,
+// with a line to specifically where they are located"). Deterministic pairwise repulsion pushes
+// overlapping marks apart (bounded, ZOOM-SCALED travel — v3.13, owner: "the further the zoom, the
+// shorter the line"); each displaced mark gets a leader line whose tip is its TRUE spot (no anchor
+// dot). Offsets are screen-relative, so panning reuses them; zoom buckets recompute.
+var beaconLayoutCache={key:'',off:{}};
+function layoutBeacons(list,z){
+  if(!list.length) return;
+  list.sort(function(a,b){ return a.id<b.id?-1:(a.id>b.id?1:0); });
+  // v3.11: key includes each mark's SIZE — when logos finish decoding, star-sized offsets must not
+  // be reused for 44px chips (that stale cache was why chips still stacked at national zoom)
+  var key=(Math.round(z*4)/4)+'|'+S.rev+'|'+list.map(function(e){return e.id+'~'+Math.round(e.s)}).join(',');
+  if(beaconLayoutCache.key===key){
+    for(var k0=0;k0<list.length;k0++){ var o=beaconLayoutCache.off[list[k0].id]||[0,0]; list[k0].dx=list[k0].tx+o[0]; list[k0].dy=list[k0].ty+o[1]; }
+    return;
+  }
+  var P=list.map(function(e){ return {x:e.tx,y:e.ty}; });
+  // v3.13 (owner): the deeper the zoom, the SHORTER the leader line — full ring-out at national so
+  // every logo stays visible, then travel tightens so chips hug their precise HQ spots zooming in.
+  var zt=z<=4.5?1:(z>=9?0:(9-z)/4.5), tvMult=1.1+2.1*zt, tvFloor=30+60*zt;
+  for(var it=0;it<40;it++){
+    var moved=false;
+    for(var i=0;i<list.length;i++){
+      for(var j=i+1;j<list.length;j++){
+        var need=((list[i].s+list[j].s)/2)*1.42+3;   // v3.11: 1.42 = diagonal-safe for SQUARE chips (circle math let corners overlap)
+        var dx=P[j].x-P[i].x, dy=P[j].y-P[i].y;
+        var d=Math.sqrt(dx*dx+dy*dy);
+        if(d<need){
+          var ux,uy;
+          if(d<0.01){ var a=((i*137+j*61)%360)*Math.PI/180; ux=Math.cos(a); uy=Math.sin(a); d=0.01; }
+          else { ux=dx/d; uy=dy/d; }
+          var push=(need-d)/2+0.5;
+          P[i].x-=ux*push; P[i].y-=uy*push;
+          P[j].x+=ux*push; P[j].y+=uy*push;
+          moved=true;
+        }
+      }
+    }
+    for(var c=0;c<list.length;c++){
+      var e=list[c]; var hx=P[c].x-e.tx, hy=P[c].y-e.ty; var hd=Math.sqrt(hx*hx+hy*hy);
+      var mx2=Math.max(tvFloor,e.s*tvMult);   // v3.11 wide ring-out, v3.13 zoom-scaled
+      if(hd>mx2){ P[c].x=e.tx+hx/hd*mx2; P[c].y=e.ty+hy/hd*mx2; }
+    }
+    if(!moved) break;
+  }
+  var off={};
+  for(var f=0;f<list.length;f++){ off[list[f].id]=[P[f].x-list[f].tx, P[f].y-list[f].ty]; list[f].dx=P[f].x; list[f].dy=P[f].y; }
+  beaconLayoutCache={key:key,off:off};
+}
+// HQ logo chips: decoded-image cache fed by mode=logo data URIs (same source as the hover tooltip)
+function beaconLogo(slug){
+  var im=S.logoImgs[slug];
+  if(im!==undefined) return im;   // Image when ready, null while pending/failed
+  S.logoImgs[slug]=null;
+  api({mode:'logo',slug:slug}).then(function(r){
+    if(r&&r.data_uri){
+      S.logoCache[slug]=r.data_uri;
+      var img=new Image();
+      img.onload=function(){ S.logoImgs[slug]=img; scheduleDraw(); };
+      img.src=r.data_uri;
+    }
+  }).catch(function(){});
+  return null;
+}
+function drawLogoChip(x,y,im,w,h){
+  if(!h) h=w;   // square fallback
+  var r=Math.max(4,Math.min(w,h)*0.24), hw=w/2, hh=h/2;
+  ctx.beginPath();
+  ctx.moveTo(x-hw+r,y-hh); ctx.arcTo(x+hw,y-hh,x+hw,y+hh,r); ctx.arcTo(x+hw,y+hh,x-hw,y+hh,r);
+  ctx.arcTo(x-hw,y+hh,x-hw,y-hh,r); ctx.arcTo(x-hw,y-hh,x+hw,y-hh,r); ctx.closePath();
+  ctx.fillStyle='#ffffff'; ctx.fill();
+  ctx.lineWidth=1.25; ctx.strokeStyle='#463f38'; ctx.stroke();
+  var pad=Math.min(w,h)*0.13, aw=w-2*pad, ah=h-2*pad;
+  var f=Math.min(aw/(im.width||1), ah/(im.height||1));
+  var dw=(im.width||aw)*f, dh=(im.height||ah)*f;
+  try{ ctx.drawImage(im,x-dw/2,y-dh/2,dw,dh); }catch(_){ }
+}
+// ------------------------- hover / click -------------------------
+function mapXY(e){ var r=$('mapwrap').getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+function pick(e){
+  var p=mapXY(e); var best=null, bd=1e9;
+  for(var i=hits.length-1;i>=0;i--){
+    var h=hits[i]; var dx=h.x-p[0], dy=h.y-p[1]; var dd=dx*dx+dy*dy;
+    var rr=h.r*h.r;
+    if(dd<=rr){ var score=dd-(h.kind==='beacon'?400:0); if(score<bd){ bd=score; best=h; } }
+  }
+  return best;
+}
+// ---- territory draw (screen-only results; NO export by owner ruling) ----
+function pxToMerc(px,py){
+  var wrap=$('mapwrap'); var W=wrap.clientWidth, H=wrap.clientHeight;
+  var z=S.map.getZoom(); var scale=256*Math.pow(2,z);
+  var ctr=S.map.getCenter();
+  return [mercX(ctr.lng())+(px-W/2)/scale, mercY(ctr.lat())+(py-H/2)/scale];
+}
+$('draw-btn').onclick=function(){
+  S.drawMode=!S.drawMode;
+  $('draw-btn').className=S.drawMode?'ghost on':'ghost';
+  if(S.map) S.map.setOptions({draggable:!S.drawMode});
+  $('mapwrap').style.cursor=S.drawMode?'crosshair':'';
+  if(!S.drawMode&&!S.terr) closeTerr();
+};
+function onDrawDown(e){
+  if(!S.drawMode) return;
+  var p=mapXY(e); var m=pxToMerc(p[0],p[1]);
+  S._drawStart={mx:m[0],my:m[1]};
+  S.terr={cmx:m[0],cmy:m[1],rMerc:0};
+  e.preventDefault(); e.stopPropagation();
+}
+function onDrawMove(e){
+  if(!S.drawMode||!S._drawStart) return;
+  var p=mapXY(e); var m=pxToMerc(p[0],p[1]);
+  var dx=m[0]-S._drawStart.mx, dy=m[1]-S._drawStart.my;
+  S.terr={cmx:S._drawStart.mx,cmy:S._drawStart.my,rMerc:Math.sqrt(dx*dx+dy*dy)};
+  scheduleDraw();
+}
+function onDrawUp(){
+  if(!S.drawMode||!S._drawStart) return;
+  S._drawStart=null;
+  S.drawMode=false; $('draw-btn').className='ghost';
+  if(S.map) S.map.setOptions({draggable:true});
+  $('mapwrap').style.cursor='';
+  if(S.terr&&S.terr.rMerc>0) terrResults(); else { S.terr=null; scheduleDraw(); }
+}
+function terrResults(){
+  var t=S.terr; if(!t) return;
+  var sel=selMap(); var byKey={}; var members=[]; var total=0;
+  for(var st in S.pinData){
+    if(S.states[st]===false) continue;
+    var d=S.pinData[st];
+    var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    for(var i=0;i<d.n;i++){
+      if(!vis[IDX[i]]) continue;
+      if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
+      if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
+      var dx=MX[i]-t.cmx, dy=MY[i]-t.cmy;
+      if(dx*dx+dy*dy > t.rMerc*t.rMerc) continue;
+      total++;
+      var sl=slugArr[IDX[i]]; byKey[sl]=(byKey[sl]||0)+1;
+      if(members.length<300) members.push([st,i,sl]);
+    }
+  }
+  var lat=invLat(t.cmy);
+  var miles=Math.round(t.rMerc*40075016.7*Math.cos(lat*Math.PI/180)/1609.34*10)/10;
+  var top=Object.keys(byKey).map(function(s){return [s,byKey[s]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,6);
+  var el=$('terr');
+  var tops=top.map(function(x){ var pct=total?Math.round(100*x[1]/total):0;
+    return '<div class="vl-row"><span class="dot" style="background:'+colorOf(x[0])+'"></span><span class="nm">'+esc(dispOf(x[0]))+'</span><span class="bar"><i style="width:'+Math.max(3,pct)+'%;background:'+colorOf(x[0])+'"></i></span><span class="ct">'+x[1].toLocaleString()+'</span></div>'; }).join('');
+  var list=members.map(function(mm){
+    var d=S.pinData[mm[0]]; var nm=d.detail?(d.detail.names[mm[1]]||'—'):'(loading…)'; var city=d.detail?(d.detail.cities[mm[1]]||''):'';
+    return '<div class="tr" data-st="'+mm[0]+'" data-i="'+mm[1]+'"><span class="dot" style="background:'+colorOf(mm[2])+'"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span><span style="color:var(--muted);font-size:10.5px">'+esc(city)+'</span></div>'; }).join('');
+  el.innerHTML='<div class="hd">'+total.toLocaleString()+' clients in circle <button class="x" id="terr-x">×</button></div>'+
+    '<div class="sub">~'+miles+' mi radius · results stay on screen — nothing exports</div>'+
+    '<div class="tops" id="terr-tops">'+tops+'</div>'+
+    '<div class="list" id="terr-list">'+list+(total>300?'<div class="sub">showing first 300 — zoom the circle tighter for a full list</div>':'')+'</div>';
+  el.style.display='flex';
+  document.getElementById('terr-x').onclick=closeTerr;
+  document.getElementById('terr-list').addEventListener('click',function(ev){
+    var row=ev.target.closest('.tr'); if(!row) return;
+    var d=S.pinData[row.dataset.st]; if(!d||!d.detail) return;
+    var id=d.detail.ids[+row.dataset.i]; if(!id) return;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slugArr[IDX[+row.dataset.i]]); });
+  });
+  scheduleDraw();
+}
+function closeTerr(){ S.terr=null; $('terr').style.display='none'; scheduleDraw(); }
+
+var hoverRaf=false;
+function onMove(e){
+  if(S.drawMode){ onDrawMove(e); return; }
+  if(hoverRaf) return; hoverRaf=true;
+  requestAnimationFrame(function(){
+    hoverRaf=false;
+    var h=pick(e);
+    if(!h){ if(S.hover){S.hover=null;closeTip();} return; }
+    S.hover=h;
+    if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }
+    if(h.kind==='hist'){ tipHist(h.i,e); return; }
+    var d=S.pinData[h.st];
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var slug=slugArr[IDX[h.i]];
+    var nm=d.detail?(d.detail.names[h.i]||'—'):'Loading…';
+    var city=d.detail?(d.detail.cities[h.i]||''):'';
+    var street=d.detail?!!d.detail.street[h.i]:false;
+    var renLine='';
+    if(d.detail){
+      var hm=(d.detail.hrm&&d.detail.hrm[h.i])||0, hb=(d.detail.hrmb&&d.detail.hrmb[h.i])||0;
+      if(hm){ renLine+='Health renews ~'+MONTHS[hm]+' <span class="mut">('+(RMB_LABELS[hb]||'unverified')+')</span><br>'; }
+      else if(S.lens==='health'){ renLine+='<span class="mut">Health renewal month unknown</span><br>'; }
+      if(d.detail.rm[h.i]){ renLine+='WC renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+RMB_LABELS[d.detail.rmb[h.i]]+')</span><br>'; }
+      else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
+      renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
+    }
+    tipShow('<b>'+esc(nm)+'</b><br>'+
+      '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
+      esc(city+(city?', ':'')+h.st)+'<br>'+renLine+
+      '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
+  });
+}
+var HKIND=['Switched','Departed — confirmed open market','Departed — ASSUMED (pending confirmation)'];
+function famDisp(s){ return S.displays.family[s]||s; }
+function tipHist(i,e){
+  var hd=S.histData; if(!hd) return;
+  var sl=hd.fams[hd.fis[i]]||'unattributed';
+  var when=hd.asof[i]?(' ~'+hd.asof[i]):'';
+  var line2=(hd.kind[i]===0&&hd.toS[i])?('Switched to '+esc(famDisp(hd.toS[i]))+when):(HKIND[hd.kind[i]]||'Departed')+when;
+  tipShow('<b>'+esc(hd.names[i]||'—')+'</b> <span class="mut">· FORMER client</span><br>'+
+    '<span style="color:'+(S.colors.family[sl]||OTHER)+';font-weight:650">'+esc(famDisp(sl))+'</span><br>'+
+    esc((hd.cities[i]||'')+(hd.cities[i]?', ':'')+(hd.sts[i]||''))+'<br>'+
+    line2+'<br>'+
+    '<span class="mut">click for details</span>',e);
+}
+function onClick(e){
+  if(S.drawMode) return;
+  var h=pick(e); if(!h) return;
+  if(h.kind==='hist'){
+    var hd2=S.histData; if(!hd2) return;
+    var hsl2=hd2.fams[hd2.fis[h.i]]||'unattributed';
+    var cid=hd2.cids[h.i];
+    if(cid) api({mode:'company',id:cid}).then(function(r){ if(r.company) openCard(r.company,hsl2,r.history); });
+    return;
+  }
+  if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }   // tap-friendly: click/tap a star shows the logo tooltip
+  var d=S.pinData[h.st]; if(!d||!d.detail) return;
+  var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+  var slug=slugArr[IDX[h.i]];
+  var id=d.detail.ids[h.i];
+  if(id) api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slug,r.history); });
+}
+function tipBeacon(b,ev){
+  var kinds={hq:'Headquarters',administrative:'Administrative beacon',hq_candidate:'HQ (candidate)'};
+  var logoHtml='';
+  var cached=S.logoCache[b.family_slug];
+  if(cached){ logoHtml='<span class="logo"><img src="'+cached+'" alt=""></span><br>'; }
+  tipShow(logoHtml+'<b>'+esc(b.peo_display||b.family_slug)+'</b><br>'+esc(kinds[b.kind]||b.kind)+'<br>'+
+    esc((b.city||'')+', '+(b.state||'')),ev);
+  if(!cached && b.has_logo && S.logoCache[b.family_slug]!==''){
+    S.logoCache[b.family_slug]='';
+    api({mode:'logo',slug:b.family_slug}).then(function(r){
+      if(r&&r.data_uri){ S.logoCache[b.family_slug]=r.data_uri;
+        if(S.hover&&S.hover.kind==='beacon'&&S.hover.b===b) tipBeacon(b,ev); }
+    }).catch(function(){});
+  }
+}
+
+// ------------------------- panels -------------------------
+function buildStatePanel(){
+  var host=$('states'); host.innerHTML='';
+  var sts=Object.keys(S.states).sort();
+  sts.forEach(function(st){
+    var d=document.createElement('div'); d.className='st '+(S.states[st]?'on':'off'); d.textContent=st;
+    d.title=(STATE_NAMES[st]||st);
+    d.onclick=function(){ S.states[st]=!S.states[st]; d.className='st '+(S.states[st]?'on':'off'); bump(); scheduleDraw(); updateStats(); writeUrl(); };
+    d.ondblclick=function(){ openSharePanel(st); };
+    host.appendChild(d);
+  });
+  $('st-count').textContent='('+sts.length+')';
+  $('st-all').onclick=function(){ sts.forEach(function(s){S.states[s]=true}); buildStatePanel(); bump(); scheduleDraw(); updateStats(); writeUrl(); };
+  $('st-none').onclick=function(){ sts.forEach(function(s){S.states[s]=false}); buildStatePanel(); bump(); scheduleDraw(); updateStats(); writeUrl(); };
+}
+function buildPeoPanel(){
+  var host=$('peo-list'); host.innerHTML='';
+  var q=($('peo-search').value||'').toLowerCase();
+  var rows=catRows(); var sel=selMap();
+  $('peo-count').textContent='('+rows.length+')';
+  rows.forEach(function(r){
+    if(q && String(r.display||r.slug).toLowerCase().indexOf(q)<0) return;
+    var on=sel[r.slug]!==false;
+    var d=document.createElement('div'); d.className='peo-row '+(on?'on':'off');
+    var sw=document.createElement('span'); sw.className='sw'; sw.style.background=r.color_hex||OTHER;
+    var nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.display||r.slug; nm.title=(r.display||r.slug)+' · slug: '+r.slug+(r.color_basis?' · color: '+r.color_basis:'');
+    var ct=document.createElement('span'); ct.className='ct';
+    var unpl=Number(r.n_unplaced)||0, placed=Math.max(0, Number(r.n_clients)-unpl);   // v3.17: placed vs location-pending (0588)
+    ct.textContent=placed.toLocaleString();
+    ct.title=Number(r.n_clients).toLocaleString()+' clients attributed · '+placed.toLocaleString()+' placed on the map'+(unpl?' · '+unpl.toLocaleString()+' location pending (recorded at the PEO’s own address — real address being resolved)':'');
+    if(unpl) ct.className+=' pend';
+    var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
+    so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
+    d.onclick=function(){ sel[r.slug]=sel[r.slug]===false?true:false; afterSel(); };
+    d.appendChild(sw); d.appendChild(nm); d.appendChild(ct); d.appendChild(so);
+    host.appendChild(d);
+  });
+}
+function afterSel(){ bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl(); }
+$('peo-search').addEventListener('input',buildPeoPanel);
+$('peo-all').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=true}); afterSel(); };
+$('peo-none').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=false}); afterSel(); };
+$('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
+$('hqlogo-on').onchange=function(){ S.hqLogos=$('hqlogo-on').checked; scheduleDraw(); writeUrl(); };
+$('hist-on').onchange=function(){
+  S.hist=$('hist-on').checked;
+  if(S.hist) loadHist();
+  bump(); scheduleDraw(); writeUrl();
+  try{ computeViewLegend(); }catch(_){}
+};
+$('g-family').onclick=function(){ switchGrain('family') };
+$('g-brand').onclick=function(){ switchGrain('brand') };
+function switchGrain(g){
+  if(S.grain===g) return;
+  S.grain=g;
+  $('g-family').className=g==='family'?'on':''; $('g-brand').className=g==='brand'?'on':'';
+  bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl();
+}
+$('pm-addr').onclick=function(){ setPlacement('address') };
+$('pm-zip').onclick=function(){ setPlacement('zip') };
+function setPlacement(pm){
+  if(S.placement===pm) return;
+  S.placement=pm;
+  $('pm-addr').className=pm==='address'?'on':''; $('pm-zip').className=pm==='zip'?'on':'';
+  bump(); scheduleDraw(); writeUrl();
+}
+$('ms-only').onchange=function(){ setMsOnly($('ms-only').checked); };
+$('lens-peo').onclick=function(){ setLens('peo') };
+$('lens-hea').onclick=function(){ setLens('health') };
+$('lens-wc').onclick=function(){ setLens('wc') };
+function syncLensButtons(){
+  $('lens-peo').className=S.lens==='peo'?'on':''; $('lens-hea').className=S.lens==='health'?'on':''; $('lens-wc').className=S.lens==='wc'?'on':'';
+}
+function setLens(v){
+  if(S.lens===v) return;
+  S.lens=v;
+  syncLensButtons();
+  renderLensLegend();
+  bump(); scheduleDraw(); writeUrl();
+}
+function renderLensLegend(){
+  var l=$('lenslegend');
+  if(!renLens()){ l.style.display='none'; return; }
+  l.innerHTML='<span style="font-weight:650">'+(S.lens==='health'?'Health renewal':'WC renewal')+'</span>'+
+    URG_LABELS.map(function(t,i){ return '<span><i style="background:'+URG_COLORS[i]+'"></i>'+t+'</span>'; }).join('');
+  l.style.display='block';
+}
+function setMsOnly(v){
+  if(S.msOnly===v) return;
+  S.msOnly=v;
+  $('ms-only').checked=v;
+  bump(); scheduleDraw(); updateStats(); writeUrl();
+}
+// v3.21 evidence filter (minimum corroborating sources)
+function syncSrcButtons(){ [0,1,2].forEach(function(k){ $('src-'+k).className=(S.minSrc===k)?'on':''; }); }
+function setMinSrc(v){
+  v=Math.max(0,Math.min(2,Number(v)||0));
+  if(S.minSrc===v) return;
+  S.minSrc=v; syncSrcButtons();
+  bump(); scheduleDraw(); updateStats(); writeUrl();
+}
+$('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ setMinSrc(1) }; $('src-2').onclick=function(){ setMinSrc(2) };
+// ---- panel collapse (desktop hide / mobile drawer) ----
+function isMobile(){ return window.matchMedia('(max-width:760px)').matches; }
+function applyPanel(){
+  var p=$('panel');
+  if(isMobile()){ p.className=S.panelOpen?'open':'off'; }
+  else { p.className=S.panelOpen?'':'off'; }
+  if(S.map){ try{ google.maps.event.trigger(S.map,'resize'); }catch(e){} }
+  scheduleDraw(); scheduleViewLegend();
+}
+$('panel-toggle').onclick=function(){ S.panelOpen=!S.panelOpen; applyPanel(); };
+window.addEventListener('resize',applyPanel);
+document.addEventListener('click',function(e){
+  if(isMobile()&&S.panelOpen&&!$('panel').contains(e.target)&&e.target!==$('panel-toggle')) { S.panelOpen=false; applyPanel(); }
+});
+function updateStats(){
+  var sel=selMap(); var nSel=0;
+  catRows().forEach(function(r){ if(sel[r.slug]!==false) nSel++; });
+  var stOn=Object.keys(S.states).filter(function(s){return S.states[s]}).length;
+  $('stats').textContent=nSel+' PEOs · '+stOn+' states';
+  scheduleViewLegend();
+}
+
+// ------------------------- tooltips & card -------------------------
+function tipShow(html,ev){
+  var t=$('tip'); t.innerHTML=html; t.style.display='block';
+  var x=(ev&&ev.clientX||0)+14, y=(ev&&ev.clientY||0)+12;
+  if(x+310>innerWidth) x=innerWidth-320; if(y+190>innerHeight) y=innerHeight-200;
+  t.style.left=x+'px'; t.style.top=y+'px';
+}
+function closeTip(){ $('tip').style.display='none'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}); }
+function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
+// v3.22 SOURCING LAW (owner 2026-09-06): sourcing is proprietary and is NEVER displayed. The page shows a
+// confidence TIER only (cs = internal corroboration count, cx = internal conflict flag) — never source names,
+// never counts of sources, never raw basis strings. basisWord() reduces any basis text to a tier word.
+function evidenceLine(cs,cx){
+  if(cs==null) return '<span class="mut">Confidence: pending</span>';
+  var n=Number(cs)||0;
+  var t=n>=2?('<span style="font-weight:650">Confidence: cross-verified</span>'):(n===1?'Confidence: verified':'<span class="mut">Confidence: pending verification</span>');
+  if(cx) t+=' <span style="color:#d9822b;font-weight:650">· under review</span>';
+  return t;
+}
+function basisWord(b){
+  if(b==null||b==='') return 'unverified';
+  if(typeof b==='number') return RMB_LABELS[b]||'unverified';
+  var s=String(b);
+  if(/VOIDED/i.test(s)) return 'unknown';
+  if(/VERIFIED/.test(s)) return 'verified';
+  if(/REASONED/.test(s)) return 'reasoned';
+  if(/_floor$|_precedence$|_ledger$/.test(s)) return 'verified';
+  return 'unverified';
+}
+function openCard(p,slug,history){
+  var c=$('card');
+  // v3.22: basis fields arrive as tier words/classes from map-data v2.10 (never raw source text); basisWord() is the belt-and-braces.
+  var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(basisWord(p.renewal_month_basis))+')':'unknown';
+  var histRows='';
+  (history||[]).forEach(function(ev){
+    var what=ev.hist_kind==='switched'?('Switched '+esc(famDisp(ev.from_family))+' → '+esc(famDisp(ev.to_family_slug||'?'))):
+      ((ev.hist_kind==='departed_confirmed'?'Departed (confirmed) from ':'Departed (assumed) from ')+esc(famDisp(ev.from_family)));
+    histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+'</div>';
+  });
+  var formerBanner=p.historical?'<div class="note" style="margin-top:0;margin-bottom:6px;font-weight:650">FORMER PEO client — shown from the historical layer</div>':'';
+  var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(basisWord(p.health_renewal_basis))+')':'unknown';
+  var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(basisWord(p.peo_current_since_basis))+')':'unknown';
+  c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
+    '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div></div>'+
+    '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
+    '<div class="bd">'+formerBanner+
+    kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
+    (p.historical?'':(kv('Health renewal',hren)+kv('WC renewal',ren)))+
+    kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
+    (p.historical?'':(kv('With PEO since',since)+kv('Multistate',p.is_multistate?'yes':'no')))+
+    (p.historical?'':kv('Confidence',(function(){
+        var n=Number(p.peo_source_count)||0;
+        var t=n>=2?'cross-verified':(n===1?'verified':'pending verification');
+        if(p.peo_source_conflict) t+='<br><span style="color:#d9822b;font-weight:650">Under review — the PEO shown is our current determination</span>';
+        return t; })()))+
+    kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
+    histRows+
+    '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase.</div>'+
+    '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
+    '</div>';
+  c.style.display='block';
+}
+function openSharePanel(st){
+  api({mode:'state_share',grain:S.grain,state:st}).then(function(r){
+    var p=$('sharepanel');
+    var rows=(r.rows||[]).map(function(x){
+      return '<tr><td><span style="color:'+(S.colors[S.grain][x.slug]||OTHER)+'">●</span> '+esc(x.display)+'</td><td class="r">'+Number(x.n).toLocaleString()+'</td><td class="r">'+x.share_pct+'%</td></tr>';
+    }).join('');
+    p.innerHTML='<div class="hd"><b>'+esc(STATE_NAMES[st]||st)+'</b> — market share '+
+      '<button class="x" style="float:right;background:none;border:0;color:var(--muted);cursor:pointer" onclick="document.getElementById(\'sharepanel\').style.display=\'none\'">×</button></div>'+
+      '<table>'+rows+'</table>';
+    p.style.display='block';
+  });
+}
+
+// ------------------------- url state -------------------------
+// v3.8: the URL is NO LONGER rewritten while you use the map — a plain refresh always loads the
+// clean default view (owner: refresh looked "wrong" because yesterday's lens/zoom rode the URL).
+// Full view state travels ONLY via the Copy view link button (buildUrl), and shared links still
+// restore everything through readUrl.
+function writeUrl(){ /* intentionally inert (v3.8) */ }
+function buildUrl(){
+  try{
+    var p=new URLSearchParams(); var sel=selMap();
+    p.set('grain',S.grain);
+    var off=catRows().filter(function(r){return sel[r.slug]===false}).map(function(r){return r.slug});
+    var on=catRows().filter(function(r){return sel[r.slug]!==false}).map(function(r){return r.slug});
+    if(on.length<=40) p.set('on',on.join(',')); else if(off.length<=40) p.set('off',off.join(','));
+    var stOff=Object.keys(S.states).filter(function(s){return !S.states[s]});
+    if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
+    if(S.beaconsOn) p.set('b','1');
+    if(S.placement==='zip') p.set('pm','zip');
+    if(!S.hqLogos) p.set('hl','0');
+    if(S.msOnly) p.set('ms','1');
+    if(S.minSrc) p.set('src',String(S.minSrc));
+    if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
+    if(S.hist) p.set('hist','1');
+    if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
+    return location.origin+location.pathname+'?'+p.toString();
+  }catch(e){ return location.href; }
+}
+function readUrl(){
+  try{
+    var p=new URLSearchParams(location.search);
+    if(p.get('grain')==='brand'){ S.grain='brand'; $('g-family').className=''; $('g-brand').className='on'; }
+    var sel=selMap();
+    if(p.get('on')){ Object.keys(sel).forEach(function(k){sel[k]=false}); p.get('on').split(',').forEach(function(s){ sel[s]=true; }); }
+    else if(p.get('off')){ p.get('off').split(',').forEach(function(s){ sel[s]=false; }); }
+    if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
+    if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
+    if(p.get('hl')==='0'){ S.hqLogos=false; $('hqlogo-on').checked=false; }
+    if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
+    if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
+    if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
+    var lz=p.get('lens');
+    if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
+    else if(lz==='wc'){ S.lens='wc'; syncLensButtons(); renderLensLegend(); }
+    if(p.get('hist')==='1'){ S.hist=true; }   // honored only if the flag renders the toggle (boot)
+    S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
+  }catch(e){}
+}
+$('permalink').onclick=function(){
+  try{ navigator.clipboard.writeText(buildUrl()); $('permalink').textContent='Copied!'; setTimeout(function(){$('permalink').textContent='Copy view link'},1400); }catch(e){}
+};
+
+// ------------------------- THIS VIEW legend (live viewport market report) -------------------------
+var vlTimer=null;
+function scheduleViewLegend(){ if(vlTimer) clearTimeout(vlTimer); vlTimer=setTimeout(computeViewLegend,250); }
+function computeViewLegend(){
+  if(!S.map||!S.catalog) return;
+  var b=S.map.getBounds(); if(!b) return;
+  var ne=b.getNorthEast(), sw=b.getSouthWest();
+  var x1=mercX(sw.lng()), x2=mercX(ne.lng()), y1=mercY(ne.lat()), y2=mercY(sw.lat());
+  var sel=selMap(); var counts={}; var total=0;
+  for(var st in S.pinData){
+    if(S.states[st]===false) continue;
+    var d=S.pinData[st];
+    var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    for(var i=0;i<d.n;i++){
+      if(!vis[IDX[i]]) continue;
+      if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
+      if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
+      if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
+      var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
+    }
+  }
+  var top=Object.keys(counts).map(function(s){return [s,counts[s]]}).sort(function(a,b2){return b2[1]-a[1]}).slice(0,8);
+  var histN=0;
+  if(S.hist&&S.histData){
+    var hd=S.histData; var HMX=(S.placement==='zip')?hd.mxZ:hd.mxA, HMY=(S.placement==='zip')?hd.myZ:hd.myA;
+    for(var hj=0;hj<hd.n;hj++){
+      if(hd.sts[hj]&&S.states[hd.sts[hj]]===false) continue;
+      if(sel[hd.fams[hd.fis[hj]]]===false) continue;
+      if(HMX[hj]<x1||HMX[hj]>x2||HMY[hj]<y1||HMY[hj]>y2) continue;
+      histN++;
+    }
+  }
+  S._vlSummary={total:total, top:top.map(function(t){return {slug:t[0], name:dispOf(t[0]), n:t[1]}}), historical_in_view:(S.hist&&S.histData)?histN:undefined};
+  var visSel=catRows().filter(function(r){return selMap()[r.slug]!==false});
+  if(visSel.length===2&&total>0){
+    var a=counts[visSel[0].slug]||0, b3=counts[visSel[1].slug]||0;
+    $('vl-total').innerHTML='Head-to-head here: <b style="color:'+colorOf(visSel[0].slug)+'">'+esc(visSel[0].display)+'</b> '+a.toLocaleString()+' vs <b style="color:'+colorOf(visSel[1].slug)+'">'+esc(visSel[1].display)+'</b> '+b3.toLocaleString();
+  } else {
+    $('vl-total').textContent=total?total.toLocaleString()+' clients in this view':'no clients in this view';
+  }
+  if(S.hist&&S.histData&&histN>0){ $('vl-total').innerHTML+=' <span style="color:var(--muted);font-weight:500">· '+histN.toLocaleString()+' former (historical)</span>'; }
+  var host=$('viewlegend'); host.innerHTML='';
+  top.forEach(function(t){
+    var pct=total?Math.round(100*t[1]/total):0;
+    var r=document.createElement('div'); r.className='vl-row'; r.title=dispOf(t[0])+' · '+t[1].toLocaleString()+' clients here — click to show only them';
+    r.innerHTML='<span class="dot" style="background:'+colorOf(t[0])+'"></span><span class="nm">'+esc(dispOf(t[0]))+'</span>'+
+      '<span class="bar"><i style="width:'+Math.max(3,pct)+'%;background:'+colorOf(t[0])+'"></i></span><span class="ct">'+pct+'%</span>';
+    r.onclick=function(){ var sm=selMap(); Object.keys(sm).forEach(function(k2){sm[k2]=false}); sm[t[0]]=true; afterSel(); };
+    host.appendChild(r);
+  });
+}
+
+// ------------------------- search-and-fly -------------------------
+function flyTo(lat,lng,z){ if(!S.map) return; S.map.panTo({lat:Number(lat),lng:Number(lng)}); if(z) S.map.setZoom(z); }
+var qTimer=null;
+$('q').addEventListener('input',function(){
+  var v=this.value.trim();
+  if(qTimer) clearTimeout(qTimer);
+  if(v.length<2){ $('q-drop').style.display='none'; return; }
+  qTimer=setTimeout(function(){ runSearch(v); },300);
+});
+$('q').addEventListener('keydown',function(e){ if(e.key==='Escape') $('q-drop').style.display='none'; });
+document.addEventListener('click',function(e){ try{ if(!$('searchwrap').contains(e.target)) $('q-drop').style.display='none'; }catch(_){} });
+function runSearch(v){
+  api({mode:'search',q:v}).then(function(r){
+    var d=$('q-drop'); d.innerHTML='';
+    function row(html,fn){ var e=document.createElement('div'); e.className='q-row'; e.innerHTML=html; e.onclick=fn; d.appendChild(e); }
+    function hd(t){ var e=document.createElement('div'); e.className='q-hd'; e.textContent=t; d.appendChild(e); }
+    if((r.companies||[]).length){ hd('Companies');
+      r.companies.forEach(function(c){
+        var slug=(S.grain==='brand')?(c.brand_slug||c.family_slug):c.family_slug;
+        row('<span class="dot" style="background:'+colorOf(slug)+'"></span>'+esc(c.company_display)+'<span class="sub">'+esc((c.city||'')+', '+(c.state||''))+'</span>',
+          function(){ $('q-drop').style.display='none'; flyTo(c.lat,c.lng,14.5);
+            api({mode:'company',id:c.company_id}).then(function(rr){ if(rr.company) openCard(rr.company,slug,rr.history); }).catch(function(){}); });
+      });
+    }
+    if((r.cities||[]).length){ hd('Places');
+      r.cities.forEach(function(c){ row('&#128205; '+esc(c.city+', '+c.state),function(){ $('q-drop').style.display='none'; flyTo(c.lat,c.lng,11); }); });
+    }
+    (r.zips||[]).forEach(function(z){ row('&#128205; ZIP '+esc(z.zip)+'<span class="sub">'+esc(z.state||'')+'</span>',function(){ $('q-drop').style.display='none'; flyTo(z.lat,z.lng,12.5); }); });
+    d.style.display=d.children.length?'block':'none';
+  }).catch(function(){});
+}
+
+// ------------------------- AI dock (the map copilot) -------------------------
+$('ai-hd').onclick=function(){ var a=$('aidock'); a.className=a.className==='min'?'':'min'; $('ai-min').textContent=a.className==='min'?'▴':'▾'; };
+$('ai-send').onclick=function(){ aiAsk($('ai-q').value.trim()); };
+$('ai-q').addEventListener('keydown',function(e){ if(e.key==='Enter') aiAsk(this.value.trim()); });
+$('ai-desc').onclick=function(){ aiAsk('Describe this view for me.'); };
+function viewContext(){
+  var stOn=Object.keys(S.states).filter(function(s){return S.states[s]});
+  return { grain:S.grain, placement:S.placement, lens:S.lens, min_sources:S.minSrc,
+    states_on: stOn.length<=15?stOn:stOn.length+' states',
+    zoom: S.map?Math.round(S.map.getZoom()*10)/10:null,
+    center: S.map?{lat:Math.round(S.map.getCenter().lat()*100)/100,lng:Math.round(S.map.getCenter().lng()*100)/100}:null,
+    in_view: S._vlSummary||null };
+}
+function aiAsk(q){
+  if(!q) return;
+  var a=$('aidock'); if(a.className==='min'){ a.className=''; $('ai-min').textContent='▾'; }
+  $('ai-send').disabled=true; $('ai-ans').textContent='Thinking…';
+  api({mode:'ai', q:q, view:viewContext()}).then(function(r){
+    $('ai-send').disabled=false;
+    if(r.error){ $('ai-ans').textContent=r.detail||('Unavailable: '+r.error); return; }
+    $('ai-ans').textContent=r.answer||'—';
+    applyFilterSpec(r.filter_spec);
+    if(r.fly_to&&isFinite(Number(r.fly_to.lat))&&isFinite(Number(r.fly_to.lng))){
+      flyTo(Number(r.fly_to.lat),Number(r.fly_to.lng),Number(r.fly_to.zoom)||undefined);
+    }
+    $('ai-q').value='';
+  }).catch(function(){ $('ai-send').disabled=false; $('ai-ans').textContent='Could not reach the map brain — try again.'; });
+}
+function applyFilterSpec(fs){
+  if(!fs||typeof fs!=='object') return;
+  if(fs.grain==='family'||fs.grain==='brand') switchGrain(fs.grain);
+  if(fs.placement==='address'||fs.placement==='zip') setPlacement(fs.placement);
+  if(fs.states==='all'){ Object.keys(S.states).forEach(function(s){S.states[s]=true}); buildStatePanel(); }
+  else if(Array.isArray(fs.states)&&fs.states.length){
+    Object.keys(S.states).forEach(function(s){S.states[s]=false});
+    fs.states.forEach(function(s){ var u=String(s).toUpperCase(); if(u in S.states) S.states[u]=true; });
+    buildStatePanel();
+  }
+  var sel=selMap();
+  if(fs.solo){ Object.keys(sel).forEach(function(k){sel[k]=false}); sel[String(fs.solo)]=true; }
+  else if(Array.isArray(fs.on)&&fs.on.length){ Object.keys(sel).forEach(function(k){sel[k]=false}); fs.on.forEach(function(s){sel[String(s)]=true}); }
+  if(Array.isArray(fs.off)) fs.off.forEach(function(s){sel[String(s)]=false});
+  bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl();
+}
+
+// ------------------------- start -------------------------
+S.panelOpen=!isMobile();          // mobile: map first, drawer on ☰
+applyPanel();
+loadGmaps();
+if(!deskKey()){ showGate(false); } else { boot(); }
+</script>
+</body>
+</html>

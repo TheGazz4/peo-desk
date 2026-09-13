@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PEO_Engine — AI Data Desk</title>
+<style>
+  /* palette: Gazz platform scheme (2026-08-17) — deep blue-black + coral/blue/green/purple.
+     Validator-passing categorical order: coral → blue → green → purple (blue+purple never adjacent unlabeled). */
+  :root{
+    --page:#070b0f; --surface:#0d141b; --surface2:#131c25;
+    --ink:#ecf1f4; --ink2:#aebac3; --muted:#71808b;
+    --grid:#223039; --base:#2e3e4a; --ring:rgba(255,255,255,.08);
+    --accent:#6390ee; --accent-dim:#4470c8;
+    --good:#43a566; --warn:#e0985c; --serious:#e0985c; --crit:#de6b5f;
+    --rem:#9781ea;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1100px 700px at 6% -8%, rgba(22,52,58,.45) 0%, rgba(22,52,58,0) 60%), var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:14px 16px 60px}
+  h1{font-size:15px;letter-spacing:.14em;margin:0;font-weight:700}
+  .blurb{font-style:italic;color:var(--muted);font-size:12px}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .hd-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--ring);background:var(--surface);font-size:11.5px;color:var(--ink2);white-space:nowrap}
+  .chip b{color:var(--ink);font-weight:600}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .chip.good{background:rgba(67,165,102,.14)} .chip.crit{background:rgba(222,107,95,.16);font-weight:600} .chip.warn{background:rgba(224,152,92,.12)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+  .tile{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px}
+  .tile .v{font-size:22px;font-weight:700} .tile .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .tile .s{font-size:11px;color:var(--ink2)}
+  .tabs{display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--grid);margin:14px 0 12px;flex-wrap:wrap}
+  .tabs button{background:none;border:none;color:var(--ink2);font:inherit;font-size:13px;padding:7px 12px;cursor:pointer;border-bottom:2px solid transparent}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+  .seg{display:inline-flex;border:1px solid rgba(236,241,244,.16);border-radius:8px;overflow:hidden;margin-right:10px}
+  .seg button{padding:6px 12px;border-bottom:none;font-size:12.5px}
+  .seg button.on{background:var(--accent);color:#08111e;font-weight:600}
+  .tabs .desklink{margin-left:auto;color:var(--muted);font-size:12px;text-decoration:none}
+  .tabs .desklink+.desklink{margin-left:12px}
+  .tabs .desklink:hover{color:var(--ink2)}
+  section.tab{display:none} section.tab.on{display:block}
+  textarea,input[type=text],input[type=password],select{width:100%;background:var(--surface);color:var(--ink);border:1px solid var(--base);border-radius:8px;padding:9px 11px;font:inherit}
+  textarea{resize:vertical;min-height:64px} textarea.sqlbox{font-family:var(--mono);font-size:12.5px;min-height:96px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .btn{background:var(--accent);border:none;color:#fff;font:inherit;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer;white-space:nowrap}
+  .btn:hover{background:var(--accent-dim)} .btn[disabled]{opacity:.5;cursor:wait}
+  .btn.ghost{background:var(--surface);border:1px solid var(--base);color:var(--ink2);font-weight:500}
+  .btn.ghost:hover{color:var(--ink)}
+  .mini{font-size:11.5px;color:var(--muted)}
+  label.ck{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--ink2);cursor:pointer}
+  .ex{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .ex button{background:var(--surface2);border:1px solid var(--ring);color:var(--ink2);font-size:11.5px;padding:4px 10px;border-radius:999px;cursor:pointer}
+  .ex button:hover{color:var(--ink);border-color:var(--accent)}
+  .pulls{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px;margin-top:14px}
+  .pull{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;font:inherit;color:var(--ink)}
+  .pull:hover{border-color:var(--accent)}
+  .pull.viewing{border-color:var(--rem);box-shadow:0 0 0 1px var(--rem)}
+  .pull .pl{font-weight:600;font-size:13px}
+  .pull .pb{font-size:11px;color:var(--muted);font-style:italic;margin-top:2px}
+  #banner{display:none;margin:10px 0;padding:10px 12px;border-radius:8px;font-size:12.5px;border:1px solid}
+  #banner.warn{display:block;background:rgba(224,152,92,.10);border-color:rgba(224,152,92,.4);color:#f0c9a6}
+  #banner.crit{display:block;background:rgba(222,107,95,.10);border-color:rgba(222,107,95,.45);color:#f2ada4}
+  #result{margin-top:16px;display:none}
+  #r-title{font-size:15px;font-weight:700;margin:0}
+  #r-summary{font-style:italic;color:var(--ink2);font-size:12.5px;margin:2px 0 6px}
+  #r-meta{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+  #r-meta b{color:var(--ink2)}
+  .tablewrap{overflow:auto;border:1px solid var(--grid);border-radius:10px;max-height:62vh;background:var(--surface)}
+  .tablewrap.mini{max-height:34vh;margin-bottom:4px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  thead th{position:sticky;top:0;background:var(--surface2);color:var(--ink2);text-align:left;padding:7px 10px;border-bottom:1px solid var(--base);cursor:pointer;white-space:nowrap;user-select:none}
+  thead th .arr{color:var(--accent);font-size:10px}
+  tbody td{padding:6px 10px;border-bottom:1px solid var(--grid);vertical-align:top;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  tbody tr:hover{background:rgba(99,144,238,.08)}
+  tbody.clickable tr{cursor:pointer}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.null{color:var(--base)}
+  .up{color:var(--good);font-weight:600;white-space:nowrap} .dn{color:var(--crit);font-weight:600;white-space:nowrap} .flat{color:var(--muted);white-space:nowrap}
+  th.gl{cursor:help;text-decoration:underline dotted rgba(236,241,244,.28);text-underline-offset:3px}
+  tfoot td{padding:7px 10px;border-top:2px solid var(--base);background:var(--surface2);font-weight:700;font-variant-numeric:tabular-nums}
+  details{margin-top:8px} summary{cursor:pointer;color:var(--muted);font-size:12px}
+  pre.sql{background:var(--surface);border:1px solid var(--grid);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;color:var(--ink2)}
+  .hist{border:1px solid var(--grid);border-radius:8px;background:var(--surface);margin-bottom:6px;padding:8px 12px;cursor:pointer}
+  .hist:hover{border-color:var(--accent)}
+  .hist .q{font-size:13px} .hist .m{font-size:11px;color:var(--muted);margin-top:2px}
+  #r-card{display:none}
+  .defgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 16px;margin:10px 0}
+  .def{font-size:12.5px;border-bottom:1px solid var(--grid);padding:3px 0;overflow:hidden;text-overflow:ellipsis}
+  .def .k{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;display:block}
+  h3.sec{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin:16px 0 6px}
+  h3.sec .cnt{color:var(--muted);font-weight:400}
+  h3.sec{border-left:3px solid var(--accent);padding-left:8px}
+  td.ctr,th.ctr{text-align:center}
+  th.num{text-align:right}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600}
+  .pill.good{background:rgba(67,165,102,.14);color:var(--good)}
+  .pill.mut{background:rgba(113,128,139,.16);color:var(--muted)}
+  .narr{font-size:12.5px;color:var(--ink2);font-style:italic;margin:8px 0;max-width:920px}
+  #keygate{position:fixed;inset:0;background:var(--page);display:none;align-items:center;justify-content:center;z-index:50}
+  #keygate.on{display:flex}
+  .gatecard{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:26px;max-width:430px;width:92%}
+  .gatecard h2{margin:0 0 4px;font-size:15px;letter-spacing:.1em}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--base);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (max-width:640px){ body{padding:10px 10px 50px} .tile .v{font-size:18px} }
+</style>
+</head>
+<body>
+
+<header>
+  <div><h1>PEO_ENGINE · AI DATA DESK</h1><div class="blurb">pull up anything — one click, a company name, or a question in English. <span class="mini" id="buildStamp">build v4.10 · 2026-08-27</span></div></div>
+  <div class="hd-chips" id="chips"></div>
+</header>
+
+<section class="tiles" id="tiles"></section>
+<div id="banner"></div>
+
+<nav class="tabs">
+  <button data-tab="pull" class="on">Pull</button>
+  <button data-tab="switchboard">Switchboard</button><a href="map.html" title="PEO Coverage Map — pins, clusters, AI copilot" style="color:#6390ee;text-decoration:none;font-size:12.5px;padding:7px 10px;align-self:center;white-space:nowrap">&#128506; Map</a>
+  <button data-tab="renewal">Renewal Intel</button>
+  <button data-tab="peos">PEOs</button>
+  <button data-tab="kpi">KPI</button>
+  <button data-tab="ask">Ask AI</button>
+  <button data-tab="browse">Browse</button>
+  <button data-tab="sql">SQL</button>
+  <button data-tab="forecast">Forecast</button>
+  <button data-tab="history">History</button>
+  <a class="desklink" href="index.html">← Command Desk</a>
+  <a class="desklink" href="#" id="logoutLink">sign out</a>
+</nav>
+
+<section class="tab on" id="tab-pull">
+  <div class="row" style="margin-top:0">
+    <input type="text" id="coQ" placeholder="type a company name and hit Enter — e.g. ACME ROOFING" style="max-width:460px">
+    <button class="btn" id="coBtn">Find company</button>
+    <span class="mini" id="coUniverse">search the company universe → click a row for the full company card</span>
+    <button class="btn ghost" id="rbaBtn" style="margin-left:auto" title="Result-back audit (RBA): samples company cards at random and traces what is displayed back to primary sources. Surfaces findings only — nothing is auto-fixed.">Run data audit</button>
+  </div>
+  <div class="pulls" id="pulls"></div>
+</section>
+
+<section class="tab" id="tab-switchboard">
+  <div class="blurb" style="margin-bottom:6px">the ranked list — every VERIFIED company scored by the live model (renewal-proximity, the only signal that survived backtest), reasons on every row, graded as outcomes arrive. Work top-down; log what happens — booked/closed/fizzled flow back through the gate and grade the model.</div>
+  <div class="row" style="margin-top:0">
+    <button class="btn" id="swReload">Load queue</button>
+    <label class="ck"><input type="checkbox" id="swWorkable" checked> workable only <span class="mini">(hide closed/dismissed)</span></label>
+    <span class="mini" id="swNote"></span>
+  </div>
+  <div id="swCard" class="mini" style="margin-top:8px"></div>
+  <div class="tablewrap" id="swWrap" style="margin-top:8px;display:none"><table id="swTable"></table></div>
+</section>
+
+<section class="tab" id="tab-renewal">
+  <div class="blurb" style="margin-bottom:6px">the timing-truth scoreboard — client-level health renewal months earned by evidence (KNOWN/LIKELY per mandate §5), never defaulted. Blank is honest. Brand instrument dates (WC books, master policy filings) are education, never client months. Every figure is a live view (v_ri_*), nothing hardcoded.</div>
+  <div class="row" style="margin-top:0"><button class="btn" id="riReload">Load scoreboard</button><button class="btn ghost" id="riCalBtn" title="the brand-level health master policy calendar (existing pull — the instrument layer this tab must never be confused with)">Health master calendar</button><span class="mini" id="riNote"></span></div>
+  <div id="riHead" class="mini" style="margin-top:8px"></div>
+  <div id="riBars" style="margin-top:8px"></div>
+  <div style="margin-top:12px"><div class="mini" style="margin-bottom:4px"><b>CALL LIST — OPEN SEASON NOW</b> — hottest first (live switch score, then window proximity). Ask the two questions — "when does your health plan renew?" and "who's your carrier?" — and log them right here; the gate runs the tier ladder (LIKELY alone, KNOWN when it corroborates, conflicts held for review). <button class="btn ghost" id="riCallLoad" style="padding:3px 10px;font-size:11.5px">Load call list</button> <span class="mini" id="riCallNote"></span></div><div class="tablewrap" id="riCallWrap" style="display:none"><table id="riCallTable"></table></div></div>
+  <div style="margin-top:10px"><div class="mini" style="margin-bottom:4px"><b>THE PEO LENS</b> — how much of each book we hold the timing code on (sorted by book size; modeled-only = legacy brand-inherited layer, shown for contrast, never counted as profiled)</div><div class="tablewrap"><table id="riLens"></table></div></div>
+  <div style="margin-top:10px"><div class="mini" style="margin-bottom:4px"><b>TOP-20 REGIME DOSSIERS</b> — chip = regime standing (ratified / hypothesis / unknown); n/9 = mandated section completeness; click a family for the full dossier</div><div class="tablewrap"><table id="riGrid"></table></div></div>
+  <div id="riEdu" class="mini" style="margin-top:10px"></div>
+  <div id="riFresh" class="mini" style="margin-top:4px"></div>
+  <div id="riDossier" style="display:none;margin-top:10px;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:12px;max-height:480px;overflow:auto"><div class="row" style="margin-top:0"><b id="riDosTitle"></b><button class="btn ghost" id="riDosClose" style="margin-left:auto">Close</button></div><pre id="riDosBody" style="white-space:pre-wrap;font-size:12px;line-height:1.5"></pre></div>
+</section>
+
+<section class="tab" id="tab-peos">
+  <div class="blurb" style="margin-bottom:6px">every PEO — same calcs at either grain. <b>PEO family</b> = the canonical group (ADP entities roll up); <b>Specific PEO</b> = the written brand (Vensure members stand alone; fold-ruled names like Paychex PEO merge their families). health_funding is the 3-state call from the H&amp;W 5500; hover any header for what it means.</div>
+  <div class="row" style="margin-top:0"><span class="seg"><button id="grainFam" class="on">PEO family</button><button id="grainBrand">Specific PEO</button></span><button class="btn" id="peoReload">Reload</button><span class="mini" id="peoGrainNote">612 family profiles, ranked by current clients (capped at 500 rows)</span></div>
+</section>
+
+<section class="tab" id="tab-kpi">
+  <div class="blurb" style="margin-bottom:6px">market scoreboard — OUR attribution vs each PEO's FILED numbers. Total WSE Count from 10-Ks/5500s (basis-labeled), visibility = share of their book we see, switch W/L from the mesh cohort, book-size priors. Snapshots accrue weekly for trends.</div>
+  <div class="row" style="margin-top:0"><button class="btn" id="kpiReload">Load KPI board</button><span class="mini">41 families with filed denominators — ranked by Total WSE; hover headers for definitions</span></div>
+</section>
+
+<section class="tab" id="tab-ask">
+  <div class="blurb" style="margin-bottom:6px">anything the buttons don't cover — ask in plain English, get a table + the SQL receipt.</div>
+  <textarea id="q" placeholder="e.g. companies that left insperity in 2026 and where they went, with headcounts"></textarea>
+  <div class="row">
+    <button class="btn" id="askBtn">Ask</button>
+    <label class="ck"><input type="checkbox" id="tierSonnet"> Sonnet only <span class="mini">(sharper on hard questions, ~3× cost)</span></label>
+    <label class="ck"><input type="checkbox" id="followup"> follow-up <span class="mini">(builds on the last answer)</span></label>
+  </div>
+  <div class="ex" id="examples"></div>
+</section>
+
+<section class="tab" id="tab-browse">
+  <div class="blurb" style="margin-bottom:6px">raw peek — 50 rows of anything. Business surfaces on top, raw plumbing below.</div>
+  <div class="row" style="margin-top:0">
+    <input type="text" id="tblFilter" placeholder="filter… (e.g. switch, fl_, 5500)" style="max-width:260px">
+    <select id="tblSelect" style="max-width:460px"></select>
+    <button class="btn" id="sampleBtn">Load 50 rows</button>
+  </div>
+</section>
+
+<section class="tab" id="tab-sql">
+  <div class="blurb" style="margin-bottom:6px">exact SQL, executed read-only (single SELECT, 20s timeout, 500-row cap).</div>
+  <textarea id="sqlIn" class="sqlbox" placeholder="select state, count(*) as companies from companies group by 1 order by 2 desc limit 20"></textarea>
+  <div class="row"><button class="btn" id="runSqlBtn">Run read-only</button><span class="mini">Ctrl/Cmd+Enter runs</span></div>
+</section>
+
+<section class="tab" id="tab-forecast">
+  <div class="blurb" style="margin-bottom:6px">the prediction desk — frozen vintages closing the 5500 gap. &#39;25 est = roster units (scored vs actuals as filings land Aug–Oct); &#39;26 YTD = fast-clock nowcast off public WSE anchors; backtest rows carry real error vs known actuals. hover any header for definitions.</div>
+  <div class="row" style="margin-top:0"><span class="seg"><button id="fcMain" class="on">Forecasts</button><button id="fcSize">Client size</button></span><button class="btn" id="fcReload">Reload</button><span class="mini" id="fcNote">frozen vintages — never retro-edited; accuracy column fills as 5500 actuals mature</span></div>
+</section>
+
+<section class="tab" id="tab-history">
+  <div class="blurb" style="margin-bottom:6px">recent pulls and questions — click to re-run (free, no AI cost).</div>
+  <div id="histList"></div>
+</section>
+
+<section id="result">
+  <h2 id="r-title"></h2>
+  <div id="r-summary"></div>
+  <div id="r-meta"></div>
+  <div id="r-card"></div>
+  <div class="tablewrap" id="r-wrap"><table id="r-table"></table></div>
+  <div class="row" id="r-actions">
+    <input type="text" id="rFilter" placeholder="filter these rows…" style="max-width:220px">
+    <button class="btn ghost" id="csvBtn">Download CSV</button>
+    <button class="btn ghost" id="refineBtn">Refine with AI ↩</button>
+    <span class="mini" id="r-trunc"></span>
+  </div>
+  <details id="r-sqlbox"><summary>SQL</summary><pre class="sql" id="r-sql"></pre></details>
+</section>
+
+<div id="keygate"><div class="gatecard">
+  <h2>AI DATA DESK</h2>
+  <div class="blurb" style="margin-bottom:14px">sign in — this login also unlocks the Command Desk in this browser.</div>
+  <button class="btn" id="googleBtn" style="display:none;width:100%;background:#fff;color:#1a1a19;margin-bottom:10px">Continue with Google</button>
+  <div class="mini" id="orSep" style="display:none;text-align:center;margin-bottom:10px">— or —</div>
+  <input type="text" id="emailIn" placeholder="email" autocomplete="username">
+  <div style="height:8px"></div>
+  <input type="password" id="pwIn" placeholder="password" autocomplete="current-password">
+  <div class="row"><button class="btn" id="loginBtn">Sign in</button><span class="mini" id="keyMsg"></span></div>
+  <div class="row" style="margin-top:14px">
+    <a href="#" id="showSetup" class="mini" style="color:var(--accent)">first time? create your login</a>
+    <a href="#" id="showKey" class="mini" style="color:var(--muted)">use desk key instead</a>
+  </div>
+  <div id="setupBox" style="display:none;margin-top:10px;border-top:1px solid var(--grid);padding-top:12px">
+    <div class="mini" style="margin-bottom:8px">creates your email + password login. Needs the desk key present — open this page in the browser where the Command Desk already works, or paste the key under "use desk key instead" first.</div>
+    <input type="text" id="suEmail" placeholder="your email">
+    <div style="height:8px"></div>
+    <input type="password" id="suPw" placeholder="choose a password (10+ characters)">
+    <div class="row"><button class="btn" id="setupBtn">Create login</button><span class="mini" id="setupMsg"></span></div>
+  </div>
+  <div id="keyBox" style="display:none;margin-top:10px;border-top:1px solid var(--grid);padding-top:12px">
+    <input type="text" id="keyIn" placeholder="desk key (Vault: desk_access_key)" autocomplete="off">
+    <div class="row"><button class="btn ghost" id="keyBtn">Enter with key</button></div>
+  </div>
+</div></div>
+
+<script>
+(function(){
+  'use strict';
+  var SB='https://lzasgflrxxrssjntrfmt.supabase.co';
+  var FN=SB+'/functions/v1/dash-ai';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
+  var PAGES='https://thegazz4.github.io/peo-desk/ask.html';
+
+  var mem={};
+  function sget(k){ try{ return localStorage.getItem(k); }catch(e){ return mem[k]||null; } }
+  function sset(k,v){ try{ localStorage.setItem(k,v); }catch(e){ mem[k]=v; } }
+  function sdel(k){ try{ localStorage.removeItem(k); }catch(e){ delete mem[k]; } }
+
+  var KEY=sget('peo_dash_key')||sget('desk_key')||'';
+  var AUTH=null; try{ AUTH=JSON.parse(sget('peo_auth')||'null'); }catch(e){ AUTH=null; }
+  function saveAuth(a){ AUTH=a; if(a) sset('peo_auth',JSON.stringify(a)); else sdel('peo_auth'); }
+  function authValid(){ return !!(AUTH&&AUTH.access_token&&AUTH.expires_at&&(AUTH.expires_at-60)>(Date.now()/1000)); }
+  function refreshAuth(){
+    if(!AUTH||!AUTH.refresh_token) return Promise.reject('no refresh token');
+    return fetch(SB+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:AUTH.refresh_token})})
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j.access_token) throw 'refresh failed';
+        saveAuth({access_token:j.access_token,refresh_token:j.refresh_token||AUTH.refresh_token,expires_at:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600)});
+      });
+  }
+
+  // OAuth return (Google): tokens arrive in the URL hash — capture, store, clean the URL
+  try{
+    if(location.hash.indexOf('access_token=')>=0){
+      var hp={}; location.hash.slice(1).split('&').forEach(function(kv){ var p=kv.split('='); hp[p[0]]=decodeURIComponent((p[1]||'').replace(/\+/g,' ')); });
+      if(hp.access_token){ saveAuth({access_token:hp.access_token,refresh_token:hp.refresh_token||null,expires_at:Number(hp.expires_at)||Math.floor(Date.now()/1000)+(Number(hp.expires_in)||3600)}); history.replaceState(null,'',location.pathname+location.search); }
+    }
+  }catch(e){}
+
+  var last={q:null,sql:null}, lastRes=null, tables=[], statusTimer=null, rowFilter='';
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+
+  function api(body,ms){
+    var pre=Promise.resolve();
+    if(AUTH&&!authValid()) pre=refreshAuth().catch(function(){ saveAuth(null); });
+    return pre.then(function(){
+      var h={'Content-Type':'application/json','apikey':ANON};
+      if(authValid()){ h['Authorization']='Bearer '+AUTH.access_token; }
+      else { h['Authorization']='Bearer '+ANON; if(KEY) h['x-desk-key']=KEY; }
+      return fetch(FN,{method:'POST',headers:h,body:JSON.stringify(body),signal:(AbortSignal&&AbortSignal.timeout)?AbortSignal.timeout(ms||45000):undefined});
+    }).then(function(r){ return r.json().then(function(j){ j.__http=r.status; return j; }); });
+  }
+
+  function banner(kind,html){ var b=$('banner'); if(!kind){ b.className=''; b.style.display='none'; return; } b.className=kind; b.innerHTML=html; }
+
+  // ---------- status ----------
+  function chip(cls,dot,html){ return '<span class="chip '+cls+'"><span class="dot" style="background:'+dot+'"></span>'+html+'</span>'; }
+  function fmtN(x){ if(x==null) return '—'; x=Number(x); return x>=1e6?(x/1e6).toFixed(2)+'M':x.toLocaleString(); }
+  function renderStatus(s){
+    var gOpen=!!s.gate_open, org=s.org||'?';
+    $('chips').innerHTML =
+      chip(org==='instance_b'?'good':'warn', org==='instance_b'?'var(--good)':'var(--warn)','org <b>'+esc(org)+'</b>') +
+      chip(gOpen?'good':'crit', gOpen?'var(--good)':'var(--crit)','AI <b>'+(gOpen?'ON':'GATED')+'</b>') +
+      chip('', 'var(--accent)','MTD <b>$'+Number(s.mtd||0).toFixed(2)+'</b> / $'+Number(s.cap||0).toFixed(0)) +
+      chip('', 'var(--accent)','today <b>$'+Number(s.today||0).toFixed(2)+'</b>');
+    var t=[['companies',s.companies,'resolved universe · to date'],['observations',s.observations,'bitemporal ledger · to date'],['switches detected',s.switches,'to date'],['plays in feed',s.plays_live,fmtN(s.plays_hot)+' hot right now']];
+    $('tiles').innerHTML=t.map(function(x){ return '<div class="tile"><div class="l">'+x[0]+'</div><div class="v">'+fmtN(x[1])+'</div><div class="s">'+esc(x[2])+'</div></div>'; }).join('');
+    if(s.companies!=null&&$('coUniverse')) $('coUniverse').textContent='search the '+fmtN(s.companies)+'-company universe → click a row for the full company card';
+    if(!gOpen) banner('warn','<b>Only the Ask-AI tab is gated</b> (Anthropic cap: $'+Number(s.mtd||0).toFixed(2)+' / $'+Number(s.cap||0).toFixed(0)+' on org “'+esc(org)+'”). Everything on the Pull, Browse, SQL and History tabs works free right now. To unlock Ask-AI: Supabase → Settings → Vault → add secret <b>anthropic_api_key_b</b> with your instance-B API key.');
+    else banner(null);
+  }
+  function loadStatus(){ api({mode:'status'},20000).then(function(j){ if(j.status) renderStatus(j.status); loadSwitchTile(); loadRenewalTile(); }).catch(function(){}); }
+  // v4.6: Switch Intelligence tile set — four live tiles from v_model_scorecard + v_switch_intelligence (quiet sql mode); click-through to Switchboard (XIV.2/XIV.5)
+  function loadSwitchTile(){
+    var Q="select s.model_id, s.as_of_cut, s.n_issued, s.switches_observed, f.hot_band, f.attested, f.top_pct, f.top_mult from v_model_scorecard s cross join (select count(*) filter (where months_to_renewal between 4 and 6) hot_band, count(*) filter (where renewal_basis_class='per_company_attested') attested, round(max(score)*100,1) top_pct, round(max(base_rate_multiple),1) top_mult from v_switch_intelligence) f limit 1";
+    api({mode:'sql',sql:Q,label:'switch tiles',quiet:true},30000).then(function(j){
+      var r=(j.rows&&j.rows[0])||null; if(!r) return;
+      function swT(id,label,val,sub){
+        var el=document.getElementById(id);
+        var html='<div class="l">'+label+'</div><div class="v">'+val+'</div><div class="s">'+sub+'</div>';
+        if(el){ el.innerHTML=html; return; }
+        var d=document.createElement('div'); d.className='tile'; d.id=id; d.style.cursor='pointer';
+        d.title='live from the switch model — click to open the Switchboard';
+        d.innerHTML=html;
+        d.onclick=function(){ var b=document.querySelector('.tabs button[data-tab="switchboard"]'); if(b) b.click(); window.scrollTo({top:0,behavior:'smooth'}); };
+        $('tiles').appendChild(d);
+      }
+      swT('swT1','switch intelligence',Number(r.n_issued).toLocaleString(),'scored · model #'+r.model_id+' · cut '+esc(String(r.as_of_cut)));
+      swT('swT2','hot band · 4–6 mo',Number(r.hot_band).toLocaleString(),'in the shopping window — work first');
+      swT('swT3','attested timing',Number(r.attested).toLocaleString(),'regulator-attested x-dates · rest inferred');
+      swT('swT4','top signal',(r.top_pct==null?'—':r.top_pct+'%'),(r.top_mult==null?'':r.top_mult+'× base rate')+' · outcomes '+r.switches_observed+' · graded weekly');
+    }).catch(function(){});
+  }
+
+
+  // ---------- renewal intelligence (RI mandate §6.5): thin reader over v_ri_* — DB does all math ----------
+  function loadRenewalTile(){
+    var Q="select timing_truth_pct, month_populated, month_known, month_likely, scored_book_companies, open_season_now, carrier_populated from v_ri_coverage_tile";
+    api({mode:'sql',sql:Q,label:'renewal coverage tile',quiet:true},30000).then(function(j){
+      var r=(j.rows&&j.rows[0])||null; if(!r) return;
+      var el=document.getElementById('riT1');
+      var html='<div class="l">renewal coverage</div><div class="v">'+(r.timing_truth_pct==null?'0':r.timing_truth_pct)+'%</div><div class="s">'+fmtN(r.month_populated)+' months held (K '+r.month_known+' / L '+r.month_likely+') · '+fmtN(r.open_season_now)+' in open season</div>';
+      if(el){ el.innerHTML=html; return; }
+      var d=document.createElement('div'); d.className='tile'; d.id='riT1'; d.style.cursor='pointer';
+      d.title='timing truth: % of the scored book carrying an evidence-earned health renewal month (KNOWN+LIKELY only — blank is honest). Click for the full Renewal Intelligence scoreboard.';
+      d.innerHTML=html;
+      d.onclick=function(){ var b=document.querySelector('.tabs button[data-tab="renewal"]'); if(b) b.click(); window.scrollTo({top:0,behavior:'smooth'}); };
+      $('tiles').appendChild(d);
+    }).catch(function(){});
+  }
+  function loadRenewal(){
+    var b=$('riReload'); if(b){ b.disabled=true; b.textContent='Loading…'; }
+    api({mode:'renewal_intelligence'},45000).then(function(j){
+      if(b){ b.disabled=false; b.textContent='Load scoreboard'; }
+      if(handleCommon(j)) return;
+      var h=j.headline||{};
+      $('riHead').innerHTML='<b>timing truth '+(h.timing_truth_pct==null?'0':h.timing_truth_pct)+'%</b> of the scored book — '+fmtN(h.month_populated)+' of '+fmtN(h.scored_book_companies)+' companies carry an evidence-earned month (KNOWN '+fmtN(h.month_known)+' / LIKELY '+fmtN(h.month_likely)+' · cut '+esc(String(h.scored_book_cut||''))+') · per-tier accuracy: '+((h.known_accuracy_pct==null&&h.likely_accuracy_pct==null)?'<i>honestly empty — grading begins when observed reality (transitions, WS4 re-confirmations) arrives against populated months</i>':(String(h.known_accuracy_pct)+'% KNOWN / '+String(h.likely_accuracy_pct)+'% LIKELY'));
+      var bars=(j.tier_bars||[]).map(function(tb){
+        var tot=Number(tb.total)||1;
+        function seg(n,color,label){ var w=Math.max(0,100*Number(n||0)/tot); return '<span title="'+label+': '+fmtN(n)+'" style="display:inline-block;height:10px;width:'+w.toFixed(2)+'%;background:'+color+'"></span>'; }
+        return '<div style="margin:4px 0"><span class="mini" style="display:inline-block;width:180px">'+esc(String(tb.field))+'</span><span style="display:inline-block;width:40%;min-width:160px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;vertical-align:middle;font-size:0">'+seg(tb.known,'var(--good)','KNOWN')+seg(tb.likely,'var(--accent)','LIKELY')+seg(tb.modeled_only,'#8a6d3b','modeled-only (legacy)')+'</span><span class="mini" style="margin-left:8px" title="'+esc(String(tb.note||''))+'">K '+fmtN(tb.known)+' · L '+fmtN(tb.likely)+' · modeled '+fmtN(tb.modeled_only)+' · unknown '+fmtN(tb.unknown)+'</span></div>';
+      }).join('');
+      $('riBars').innerHTML=bars;
+      var lh='<thead><tr><th>PEO</th><th class="num">current clients</th><th class="num" title="% of the book with an evidence-earned month (KNOWN+LIKELY)">% month profiled</th><th class="num" title="% with client-level carrier attribution at KNOWN/LIKELY">% carrier known</th><th class="num" title="legacy brand-inherited months — context only, never counted as profiled">modeled-only</th></tr></thead><tbody>';
+      (j.peo_lens||[]).forEach(function(r){ lh+='<tr><td>'+esc(r.peo||r.family_slug||'')+'</td><td class="num">'+fmtN(r.current_clients)+'</td><td class="num"><b>'+(r.pct_month_profiled==null?'0':r.pct_month_profiled)+'%</b> ('+fmtN(r.month_profiled_n)+')</td><td class="num">'+(r.pct_carrier_known==null?'0':r.pct_carrier_known)+'%</td><td class="num">'+fmtN(r.modeled_only_n)+'</td></tr>'; });
+      $('riLens').innerHTML=lh+'</tbody>';
+      var gh='<thead><tr><th>family</th><th>regime</th><th class="ctr">sections</th><th class="num">current clients</th><th class="num">WS1 anchors</th><th class="ctr">version</th></tr></thead><tbody>';
+      (j.top20||[]).forEach(function(r){
+        var chipColor=r.regime_chip==='ratified'?'var(--good)':(r.regime_chip==='hypothesis'?'var(--accent)':'var(--ink2)');
+        gh+='<tr><td><a href="#" class="riDos" data-f="'+esc(String(r.family_key))+'" style="color:var(--accent);text-decoration:none">'+esc(r.family_display||r.family_key)+'</a></td><td><span style="color:'+chipColor+'">●</span> '+esc(String(r.regime_chip||''))+'</td><td class="ctr">'+r.sections_complete+'/9</td><td class="num">'+fmtN(r.current_clients)+'</td><td class="num">'+fmtN(r.ws1_anchors)+'</td><td class="ctr">v'+r.version+'</td></tr>';
+      });
+      $('riGrid').innerHTML=gh+'</tbody>';
+      Array.prototype.forEach.call($('riGrid').querySelectorAll('.riDos'),function(a){ a.onclick=function(e){ e.preventDefault(); riOpenDossier(a.getAttribute('data-f')); }; });
+      var ed=j.education||{};
+      $('riEdu').innerHTML='<b>education coverage (whole registry, live):</b> '+fmtN(ed.families_all)+' families · '+fmtN(ed.welfare_visible)+' welfare-visible · '+fmtN(ed.calendared)+' calendared (EIN-attributed Schedule A anniversaries) · '+fmtN(ed.harvest_only_remainder)+' harvest-only remainder · dossier families: '+ed.dossier_educated+' educated / '+ed.dossier_partial+' partial / '+ed.dossier_uneducated+' uneducated';
+      var f=j.freshness||{};
+      $('riFresh').innerHTML='<b>freshness &amp; momentum:</b> '+fmtN(f.open_season_now)+' in open season now · median evidence age '+(f.median_evidence_age_days==null?'—':Math.round(f.median_evidence_age_days)+'d')+' · '+(f.pct_evidence_within_90d==null?'—':f.pct_evidence_within_90d+'%')+' fresh ≤90d · net upgraded last 7d: '+fmtN(f.net_upgraded_7d)+' <span class="mini">(zero momentum = harvest discipline slipped)</span>';
+      $('riNote').textContent='Population Law live: KNOWN/LIKELY or blank — never defaulted.';
+    }).catch(function(){ if(b){ b.disabled=false; b.textContent='Load scoreboard'; } netFail(); });
+  }
+  function riOpenDossier(f){
+    f=String(f||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+    if(!f) return;
+    var Q0="select family_display, version, created_at::date::text as asof, length(dossier_md) as len from peo_regime_dossiers where family_key='"+f+"' order by version desc limit 1";
+    api({mode:'sql',sql:Q0,label:'dossier meta',quiet:true},30000).then(function(j){
+      var m=(j.rows&&j.rows[0])||null; if(!m){ banner('warn','no dossier for '+esc(f)); return; }
+      var len=Number(m.len)||0, got='', off=1;
+      function step(){
+        if(off>len){ $('riDosTitle').textContent=m.family_display+' — regime dossier v'+m.version+' ('+m.asof+')'; $('riDosBody').textContent=got; $('riDossier').style.display='block'; $('riDossier').scrollIntoView({behavior:'smooth'}); return; }
+        var Q="select substr(dossier_md,"+off+",3500) as c from peo_regime_dossiers where family_key='"+f+"' and version="+m.version;
+        api({mode:'sql',sql:Q,label:'dossier chunk',quiet:true},30000).then(function(j2){ var c=(j2.rows&&j2.rows[0]&&j2.rows[0].c)||''; got+=c; off+=3500; step(); }).catch(function(){ netFail(); });
+      }
+      step();
+    }).catch(function(){ netFail(); });
+  }
+
+  function riLoadCalls(){
+    var b=$('riCallLoad'); if(b){ b.disabled=true; b.textContent='Loading…'; }
+    var Q="select company_id, legal_name, city, state, current_peo, renewal_month, months_until, tier, confidence, basis_short, switch_pct, headcount_est, phone, prior_claims from v_ws4_call_list limit 300";
+    api({mode:'sql',sql:Q,label:'ws4 call list',quiet:true},45000).then(function(j){
+      if(b){ b.disabled=false; b.textContent='Load call list'; }
+      if(handleCommon(j)) return;
+      var rows=j.rows||[];
+      var h='<thead><tr><th>#</th><th>company</th><th>st</th><th>current PEO</th><th title="evidence-earned renewal month + tier — hover for the basis">renewal</th><th class="num" title="months until the renewal month">mo out</th><th class="num">switch %</th><th class="num">size</th><th>phone</th><th title="log what the client says — the gate runs the §5 tier ladder and reconciles every entry">log x-date / carrier</th></tr></thead><tbody>';
+      rows.forEach(function(r,i){
+        h+='<tr data-cid="'+esc(String(r.company_id))+'"><td class="num">'+(i+1)+'</td>'
+          +'<td><a href="#" class="riCo" data-cid="'+esc(String(r.company_id))+'" style="color:var(--accent);text-decoration:none">'+esc(r.legal_name||'')+'</a>'+(Number(r.prior_claims)>0?' <span class="mini">('+r.prior_claims+' logged)</span>':'')+'</td>'
+          +'<td class="ctr">'+esc(r.state||'')+'</td><td>'+esc(r.current_peo||'')+'</td>'
+          +'<td title="'+esc(r.basis_short||'')+'">'+esc(r.renewal_month||'')+' <span class="mini">'+esc(r.tier||'')+'</span></td>'
+          +'<td class="num">'+r.months_until+'</td><td class="num">'+(r.switch_pct!=null?r.switch_pct+'%':'')+'</td>'
+          +'<td class="num">'+(r.headcount_est!=null?fmtN(r.headcount_est):'')+'</td><td>'+esc(r.phone||'')+'</td>'
+          +'<td style="white-space:nowrap"><select class="riMon" style="width:auto;padding:3px 5px;font-size:11.5px"><option value="">month…</option>'+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(function(m,mi){return '<option value="'+(mi+1)+'">'+m+'</option>';}).join('')+'</select> <input type="text" class="riCarr" placeholder="carrier" style="width:80px;padding:3px 5px;font-size:11.5px"> <button class="btn ghost riLog" style="padding:3px 9px;font-size:11.5px">Log</button></td></tr>';
+      });
+      $('riCallTable').innerHTML=h+'</tbody>';
+      $('riCallWrap').style.display='block';
+      $('riCallNote').textContent=rows.length+' shown (top of the open-season book, hottest first)';
+      Array.prototype.forEach.call($('riCallTable').querySelectorAll('.riCo'),function(a){ a.onclick=function(e){ e.preventDefault(); openCard(a.getAttribute('data-cid')); }; });
+      Array.prototype.forEach.call($('riCallTable').querySelectorAll('.riLog'),function(btn){ btn.onclick=function(){
+        var tr=btn.closest('tr'); var cid=tr.getAttribute('data-cid');
+        var mon=tr.querySelector('.riMon').value; var carr=tr.querySelector('.riCarr').value.trim();
+        if(!mon&&!carr){ banner('warn','capture at least the stated month or the carrier — that is the whole harvest.'); return; }
+        btn.disabled=true; btn.textContent='…';
+        api({mode:'record_xdate',company_id:cid,month:mon||undefined,carrier:carr||undefined},30000).then(function(j2){
+          btn.disabled=false; btn.textContent='Log';
+          if(j2&&j2.ok){ var act=(j2.result&&j2.result.action)||''; banner('warn','<b>harvested through the gate:</b> '+esc(String(act).replace(/_/g,' '))+' — dated, attributed, reconciled.'); btn.textContent='✓'; }
+          else banner('crit','<b>gate refused:</b> '+esc(String((j2&&(j2.detail||j2.error))||'no response')));
+        }).catch(function(){ btn.disabled=false; btn.textContent='Log'; netFail(); });
+      }; });
+    }).catch(function(){ if(b){ b.disabled=false; b.textContent='Load call list'; } netFail(); });
+  }
+
+  // ---------- quick pulls ----------
+  var PULLS=[
+    ['Health master renewal calendar','WHEN each PEO BRAND renews its own medical master policies, and with which carriers — brand instrument dates, not client renewal months (benefit_source_precedence_law). Medical Schedule A only, EIN-attributed, latest welfare filing.',"select month_label as month, peo, renews_on, carriers_ct as carriers, medical_carriers, covered_lives from dash_health_master_calendar order by renewal_month, covered_lives desc"],
+    ['Health masters renewing next 90 days','The brands whose medical masters renew soon — carrier changes and rate actions surface here first (§2.6 disruption watch).',"select month_label as month, peo, renews_on, medical_carriers, covered_lives from dash_health_master_calendar where renewal_month in (extract(month from now())::int, extract(month from now()+interval '1 month')::int, extract(month from now()+interval '2 months')::int) order by renewal_month, covered_lives desc"],
+    ['Renewal timing truth — the PEO lens','Per PEO book: % of THEIR current clients whose health renewal month we hold at KNOWN/LIKELY tier, and % with client-level carrier attribution — simultaneously the progress report and the targeting map (mandate §6.5). modeled_only = legacy brand-inherited months, context only.',"select peo, current_clients, pct_month_profiled, month_profiled_n, pct_carrier_known, carrier_known_n, modeled_only_n from v_ri_peo_lens order by current_clients desc"],
+    ['Latest PEO switches','TO-DATE feed ordered by WHEN IT HAPPENED (evidence_as_of, valid time); detected_at = when we learned',"select * from dash_latest_switches"],
+    ['Top PEOs by clients — current book','NOW — companies attributed today (knowledge-as-of); canonical names; folded brands aggregate per your rulings',"select * from dash_top_peos_current"],
+    ['Companies by state','NOW — the resolved universe today; Σ row = total',"select * from dash_companies_by_state"],
+    ['Hot plays now','NOW — inside their timing window at this moment',"select * from dash_hot_plays"],
+    ['Plays by angle','TO-DATE minted vs NOW hot — two clocks, on purpose',"select * from dash_plays_by_angle"],
+    ['Recent departures','NOW — still dark on their last PEO as of last check',"select * from dash_recent_departures"],
+    ['WC renewals — next 90 days','WINDOW — today through +90 days',"select * from dash_wc_renewals_90d"],
+    ['FL master policy book','NOW — book as last captured from the FL feed; eff_max = last activity seen',"select * from dash_fl_master_book"],
+    ['TX clients under PEOs','NOW vs TO-DATE — active (exp ≥ today; ~105-day feed lag) beside ever-seen; canonical parent names',"select * from dash_tx_clients"],
+    ['Multi-state companies','NOW — current known footprint (evidence-based hq_state), widest first; on-PEO only',"select * from dash_multistate_companies"],
+    ['Recently updated intel','freshest first — latest_intel_at is the knowledge date',"select * from dash_recent_intel"],
+    ['5500 MEP roster by year','WINDOW — latest filing year runs thin (filing lag), so the prior year sits beside it',"select * from dash_5500_roster_years"],
+    ['PEO ratings','NOW — as last graded; graded column shows freshness',"select * from dash_peo_ratings"],
+    ['Switch flow matrix','TO-DATE with a NOW lens — all detections beside the last 12 months (by valid time); canonical names',"select * from dash_switch_flow_matrix"],
+    ['PEO avg client tenure','WAS — observed years on the PEO across 5500 filing years 2020→latest (valid time). Censored both ends: still_active% keep running (true tenure is longer); left_censored% started at/before 2020',"select * from dash_peo_tenure_5500"],
+    ['Longest-running relationships','WAS→NOW — contiguous 5500 filing-year runs (2020→latest), still filing as of the latest mature year; stack-ranked by years running. Starts may predate 2020',"select * from dash_longest_running_5500"],
+    ['Book by PEO family','NOW — clients + live avg/median current tenure per family (pct_tenure_known = coverage; floors are left-censored)',"select * from dash_peo_book_by_family"],
+    ['Book by specific PEO','NOW — same book, brand grain per your rulings: ADP entities fold to one, Vensure members stand alone',"select * from dash_peo_book_by_brand"],
+    ['Longest current tenures','WAS→NOW — companies longest on their current PEO (live years from the valid-time anchor; basis + came_from shown). Click a row for the card',"select * from dash_company_tenure"],
+    ["Client forecasts '25/'26",'ESTIMATE — frozen-vintage predictions closing the 5500 gap: \'25 est (roster units, scored vs actuals when filings complete Aug–Oct) + \'26 YTD nowcast off public WSE anchors. Bands + method + receipts on every row',"select * from dash_peo_forecast"],
+    ["Client size by PEO",'NOW — who plays down-market vs up-market: mean/median/p25/p75 employees per client from our estimates (coverage shown), Implied WSE/Client for the majors (public WSE ÷ our book) and the calibration factor between them',"select * from dash_peo_client_size"]
+  ];
+  function markViewing(i){
+    Array.prototype.forEach.call(document.querySelectorAll('.pull'),function(el){
+      el.classList.toggle('viewing', Number(el.getAttribute('data-i'))===i);
+    });
+  }
+  function renderPulls(){
+    $('pulls').innerHTML=PULLS.map(function(p,i){ return '<button class="pull" data-i="'+i+'"><div class="pl">'+esc(p[0])+'</div><div class="pb">'+esc(p[1])+'</div></button>'; }).join('');
+    Array.prototype.forEach.call($('pulls').children,function(el){
+      el.onclick=function(){ var i=Number(el.getAttribute('data-i')); runPull(PULLS[i],i); };
+    });
+  }
+  function runPull(p,i){
+    banner(null); showCard(false); markViewing(typeof i==='number'?i:-1);
+    $('r-title').textContent=p[0]; $('r-summary').textContent='loading…'; $('result').style.display='block';
+    api({mode:'sql',sql:p[2],label:p[0],quiet:false},45000).then(function(j){
+      if(handleCommon(j)) return;
+      j.title=p[0]; j.summary=p[1]; last={q:p[0],sql:j.sql}; renderResult(j);
+    }).catch(function(){ netFail(); });
+  }
+  var PEO_PROFILES=['PEO profiles','NOW + valid-time — client counts with 5500-roster YOY; health funding called 3-state (fully insured / partially self-funded / self-funded) from the H&W 5500 with receipts; insured lives with YOY; carrier strings lead with the total then % shares; hover any header for what it means',"select * from dash_peo_profiles"];
+  var PEO_PROFILES_BRAND=['PEO profiles — by specific PEO','NOW + valid-time — the written brand: clients, YOY, attested, WC carrier shares, brand-entity CPEO. Health inherits the family plan only where unambiguous (H&W 5500s are filed at family grain) — otherwise the row points to the PEO family view.',"select * from dash_peo_profiles_by_brand"];
+  var peoGrain='family';
+  function setPeoGrain(g){ peoGrain=g;
+    var gf=$('grainFam'),gb=$('grainBrand');
+    if(gf){ gf.className=(g==='family')?'on':''; } if(gb){ gb.className=(g==='brand')?'on':''; }
+    var gn=$('peoGrainNote'); if(gn) gn.textContent=(g==='family')?'612 family profiles, ranked by current clients (capped at 500 rows)':'written PEO brands — merged names (Paychex PEO) roll their families together; health stays family-grain where ambiguous';
+    runPeoProfiles(); }
+  function runPeoProfiles(){ runPull(peoGrain==='brand'?PEO_PROFILES_BRAND:PEO_PROFILES,-1); }
+  var FC_TAB=["Client forecasts '25/'26","ESTIMATE — frozen-vintage predictions: '25 est in roster units (scored vs actuals when filings complete), '26 YTD off public WSE anchors. Bands + method + receipts every row","select * from dash_peo_forecast"];
+  var SIZE_TAB=["Client size by PEO","NOW — who plays down-market vs up-market: size distribution, Implied WSE/Client, Est Total WSEs, ownership","select * from dash_peo_client_size"];
+  var fcView='main';
+  function runForecastTab(){ runPull(fcView==='size'?SIZE_TAB:FC_TAB,-1); }
+  function setFcView(v){ fcView=v; var a=$('fcMain'),b=$('fcSize'); if(a){a.className=(v==='main')?'on':'';} if(b){b.className=(v==='size')?'on':'';} runForecastTab(); }
+  var PEO_KPIS=['PEO KPI board','our visibility into each book (clients + est. WSE %), filed Total WSE with YOY, switch wins/losses observed by the mesh, book-size priors — live computation, weekly snapshots in peo_kpi_snapshots',"select * from dash_peo_kpis order by filed_total_wse desc nulls last"];
+  function runPeoKpis(){ runPull(PEO_KPIS,-1); }
+
+  // ---------- switchboard (step5): ranked queue + gated outcome logging ----------
+  var SW_STAGES=['contacted','meeting_booked','proposal_sent','closed_won','closed_lost','fizzled','dismissed'];
+  var swRows=[];
+  function swReasons(rc){ try{ return (rc||[]).map(function(r){return r.text||r.code||'';}).filter(Boolean).join(' · '); }catch(e){ return ''; } }
+  function loadSwitchboard(){
+    var b=$('swReload'); if(b){ b.disabled=true; b.textContent='Loading…'; }
+    api({mode:'switchboard',limit:150,workable:$('swWorkable').checked},45000).then(function(j){
+      if(b){ b.disabled=false; b.textContent='Load queue'; }
+      if(handleCommon(j)) return;
+      var sc=(j.scorecard&&j.scorecard[0])||null;
+      $('swCard').innerHTML = sc ? ('model <b>#'+sc.model_id+'</b> ('+esc(String(sc.model_kind))+') · cut <b>'+esc(String(sc.as_of_cut))+'</b> · issued <b>'+Number(sc.n_issued).toLocaleString()+'</b> · outcomes so far <b>'+sc.switches_observed+'</b> ('+sc.observed_rate_pct+'%) · top-decile lift <b>'+(sc.top_decile_lift==null?'—':sc.top_decile_lift)+'</b>'+(sc.funnel?' · funnel '+esc(JSON.stringify(sc.funnel)):'')) : 'no active production issuance yet';
+      swRows=j.rows||[];
+      var h='<thead><tr><th>#</th><th>company</th><th>state</th><th>current PEO</th><th class="num" title="12-month switch probability from the live model — renewal-band rates, honest by construction">switch %</th><th class="num" title="vs the book base rate">× base</th><th title="months to WC renewal + how we know the date (derivation class; ⚠ = PEO plan anniversary, display only, never a score input)">renewal</th><th>why (reason codes)</th><th class="ctr">angles</th><th class="ctr">contact</th><th>funnel</th><th>log outcome</th></tr></thead><tbody>';
+      swRows.forEach(function(r,i){
+        var ren=(r.months_to_renewal!=null?('~'+r.months_to_renewal+' mo'+(r.renewal_month?' ('+r.renewal_month+')':'')):(r.renewal_month?r.renewal_month:''))+(r.renewal_basis_class&&r.renewal_basis_class!=='none'?' · '+String(r.renewal_basis_class).replace(/_/g,' '):'');
+        if(r.renewal_is_inherited_anniversary) ren+=' ⚠ plan anniversary';
+        h+='<tr data-i="'+i+'"><td class="num">'+(i+1)+'</td>'
+          +'<td><a href="#" class="swCo" data-cid="'+esc(String(r.company_id))+'" style="color:var(--accent);text-decoration:none">'+esc(r.legal_name||'')+'</a></td>'
+          +'<td class="ctr">'+esc(r.state||'')+'</td><td>'+esc(r.current_peo||'')+'</td>'
+          +'<td class="num"><b>'+r.switch_pct+'%</b></td><td class="num">'+(r.base_rate_multiple!=null?r.base_rate_multiple+'×':'')+'</td>'
+          +'<td>'+esc(ren)+'</td><td style="max-width:340px;white-space:normal">'+esc(swReasons(r.reason_codes))+'</td>'
+          +'<td class="ctr">'+(r.live_angles||0)+'</td><td class="ctr">'+(r.has_contact?'✓':'—')+'</td>'
+          +'<td class="swFunnel">'+(r.funnel_stage?esc(String(r.funnel_stage).replace(/_/g,' '))+(r.funnel_stage_at?' <span class="mini">'+esc(r.funnel_stage_at)+'</span>':''):'')+'</td>'
+          +'<td style="white-space:nowrap"><select class="swStage" style="width:auto;padding:4px 6px;font-size:11.5px">'+SW_STAGES.map(function(s){return '<option value="'+s+'">'+s.replace(/_/g,' ')+'</option>';}).join('')+'</select> <input type="text" class="swReason" placeholder="reason" style="width:90px;padding:4px 6px;font-size:11.5px;display:none"> <button class="btn ghost swLog" style="padding:4px 10px;font-size:11.5px">Log</button></td></tr>';
+      });
+      h+='</tbody>';
+      var tb=$('swTable'); tb.innerHTML=h; $('swWrap').style.display='block';
+      $('swNote').textContent=j.row_count+' rows · ranked by score · strict per-company renewal anchors only';
+      Array.prototype.forEach.call(tb.querySelectorAll('.swCo'),function(a){ a.onclick=function(e){ e.preventDefault(); openCard(a.getAttribute('data-cid')); }; });
+      Array.prototype.forEach.call(tb.querySelectorAll('.swStage'),function(sel){ sel.onchange=function(){ var tr=sel.closest('tr'); var ri=tr.querySelector('.swReason'); ri.style.display=(sel.value==='dismissed'||sel.value==='fizzled')?'inline-block':'none'; }; });
+      Array.prototype.forEach.call(tb.querySelectorAll('.swLog'),function(btn){ btn.onclick=function(){
+        var tr=btn.closest('tr'); var i=Number(tr.getAttribute('data-i')); var r=swRows[i]; if(!r) return;
+        var stage=tr.querySelector('.swStage').value; var reason=tr.querySelector('.swReason').value.trim();
+        if(stage==='dismissed'&&!reason){ banner('warn','dismissed needs a reason — the gate refuses without one (structural, not a suggestion).'); return; }
+        btn.disabled=true; btn.textContent='…';
+        api({mode:'record_outcome',prediction_id:r.prediction_id,stage:stage,reason:reason||undefined},30000).then(function(j2){
+          btn.disabled=false; btn.textContent='Log';
+          if(j2&&j2.ok){ banner('warn','<b>logged through the gate:</b> '+esc(stage.replace(/_/g,' '))+' → '+esc(r.legal_name||'')+' (reconciled; the scorecard regrades as outcomes accrue).'); tr.querySelector('.swFunnel').textContent=stage.replace(/_/g,' '); }
+          else banner('crit','<b>gate refused:</b> '+esc(String((j2&&(j2.detail||j2.error))||'no response')));
+        }).catch(function(){ btn.disabled=false; btn.textContent='Log'; netFail(); });
+      }; });
+    }).catch(function(){ if(b){ b.disabled=false; b.textContent='Load queue'; } netFail(); });
+  }
+
+  // ---------- company search + card ----------
+  function coSearch(){
+    var q=$('coQ').value.trim(); if(q.length<2) return;
+    banner(null); showCard(false); markViewing(-1);
+    api({mode:'company',q:q},30000).then(function(j){
+      if(handleCommon(j)) return;
+      j.summary='click a row to open the full company card';
+      renderResult(j);
+    }).catch(function(){ netFail(); });
+  }
+  function openCard(id){
+    banner(null);
+    $('result').style.display='block'; $('r-title').textContent='loading company…';
+    api({mode:'company',id:id},30000).then(function(j){
+      if(handleCommon(j)) return;
+      renderCompany(j);
+    }).catch(function(){ netFail(); });
+  }
+  var FRIENDLY_KEYS={legal_name:'Legal name',dba_name:'DBA',ein:'EIN',city:'City',state:'State',hq_state:'HQ state',operating_states:'Operating states',naics:'NAICS',headcount_est:'Headcount est.',revenue_range:'Revenue range',domain:'Domain',peo_current:'On a PEO now',peo:'PEO family',peo_original:'Original PEO',came_from:'Came from',peo_switch_as_of:'Switched as of',current_peo_tenure_yrs:'Current PEO tenure (yrs)',peo_current_since:'With current PEO since',peo_current_since_basis:'Tenure basis',attribution_class:'Attribution class',industry:'Industry',wc_carrier:'WC carrier',wc_renewal_month:'WC renewal month',wc_coverage_status:'WC status',wc_policy_expiration:'WC policy expires',health_renewal_month:'Health renewal month',operating_status:'Operating status',is_client:'Is our client',latest_intel_at:'Latest intel'};
+  function showCard(on){ $('r-card').style.display=on?'block':'none'; $('r-wrap').style.display=on?'none':'block'; $('r-actions').style.display=on?'none':'flex'; $('r-sqlbox').style.display=on?'none':'block'; }
+  // column glossary — DB-resident (dash_column_glossary), fetched once through the governed sql door
+  var GLOSS={};
+  function glossTitle(c){ var g=GLOSS[c]; return g?' title="'+esc(g)+'"':''; }
+  function loadGloss(){
+    api({mode:'sql',sql:'select col_key, blurb from dash_column_glossary',quiet:true},20000).then(function(j){
+      if(j&&j.rows&&j.rows.length){ j.rows.forEach(function(r){ if(r.col_key) GLOSS[String(r.col_key)]=String(r.blurb||''); });
+        if(lastRes) drawTable(lastRes.columns,lastRes.rows,null,null); }
+    }).catch(function(){});
+  }
+  function tableHTML(cols,rows){
+    var colCls={};
+    cols.forEach(function(c){ var seen='',ok=true,found=false;
+      for(var i=0;i<rows.length&&i<20;i++){ var v=rows[i][c]; if(v==null) continue;
+        var f0=cellFmt(v,c); if(!found){seen=f0.cls;found=true;} else if(f0.cls!==seen){ok=false;break;} }
+      colCls[c]=(found&&ok&&(seen==='num'||seen==='ctr'))?seen:''; });
+    var h='<div class="tablewrap mini"><table><thead><tr>'+cols.map(function(c){var tc=[colCls[c],GLOSS[c]?'gl':''].filter(Boolean).join(' ');return '<th'+(tc?' class="'+tc+'"':'')+glossTitle(c)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
+    rows.forEach(function(r){ h+='<tr>'+cols.map(function(c){ var f=cellFmt(r[c],c); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; });
+    return h+'</tbody></table></div>';
+  }
+  function renderCompany(j){
+    lastRes=null; showCard(true);
+    var p=j.profile||{};
+    $('r-title').textContent=p.legal_name||'Company';
+    $('r-summary').textContent=[p.city,p.state].filter(Boolean).join(', ')+(p.peo?' · PEO: '+p.peo:'')+(p.headcount_est?' · ~'+p.headcount_est+' employee'+(Number(p.headcount_est)===1?'':'s'):'');
+    $('r-meta').innerHTML='';
+    var h='';
+    if(p.current_narrative) h+='<div class="narr">'+esc(String(p.current_narrative).slice(0,900))+'</div>';
+    h+='<div class="defgrid">';
+    Object.keys(FRIENDLY_KEYS).forEach(function(k){
+      var v=p[k]; if(v==null||v==='') return;
+      if(Array.isArray(v)) v=v.join(', ');
+      if(typeof v==='boolean') v=v?'Yes':'No';
+      if(typeof v==='string') v=v.replace(/T00:00:00(\.0+)?Z?$/,'');
+      var chip=null;
+      if(k==='peo_current'||k==='is_client') chip=(String(v)==='Yes')?'good':'mut';
+      if(k==='wc_coverage_status'&&/active/i.test(String(v))) chip='good';
+      h+='<div class="def"><span class="k">'+esc(FRIENDLY_KEYS[k])+'</span>'+(chip?'<span class="pill '+chip+'">'+esc(String(v))+'</span>':esc(String(v)))+'</div>';
+    });
+    h+='</div>';
+    (j.sections||[]).forEach(function(s){
+      if(!s.rows||!s.rows.length) return;
+      h+='<h3 class="sec">'+esc(s.title)+' <span class="cnt">('+s.n+')</span></h3>'+tableHTML(s.columns,s.rows);
+    });
+    $('r-card').innerHTML=h;
+    $('result').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
+  // ---------- table rendering ----------
+  var NOSUM=/(^|_)(id|ein|year|month|day|zip|decile|score|confidence|pct|percent|share|rate|ratio|lat|lng|version|seq|yrs|tenure)$/i;
+  var UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function isNumCol(rows,c){ var n=0,t=0; for(var i=0;i<rows.length&&i<50;i++){ var v=rows[i][c]; if(v==null) continue; t++; if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(v)&&String(v).trim()!=='')) n++; } return t>0&&n/t>=0.8; }
+  var YEARCOL=/(^|_)(year|yr)s?($|_)/i;
+  function isYearish(col,v){ var n=Number(v); return !!col&&YEARCOL.test(col)&&Number.isInteger(n)&&n>=1000&&n<=9999; }
+  function cellFmt(v,col){
+    if(v==null) return {h:'∅',cls:'null',raw:'',title:'no observed value yet for this field — the platform records only source-attested facts and never guesses'};
+    if(typeof v==='boolean') return {h:v?'✓':'—',cls:'ctr',raw:v};
+    if(col&&(/_yoy_pct$/i.test(col)||/^clients '?\d{2}\/'?\d{2}$/i.test(col))&&v!==''&&!isNaN(v)){ var yp=Number(v); // Gazz law: YOY green up / red down, with %
+      var yh=yp>0?'<span class="up">▲ '+yp.toLocaleString(undefined,{maximumFractionDigits:1})+'%</span>'
+            :yp<0?'<span class="dn">▼ '+Math.abs(yp).toLocaleString(undefined,{maximumFractionDigits:1})+'%</span>'
+            :'<span class="flat">0%</span>';
+      return {h:yh,cls:'num',raw:yp}; }
+    if(isYearish(col,v)) return {h:String(Number(v)),cls:'num',raw:Number(v)}; // years never get thousands separators
+    if(typeof v==='number') return {h:v.toLocaleString(undefined,{maximumFractionDigits:4}),cls:'num',raw:v};
+    if(Array.isArray(v)) { var a=v.join(', '); return {h:esc(a.length>160?a.slice(0,160)+'…':a),cls:'',raw:a,title:a.length>160?a.slice(0,800):null}; }
+    if(typeof v==='object') { var j=JSON.stringify(v); return {h:esc(j.length>120?j.slice(0,120)+'…':j),cls:'',raw:j,title:j.slice(0,800)}; }
+    var s=String(v);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return {h:s,cls:'ctr',raw:s}; // date grain centered
+    if(col&&/_month$/i.test(col)) return {h:esc(s),cls:'ctr',raw:s}; // month names centered
+    var m=s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}/);
+    if(m) return {h:m[2]==='00:00'&&/T00:00:00(\.0+)?Z?$/.test(s)?m[1]:m[1]+' '+m[2],cls:'ctr',raw:s};
+    if(/^-?\d+(\.\d+)?$/.test(s.trim())&&s.trim().length<18&&!UUID_RE.test(s)) return {h:Number(s).toLocaleString(undefined,{maximumFractionDigits:4}),cls:'num',raw:Number(s)};
+    return {h:esc(s.length>160?s.slice(0,160)+'…':s),cls:'',raw:s,title:s.length>160?s.slice(0,800):null};
+  }
+  function renderResult(res){
+    lastRes=res; rowFilter=''; $('rFilter').value='';
+    showCard(false);
+    $('result').style.display='block';
+    $('r-title').textContent=res.title||'Result';
+    $('r-summary').textContent=res.summary||'';
+    var mc=(res.model_chain||[]).map(function(m){return m.model.indexOf('haiku')>=0?'haiku':(m.model.indexOf('sonnet')>=0?'sonnet':m.model);}).join(' → ');
+    $('r-meta').innerHTML='<b>'+res.row_count+'</b> rows'+(res.elapsed_ms?' · '+res.elapsed_ms+' ms':'')+(mc?' · <b>'+esc(mc)+'</b>':'')+(res.cost_usd!=null?' · $'+Number(res.cost_usd).toFixed(4):'');
+    $('r-trunc').textContent=res.truncated?'capped — filter or aggregate for the rest':'';
+    $('r-sql').textContent=res.sql||'';
+    $('r-sqlbox').style.display=res.sql?'block':'none';
+    drawTable(res.columns||[],res.rows||[],null,null);
+    $('result').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  var displayedRows=[];
+  function drawTable(cols,baseRows,sortC,sortDir){
+    var rows=baseRows;
+    if(rowFilter){ var f=rowFilter.toLowerCase(); rows=rows.filter(function(r){ return cols.some(function(c){ var v=r[c]; return v!=null&&String(typeof v==='object'?JSON.stringify(v):v).toLowerCase().indexOf(f)>=0; }); }); }
+    var numCols={}; cols.forEach(function(c){ numCols[c]=isNumCol(rows,c); });
+    if(sortC){ rows=rows.slice().sort(function(a,b){ var x=a[sortC],y=b[sortC]; if(x==null)return 1; if(y==null)return -1;
+      if(numCols[sortC]){ x=Number(x); y=Number(y);} else { x=String(x); y=String(y);} return (x<y?-1:x>y?1:0)*(sortDir==='desc'?-1:1); }); }
+    displayedRows=rows;
+    var clickable=cols.indexOf('company_id')>=0 || (cols.indexOf('id')>=0 && (cols.indexOf('legal_name')>=0||cols.indexOf('dba_name')>=0));
+    var h='<thead><tr>'+cols.map(function(c){ return '<th class="'+(numCols[c]?'num':'')+(GLOSS[c]?' gl':'')+'" data-c="'+esc(c)+'"'+glossTitle(c)+'>'+esc(c)+(sortC===c?' <span class="arr">'+(sortDir==='desc'?'▼':'▲')+'</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody'+(clickable?' class="clickable" title="click a row for the company card"':'')+'>';
+    for(var i=0;i<rows.length;i++){ h+='<tr data-i="'+i+'">'+cols.map(function(c){ var f=cellFmt(rows[i][c],c); return '<td class="'+f.cls+'"'+(f.title?' title="'+esc(f.title)+'"':'')+'>'+f.h+'</td>'; }).join('')+'</tr>'; }
+    h+='</tbody>';
+    if(rows.length>1){
+      var sums={},any=false;
+      cols.forEach(function(c){ if(numCols[c]&&!NOSUM.test(c)){ var s=0,seen=false; rows.forEach(function(r){ var v=r[c]; if(v!=null&&v!==''&&!isNaN(v)){ s+=Number(v); seen=true; } }); if(seen){ sums[c]=s; any=true; } } });
+      if(any){ h+='<tfoot><tr>'+cols.map(function(c,i2){ if(i2===0&&sums[c]==null) return '<td>Σ</td>'; return sums[c]!=null?'<td class="num">'+sums[c].toLocaleString(undefined,{maximumFractionDigits:2})+'</td>':'<td></td>'; }).join('')+'</tr></tfoot>'; }
+    }
+    var tb=$('r-table'); tb.innerHTML=h;
+    tb.querySelector('thead').onclick=function(e){ var th=e.target.closest('th'); if(!th) return; var c=th.getAttribute('data-c');
+      var dir=(sortC===c&&sortDir!=='desc')?'desc':'asc'; drawTable(cols,baseRows,c,dir); };
+    if(clickable){
+      tb.querySelector('tbody').onclick=function(e){ var tr=e.target.closest('tr'); if(!tr) return; var row=displayedRows[Number(tr.getAttribute('data-i'))]; if(!row) return;
+        var cid=row.company_id||row.id; if(cid&&UUID_RE.test(String(cid))) openCard(String(cid)); };
+    }
+  }
+  $('rFilter') && ($('rFilter').oninput=function(){ if(!lastRes) return; rowFilter=this.value.trim(); drawTable(lastRes.columns,lastRes.rows,null,null); });
+
+  // ---------- actions ----------
+  function busy(btn,on){ btn.disabled=on; btn.dataset.t=btn.dataset.t||btn.textContent; btn.innerHTML=on?'<span class="spin"></span> working':btn.dataset.t; }
+  function handleCommon(j){
+    if(j.__http===401||j.__http===403){ saveAuth(null); showGate(j.__http===403?'this login is not permitted — sign in again.':'session expired — sign in.'); return true; }
+    if(j.error==='governor_closed'){ banner('warn','<b>Ask-AI is gated</b> — '+esc(j.detail||'')+' Meanwhile: the Pull tab covers the common reports with zero AI cost.'); return true; }
+    if(j.error==='not_found'){ banner('warn','No such company.'); return true; }
+    if(j.error){ banner('crit','<b>'+esc(j.error)+'</b> — '+esc(j.detail||'')); return true; }
+    return false;
+  }
+  function netFail(){ banner('crit','Can’t reach the API from this surface. Open the published copy instead: <a style="color:var(--accent)" href="'+PAGES+'">'+PAGES+'</a>'); }
+
+  function ask(){
+    var q=$('q').value.trim(); if(!q) return;
+    var body={mode:'ask',question:q,tier:$('tierSonnet').checked?'sonnet':'auto'};
+    if($('followup').checked&&last.q&&last.sql) body.context={prev_question:last.q,prev_sql:last.sql};
+    busy($('askBtn'),true); banner(null); markViewing(-1);
+    api(body,90000).then(function(j){ busy($('askBtn'),false);
+      if(j.refused){ banner('warn','<b>Can’t answer:</b> '+esc(j.refused)); return; }
+      if(handleCommon(j)) return;
+      last={q:q,sql:j.sql}; $('followup').checked=true;
+      renderResult(j); loadStatus();
+    }).catch(function(){ busy($('askBtn'),false); netFail(); });
+  }
+  function runSql(){
+    var s=$('sqlIn').value.trim(); if(!s) return;
+    busy($('runSqlBtn'),true); banner(null); markViewing(-1);
+    api({mode:'sql',sql:s},45000).then(function(j){ busy($('runSqlBtn'),false);
+      if(handleCommon(j)) return; last={q:'(manual SQL)',sql:j.sql}; renderResult(j);
+    }).catch(function(){ busy($('runSqlBtn'),false); netFail(); });
+  }
+  function sample(){
+    var t=$('tblSelect').value; if(!t) return;
+    busy($('sampleBtn'),true); banner(null); markViewing(-1);
+    api({mode:'sample',table:t},45000).then(function(j){ busy($('sampleBtn'),false);
+      if(handleCommon(j)) return; renderResult(j);
+    }).catch(function(){ busy($('sampleBtn'),false); netFail(); });
+  }
+  function loadTables(){
+    api({mode:'tables'},30000).then(function(j){ if(j.tables){ tables=j.tables; drawTables(); } }).catch(function(){});
+  }
+  var GROUPS=[
+    ['Companies & universe',{companies:'All companies (resolved universe)',company_state_footprint:'State footprint',company_aliases:'Name aliases',company_locations:'Locations',company_lifecycle_events:'Lifecycle events',company_peo_stints:'PEO stints (tenure spans)',field_observations:'Observation ledger (bitemporal)',company_web_profile:'Web profiles'}],
+    ['PEOs',{peo_profiles:'PEO profiles',peo_families:'PEO name registry',peo_family_groups:'Corporate family rollup',peo_alias_registry:'Alias registry',peo_entity_registry:'Legal entities',peo_sponsor_eins:'Sponsor EINs',peo_review_ratings:'Ratings (benchmark composite)',peo_carrier_offerings:'Carrier menus by year',peo_ma_events:'M&A events',irs_cpeo_snapshots:'IRS certified PEOs'}],
+    ['Switches & exits',{peo_switch_ledger:'Switch ledger',peo_departure_ledger:'Departure ledger',peo_departure_candidates:'Departure candidates',seed_switch_candidates:'Seed switch candidates'}],
+    ['Plays',{v_play_feed:'Play feed (scored)',company_angles:'Minted plays',angle_taxonomy:'Play types',play_theses:'Play theses'}],
+    ['Filings & federal',{form5500_mep_participants:'5500 MEP participants',efast_5500_staging:'5500 filings (raw staging)',f5500_sch_a_staging:'Schedule A (raw staging)',efast_5500_sf_staging:'5500-SF short form (raw)'}],
+    ['State WC data',{wc_coverage_fl:'FL WC coverage (policy grain)',fl_master_policy_book:'FL master policy book',fl_company_peo_crossref:'FL company↔PEO crossref',tx_policy_parentage:'TX clients under PEO policies',tx_lcf_matches:'TX LCF matches',state_survey_claims:'50-state survey claims',state_dead_ends:'50-state dead ends',wc_state_directory:'WC state directory'}],
+    ['Scores & signals',{switch_model_scores:'Switch model scores',signals:'Signals',events:'Event stream'}]
+  ];
+  function drawTables(){
+    var f=$('tblFilter').value.trim().toLowerCase();
+    var byName={}; tables.forEach(function(t){ byName[t.name]=t; });
+    function opt(t,label){ return '<option value="'+esc(t.name)+'">'+esc(label?label+' — '+t.name:t.name)+(t.approx_rows!=null?' · ~'+fmtN(t.approx_rows):'')+((t.kind==='v'||t.kind==='m')?' · view':'')+'</option>'; }
+    if(f){
+      var opts=tables.filter(function(t){ return t.name.indexOf(f)>=0; }).slice(0,400).map(function(t){ return opt(t,null); }).join('');
+      $('tblSelect').innerHTML=opts||'<option value="">(no match)</option>';
+      return;
+    }
+    var used={}, h='';
+    GROUPS.forEach(function(g){
+      var inner=''; Object.keys(g[1]).forEach(function(name){ var t=byName[name]; if(t){ used[name]=1; inner+=opt(t,g[1][name]); } });
+      if(inner) h+='<optgroup label="'+esc(g[0])+'">'+inner+'</optgroup>';
+    });
+    var rest=tables.filter(function(t){ return !used[t.name]; }).map(function(t){ return opt(t,null); }).join('');
+    if(rest) h+='<optgroup label="All other objects (raw / ops)">'+rest+'</optgroup>';
+    $('tblSelect').innerHTML=h;
+  }
+  function loadHistory(){
+    api({mode:'history',limit:25},30000).then(function(j){
+      var h=(j.history||[]).map(function(r){ var d=r.detail||{}; var q=d.question||d.source||'(sql)';
+        return '<div class="hist" data-sql="'+esc(d.sql||'')+'"><div class="q">'+(r.ok?'':'<span style="color:var(--crit)">✕</span> ')+esc(q)+'</div><div class="m">'+esc(String(r.started_at).replace('T',' ').slice(0,16))+' · '+(d.rows!=null?d.rows+' rows · ':'')+(d.cost_usd?'$'+Number(d.cost_usd).toFixed(4):'free')+'</div></div>'; }).join('');
+      $('histList').innerHTML=h||'<div class="mini">nothing yet — hit a Pull button or ask something.</div>';
+      Array.prototype.forEach.call(document.querySelectorAll('.hist'),function(el){
+        el.onclick=function(){ var s=el.getAttribute('data-sql'); if(!s) return; $('sqlIn').value=s; switchTab('sql'); runSql(); };
+      });
+    }).catch(function(){});
+  }
+  function csv(){
+    if(!lastRes) return;
+    var cols=lastRes.columns, rows=lastRes.rows;
+    var out=[cols.join(',')];
+    rows.forEach(function(r){ out.push(cols.map(function(c){ var v=r[c]; if(v==null) return ''; if(typeof v==='object') v=JSON.stringify(v); v=String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(',')); });
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([out.join('\n')],{type:'text/csv'}));
+    a.download=(lastRes.title||'result').toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,60)+'.csv';
+    a.click();
+  }
+
+  // ---------- tabs / gate / boot ----------
+  function switchTab(name){
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs button'),function(b){ b.classList.toggle('on',b.getAttribute('data-tab')===name); });
+    Array.prototype.forEach.call(document.querySelectorAll('section.tab'),function(s){ s.classList.toggle('on',s.id==='tab-'+name); });
+    if(name==='browse'&&!tables.length) loadTables();
+    if(name==='history') loadHistory();
+    if(name==='switchboard') loadSwitchboard();
+    if(name==='renewal') loadRenewal();
+    if(name==='peos') runPeoProfiles();
+    if(name==='kpi') runPeoKpis();
+    if(name==='forecast') runForecastTab();
+  }
+  function checkGoogle(){
+    fetch(SB+'/auth/v1/settings',{headers:{'apikey':ANON}}).then(function(r){return r.json();}).then(function(j){
+      if(j&&j.external&&j.external.google){ $('googleBtn').style.display='block'; $('orSep').style.display='block'; }
+    }).catch(function(){});
+  }
+  function showGate(msg){ $('keygate').classList.add('on'); $('keyMsg').textContent=msg||''; checkGoogle(); if($('emailIn')) $('emailIn').focus(); }
+  function afterAuth(statusJ){ $('keygate').classList.remove('on'); boot(statusJ&&statusJ.status?statusJ.status:null); }
+  function fetchDeskKey(){
+    return api({mode:'desk_key'},20000).then(function(j){ if(j&&j.ok&&j.desk_key){ KEY=j.desk_key; sset('desk_key',KEY); sset('peo_dash_key',KEY); } }).catch(function(){});
+  }
+  function signIn(email,pw,msgEl){
+    if(!email||!pw){ msgEl.textContent='email + password required'; return Promise.reject('empty'); }
+    msgEl.innerHTML='<span class="spin"></span>';
+    return fetch(SB+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pw})})
+      .then(function(r){return r.json();}).then(function(j){
+        if(!j.access_token){ msgEl.textContent=(j.error_description||j.msg||j.error||'sign-in failed'); throw 'auth'; }
+        saveAuth({access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600)});
+        return api({mode:'status'},20000);
+      }).then(function(sj){
+        if(sj.__http===403){ msgEl.textContent='this login is not permitted on the desk.'; saveAuth(null); throw 'forbidden'; }
+        if(!sj.status){ msgEl.textContent=(sj.detail||sj.error||'unexpected response'); throw 'status'; }
+        msgEl.textContent=''; fetchDeskKey(); afterAuth(sj);
+      });
+  }
+  function doSetup(){
+    var e=$('suEmail').value.trim(), p=$('suPw').value;
+    if(!e||p.length<10){ $('setupMsg').textContent='email + password (10+ chars) required'; return; }
+    if(!KEY){ $('setupMsg').textContent='desk key needed — paste it under "use desk key instead" first.'; return; }
+    $('setupMsg').innerHTML='<span class="spin"></span>';
+    var keep=AUTH; saveAuth(null);
+    api({mode:'auth_bootstrap',email:e,password:p},30000).then(function(j){
+      if(!j.ok){ saveAuth(keep); $('setupMsg').textContent=(j.detail||j.error||'failed'); return; }
+      $('setupMsg').textContent='login '+j.result+' — signing in…';
+      return signIn(e,p,$('setupMsg'));
+    }).catch(function(){ if(!$('setupMsg').textContent) $('setupMsg').textContent='failed'; });
+  }
+  function useKey(){
+    var k=$('keyIn').value.trim(); if(!k) return;
+    KEY=k; saveAuth(null); $('keyMsg').innerHTML='<span class="spin"></span>';
+    api({mode:'status'},20000).then(function(j){
+      if(j.__http===401){ $('keyMsg').textContent='bad key.'; KEY=''; return; }
+      if(j.status){ sset('peo_dash_key',k); sset('desk_key',k); $('keyMsg').textContent=''; afterAuth(j); }
+      else $('keyMsg').textContent=(j.detail||j.error||'unexpected response');
+    }).catch(function(){ $('keyMsg').textContent='network blocked here — open the Pages copy.'; });
+  }
+  function logout(){ saveAuth(null); location.reload(); }
+  var EXAMPLES=[
+    'Companies that left insperity in 2026 and where they went',
+    'Top destinations for switchers out of adp_totalsource',
+    'Average months on a PEO before leaving, by PEO',
+    'FL companies whose WC policy was cancelled this year',
+    'Which PEOs offer aetna medical, by year'
+  ];
+  function boot(status){
+    if(status) renderStatus(status); else loadStatus();
+    if(statusTimer) clearInterval(statusTimer);
+    statusTimer=setInterval(loadStatus,60000);
+    loadGloss();
+    renderPulls();
+    $('examples').innerHTML=EXAMPLES.map(function(e){ return '<button>'+esc(e)+'</button>'; }).join('');
+    Array.prototype.forEach.call($('examples').children,function(b){ b.onclick=function(){ $('q').value=b.textContent; ask(); }; });
+  }
+
+  $('askBtn').onclick=ask;
+  $('q').addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); ask(); } });
+  $('runSqlBtn').onclick=runSql;
+  $('sqlIn').addEventListener('keydown',function(e){ if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); runSql(); } });
+  $('sampleBtn').onclick=sample;
+  $('tblFilter').addEventListener('input',drawTables);
+  $('csvBtn').onclick=csv;
+  $('refineBtn').onclick=function(){ switchTab('ask'); $('followup').checked=true; $('q').focus(); };
+  $('peoReload').onclick=runPeoProfiles;
+  if($('riCallLoad')) $('riCallLoad').onclick=riLoadCalls;
+  if($('riCalBtn')) $('riCalBtn').onclick=function(){ var p=null; for(var i=0;i<PULLS.length;i++){ if(PULLS[i][0]==='Health master renewal calendar'){ p=PULLS[i]; break; } } if(p) runPull(p,-1); };
+  if($('riDosClose')) $('riDosClose').onclick=function(){ $('riDossier').style.display='none'; };
+  $('grainFam')&&($('grainFam').onclick=function(){ setPeoGrain('family'); });
+  $('grainBrand')&&($('grainBrand').onclick=function(){ setPeoGrain('brand'); });
+  $('fcReload')&&($('fcReload').onclick=runForecastTab);
+  $('fcMain')&&($('fcMain').onclick=function(){ setFcView('main'); });
+  $('fcSize')&&($('fcSize').onclick=function(){ setFcView('size'); });
+  $('kpiReload').onclick=runPeoKpis;
+  $('rbaBtn').onclick=function(){
+    var b=$('rbaBtn'); if(b.disabled) return; b.disabled=true; var old=b.textContent; b.textContent='Auditing…';
+    banner('');
+    api({mode:'rba',cards:150},140000).then(function(j){
+      b.disabled=false; b.textContent=old;
+      if(j&&j.rows){
+        var s=j.summary||{};
+        renderResult({title:j.title||'Result-back audit',
+          summary:'Sampled '+(s.cards_sampled!=null?s.cards_sampled:'?')+' cards · defect rate '+(s.defect_rate_pct!=null?s.defect_rate_pct+'%':'—')+' · '+(s.findings_new||0)+' new · '+(s.findings_cleared||0)+' cleared · all OPEN findings below (worklist — nothing auto-fixed)',
+          columns:j.columns,rows:j.rows,row_count:j.row_count,elapsed_ms:j.elapsed_ms});
+      } else { banner('crit','Audit failed: '+esc(String((j&&(j.detail||j.error))||'no response'))); }
+    }).catch(function(e){ b.disabled=false; b.textContent=old; banner('crit','Audit failed: '+esc(String((e&&e.message)||e))); });
+  };
+  $('swReload')&&($('swReload').onclick=loadSwitchboard);
+  $('swWorkable')&&($('swWorkable').onchange=loadSwitchboard);
+  $('coBtn').onclick=coSearch;
+  $('coQ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); coSearch(); } });
+  $('googleBtn').onclick=function(){ location.href=SB+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(location.origin+location.pathname); };
+  $('loginBtn').onclick=function(){ signIn($('emailIn').value.trim(),$('pwIn').value,$('keyMsg')).catch(function(){}); };
+  $('pwIn').addEventListener('keydown',function(e){ if(e.key==='Enter') $('loginBtn').click(); });
+  $('setupBtn').onclick=doSetup;
+  $('keyBtn').onclick=useKey;
+  $('keyIn').addEventListener('keydown',function(e){ if(e.key==='Enter') useKey(); });
+  $('showSetup').onclick=function(e){ e.preventDefault(); var b=$('setupBox'); b.style.display=b.style.display==='none'?'block':'none'; };
+  $('showKey').onclick=function(e){ e.preventDefault(); var b=$('keyBox'); b.style.display=b.style.display==='none'?'block':'none'; };
+  $('logoutLink').onclick=function(e){ e.preventDefault(); logout(); };
+  Array.prototype.forEach.call(document.querySelectorAll('.tabs button'),function(b){ b.onclick=function(){ switchTab(b.getAttribute('data-tab')); }; });
+
+  if(AUTH||KEY){
+    api({mode:'status'},20000).then(function(j){
+      if(j.__http===401||j.__http===403){ saveAuth(null); showGate(j.__http===403?'this login is not permitted — sign in again.':''); }
+      else { if(authValid()&&!sget('desk_key')) fetchDeskKey(); afterAuth(j); }
+    }).catch(function(){ boot(null); netFail(); });
+  } else showGate();
+})();
+</script>
+</body>
+</html>
