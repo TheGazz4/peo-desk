@@ -3,9 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PEO Engine — Command Desk (Live)</title>
+<title>PEO Engine — Platform Desk</title>
+<!--
+  ============================================================================
+  PEO ENGINE PLATFORM SHELL  (desk_shell_law, 2026-09-14)
+  This file is the SHELL ONLY. It contains no panels and no data calls.
+  The Command Desk panels that used to live at index.html now live in desk.html
+  and are UNCHANGED (byte-identical move). Edit panels there, not here.
+  Surfaces are mounted in same-origin iframes so each page keeps its own
+  version, its own publish path, and the shared localStorage desk_key.
+  Publish door: RE-SYNC -> desk_assets -> desk_asset_commit('index.html', ...)
+  ============================================================================
+-->
 <style>
-  /* ------ palette: reference dataviz palette, roles only ------ */
   :root {
     color-scheme: dark;
     --surface-1: #1a1a19;
@@ -14,12 +24,10 @@
     --ink-2: #c3c2b7;
     --ink-muted: #898781;
     --grid: #2c2c2a;
-    --baseline: #383835;
     --border: rgba(255,255,255,0.10);
     --series-1: #3987e5;
     --good: #0ca30c;
     --warning: #fab219;
-    --serious: #ec835a;
     --critical: #d03b3b;
   }
   :root[data-theme="light"] {
@@ -30,955 +38,205 @@
     --ink-2: #52514e;
     --ink-muted: #898781;
     --grid: #e1e0d9;
-    --baseline: #c3c2b7;
     --border: rgba(11,11,11,0.10);
     --series-1: #2a78d6;
     --good: #0ca30c;
     --warning: #fab219;
-    --serious: #ec835a;
     --critical: #d03b3b;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: var(--page); color: var(--ink-1);
-    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  a { color: var(--series-1); }
+  html, body { margin:0; padding:0; height:100%; background:var(--page); color:var(--ink-1);
+    font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display:flex; flex-direction:column; }
 
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 20px;
-    padding: 14px 20px 10px; border-bottom: 1px solid var(--border); }
-  header h1 { font-size: 16px; margin: 0; letter-spacing: 0.04em; }
-  header .sub { color: var(--ink-muted); font-size: 12px; }
-  #conn { font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); }
-  #conn.ok   { color: var(--good); }
-  #conn.err  { color: var(--critical); }
-  #themeBtn { margin-left: auto; background: none; border: 1px solid var(--border);
-    color: var(--ink-2); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+  header { display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:8px 16px; border-bottom:1px solid var(--border); background:var(--surface-1); flex:none; }
+  .brand { font-size:13px; font-weight:650; letter-spacing:.10em; white-space:nowrap; }
+  .brand span { color:var(--ink-muted); font-weight:400; letter-spacing:.04em; }
 
-  #strip { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 20px; }
-  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
-    padding: 10px 14px; min-width: 128px; }
-  .tile .k { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-  .tile .v { font-size: 22px; font-weight: 650; margin-top: 2px; }
-  .tile .d { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; }
+  nav button { background:none; border:1px solid transparent; color:var(--ink-2);
+    border-radius:8px; padding:5px 12px; cursor:pointer; font-size:13px; font-family:inherit;
+    display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+  nav button:hover { color:var(--ink-1); background:rgba(127,127,127,.12); }
+  nav button[aria-current="page"] { color:var(--ink-1); background:rgba(57,135,229,.16);
+    border-color:var(--series-1); font-weight:600; }
+  nav button .n { font-size:10px; color:var(--ink-muted); font-variant-numeric:tabular-nums; }
 
-  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 14px; padding: 0 20px 30px; }
-  section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
-  section h2 { font-size: 12px; margin: 0 0 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.08em; }
-  section h2 small { color: var(--ink-muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
-  .blurb { font-size: 12px; line-height: 1.5; font-style: italic; color: var(--ink-2); margin: -4px 0 12px; max-width: 72ch; }
-  .blurb b { font-weight: 600; }
-  #legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 20px 0; font-size: 12px; color: var(--ink-2); }
-  #legend .chip { border: none; padding-left: 0; }
+  .spacer { margin-left:auto; }
+  .ctl { background:none; border:1px solid var(--border); color:var(--ink-2);
+    border-radius:6px; padding:3px 10px; cursor:pointer; font-size:12px; font-family:inherit; }
+  .ctl:hover { color:var(--ink-1); }
+  #keychip { font-size:11px; padding:2px 10px; border-radius:999px; border:1px solid var(--border);
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+  #keychip::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--ink-muted); flex:none; }
+  #keychip.ok::before { background:var(--good); }
+  #keychip.no::before { background:var(--warning); }
+  #keychip.ok { color:var(--ink-2); }
+  #keychip.no { color:var(--warning); }
 
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--ink-muted); font-weight: 500; font-size: 11px;
-    border-bottom: 1px solid var(--grid); padding: 3px 8px 5px 0; }
-  td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--grid); vertical-align: middle; white-space: nowrap; }
-  td:last-child, th:last-child { padding-right: 0; }
-  td .age { white-space: nowrap; }
-  tr:last-child td { border-bottom: none; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .age { color: var(--ink-2); font-variant-numeric: tabular-nums; }
-  .age.hot { color: var(--good); }
-  .age.cold { color: var(--ink-muted); }
+  #banner { display:none; font-size:12px; color:var(--ink-1); background:rgba(250,178,25,.14);
+    border-bottom:1px solid var(--border); padding:7px 16px; flex:none; }
+  #banner.show { display:block; }
 
-  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; padding: 2px 9px;
-    border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; color: var(--ink-1); }
-  .chip::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--ink-muted); flex: none; }
-  .chip.ok       { background: color-mix(in srgb, var(--good) 14%, transparent);     border-color: color-mix(in srgb, var(--good) 50%, transparent); }
-  .chip.warn     { background: color-mix(in srgb, var(--warning) 16%, transparent);  border-color: color-mix(in srgb, var(--warning) 55%, transparent); }
-  .chip.serious  { background: color-mix(in srgb, var(--serious) 18%, transparent);  border-color: color-mix(in srgb, var(--serious) 60%, transparent); }
-  .chip.critical { background: color-mix(in srgb, var(--critical) 26%, transparent); border-color: var(--critical); font-weight: 700; }
-  .chip.ok::before { background: var(--good); }
-  .chip.warn::before { background: var(--warning); }
-  .chip.serious::before { background: var(--serious); }
-  .chip.critical::before { background: var(--critical); }
+  #stage { position:relative; flex:1 1 auto; min-height:0; background:var(--page); }
+  #stage iframe { position:absolute; inset:0; width:100%; height:100%; border:0; display:none; background:var(--page); }
+  #stage iframe.live { display:block; }
+  #loading { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    color:var(--ink-muted); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+  #loading.show { display:flex; }
 
-  .meter { position: relative; height: 8px; background: var(--grid); border-radius: 4px; min-width: 90px; }
-  .meter > i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--series-1); }
-  .meter.warn > i { background: var(--warning); }
-  .meter.critical > i { background: var(--critical); }
-
-  svg.spark { display: block; }
-  svg.spark polyline { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-  svg.spark line.base { stroke: var(--baseline); stroke-width: 1; }
-
-  #overlay { position: fixed; inset: 0; background: var(--page); display: flex;
-    align-items: center; justify-content: center; z-index: 10; }
-  #overlay .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
-    padding: 26px 30px; width: 360px; }
-  #overlay h2 { margin: 0 0 6px; font-size: 15px; }
-  #overlay p { color: var(--ink-2); font-size: 13px; }
-  #overlay input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--baseline);
-    background: var(--page); color: var(--ink-1); font-size: 13px; }
-  #overlay button { margin-top: 12px; width: 100%; padding: 8px; border-radius: 8px; border: none;
-    background: var(--series-1); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
-  #overlay .err { color: var(--critical); font-size: 12px; min-height: 16px; margin-top: 8px; }
-  .hidden { display: none !important; }
-
-  /* ---- mesh scorecard ---- */
-  section.wide { grid-column: 1 / -1; }
-  .sc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 8px; }
-  .sc-narr { font-size: 13.5px; line-height: 1.6; color: var(--ink-1); max-width: 110ch; margin: 0 0 12px;
-    padding: 10px 14px; border-left: 3px solid var(--series-1); background: color-mix(in srgb, var(--series-1) 6%, transparent); border-radius: 0 8px 8px 0; }
-  .sc-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
-  .sc-tiles .tile { min-width: 118px; padding: 8px 12px; }
-  .sc-tiles .tile .v { font-size: 19px; }
-  .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
-  .sc-grid h3 { font-size: 11px; margin: 0 0 6px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
-  .sc-grid td { white-space: normal; }
-  .sc-grid td.nw { white-space: nowrap; }
-  .delta-up { color: var(--good); font-weight: 650; }
-  .delta-dn { color: var(--serious); }
-  .delta-0  { color: var(--ink-muted); }
-  .bookBtn { background: none; border: 1px solid var(--border); color: var(--ink-2); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: 11px; }
-  .bookBtn.on { border-color: var(--series-1); color: var(--ink-1); background: color-mix(in srgb, var(--series-1) 14%, transparent); }
-  #tip { position: fixed; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
-    border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink-1); z-index: 20;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
+  @media (max-width: 720px) {
+    header { padding:8px 10px; gap:8px; }
+    .brand { width:100%; }
+    nav button { padding:5px 9px; font-size:12px; }
+    nav button .n { display:none; }
+  }
 </style>
 </head>
 <body>
 
-<div id="overlay" class="hidden">
-  <div class="card">
-    <h2>Command Desk</h2>
-    <p>Enter your desk access key. It is stored only in this browser.</p>
-    <input id="keyInput" type="password" placeholder="dk_…" autocomplete="off">
-    <div class="err" id="keyErr"></div>
-    <button id="keyGo">Open the desk</button>
-  </div>
-</div>
-
 <header>
-  <h1>PEO ENGINE — COMMAND DESK</h1>
-  <span class="sub" id="clock">—</span>
-  <span class="sub">poll: 5s · <span id="lastPoll">never</span></span>
-  <span id="conn">connecting…</span>
-  <button id="themeBtn" title="Toggle light/dark">◐ theme</button>
+  <div class="brand">PEO ENGINE <span>· platform desk</span></div>
+  <nav id="nav"></nav>
+  <div class="spacer"></div>
+  <span id="keychip" class="no">key</span>
+  <button class="ctl" id="reloadBtn" title="Reload the surface you are on">reload</button>
+  <button class="ctl" id="popBtn" title="Open this surface in its own tab">open ↗</button>
+  <button class="ctl" id="themeBtn">theme</button>
 </header>
 
-<div id="legend">
-  <span class="chip ok">green = good</span>
-  <span class="chip warn">yellow = watch</span>
-  <span class="chip serious">orange = stalled, needs a look</span>
-  <span class="chip critical">red = act now</span>
-  <span class="chip">gray = idle (fine)</span>
+<div id="banner"></div>
+
+<div id="stage">
+  <div id="loading">loading…</div>
 </div>
 
-<div id="strip"></div>
-
-<main>
-  <section class="wide" id="scorecard">
-    <h2>Mesh scorecard <small>— what changed since the last run, in plain English</small></h2>
-    <div class="sc-head" id="scHead"></div>
-    <div class="sc-head" id="scBook"><span class="age cold">book:</span>
-      <button class="bookBtn" data-book="both">current + former</button>
-      <button class="bookBtn" data-book="current">current PEO users</button>
-      <button class="bookBtn" data-book="former">former PEO users</button>
-      <span class="age cold" id="scBookNote"></span></div>
-    <p class="sc-narr" id="scNarr">waiting for the first scorecard run…</p>
-    <div class="sc-tiles" id="scTiles"></div>
-    <div class="sc-grid">
-      <div>
-        <h3>The 16 agreed fields — how full is the book</h3>
-        <table id="tblScFields"><thead><tr>
-          <th>#</th><th>field</th><th style="width:120px">filled</th><th class="num">pct</th><th class="num">strong</th><th class="num">Δ run</th><th class="num">landed</th><th>top source</th>
-        </tr></thead><tbody></tbody></table>
-      </div>
-      <div>
-        <h3>Who helped — sources this window</h3>
-        <table id="tblScSources"><thead><tr>
-          <th>source</th><th>kind</th><th class="num">companies</th><th class="num">fields</th><th class="num">accepted</th><th class="num">conflicting</th>
-        </tr></thead><tbody></tbody></table>
-        <h3 style="margin-top:14px">Last runs</h3>
-        <table id="tblScHist"><thead><tr>
-          <th class="num">run</th><th>verdict</th><th class="num">new users</th><th class="num">switches</th><th class="num">exits</th><th class="num">2+ sources</th><th class="num">accepted</th>
-        </tr></thead><tbody></tbody></table>
-      </div>
-      <div>
-        <h3>Most fully appended states</h3>
-        <table id="tblScStates"><thead><tr>
-          <th>state</th><th class="num">companies</th><th style="width:100px">complete</th><th class="num">pct</th><th class="num">Δ pts</th><th class="num">touched</th>
-        </tr></thead><tbody></tbody></table>
-        <h3 style="margin-top:14px">Most fully appended PEO books</h3>
-        <table id="tblScPeos"><thead><tr>
-          <th>peo</th><th class="num">companies</th><th style="width:100px">complete</th><th class="num">pct</th><th class="num">Δ pts</th><th class="num">touched</th>
-        </tr></thead><tbody></tbody></table>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2>Decision desk <small>— what the platform decided without you</small></h2>
-    <p class="blurb">Every question the platform raises lands here. The <b>judge</b> researches it against project history and rules tiers 1 and 2; the <b>executor</b> then fixes, audits and re-tests it, and nothing is marked applied without a live-passing acceptance test. Tier 3 — sends, deletes, spend caps, security, or two of your own laws in conflict — is always yours, with an opinion attached.</p>
-    <p class="blurb" id="decSummary">&nbsp;</p>
-    <table id="tblDecisions"><thead><tr>
-      <th class="num">#</th><th>subsystem</th><th class="num">tier</th><th>state</th><th>decided by</th><th class="num">conf</th><th class="num">tries</th><th class="num">age (d)</th><th>outcome</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>Ready plays <small>— the funnel to actionable</small></h2>
-    <p class="blurb">Plays ready to fire: live, in timing window, not suppressed. Sendable = also has a contact.</p>
-    <table id="tblPlays"><thead><tr>
-      <th>angle</th><th class="num">minted</th><th class="num">live</th><th class="num">in window</th><th class="num">ready</th><th class="num">sendable</th><th class="num">24h</th><th class="num">last minted</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>Enrichment progress <small>— coverage of the targetable universe</small></h2>
-    <p class="blurb">How enriched the book is, stage by stage, toward narratives and plays. Bars fill as appending lands. <b>Δ7d</b> = companies gained this week — green movement = progress.</p>
-    <table id="tblEnrich"><thead><tr>
-      <th>stage</th><th style="width:150px">coverage</th><th class="num">companies</th><th class="num">pct</th><th class="num">Δ24h</th><th class="num">Δ7d</th>
-    </tr></thead><tbody></tbody></table>
-    <p class="blurb" style="margin:8px 0 0" id="enrichFoot"></p>
-  </section>
-
-  <section>
-    <h2>Rate limits <small>— used vs cap, live</small></h2>
-    <p class="blurb">Paid/capped resources vs their caps. Yellow = 80%+ or running low. Red = cap hit; spending lanes stop.</p>
-    <table id="tblLimits"><thead><tr>
-      <th>resource</th><th>window</th><th class="num">used</th><th class="num">cap</th><th style="width:110px">meter</th><th>state</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>Append throughput <small>— rows/runs landed per window</small></h2>
-    <p class="blurb">Rows landing per pipeline. Green = flowing now. Orange "stalled" = work queued, nothing moving. Gray = no work.</p>
-    <table id="tblAppend"><thead><tr>
-      <th>pipeline</th><th class="num">pending</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
-      <th>trend</th><th class="num">last activity</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>API usage <small>— calls by module</small></h2>
-    <p class="blurb">External API calls by module — run rate, 24h cost, last fired.</p>
-    <table id="tblApi"><thead><tr>
-      <th>module</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
-      <th class="num">$ 24h</th><th>trend</th><th class="num">last call</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>Freshness <small>— is measurement itself alive?</small></h2>
-    <p class="blurb">Every heartbeat and cron vs its schedule. Anything overdue or failed = the machinery itself slipped.</p>
-    <div id="freshLanes"></div>
-    <div id="freshCrons" style="margin-top:10px"></div>
-  </section>
-
-  <section>
-    <h2>Module utilization <small>— are the hubs running on their own?</small></h2>
-    <p class="blurb">Each module's runs in 24h vs what its schedules promise. Green = running as scheduled. Failures &gt; 0 = look. Dormant = installed but not ticking.</p>
-    <table id="tblHubs"><thead><tr>
-      <th>module</th><th class="num">1h</th><th class="num">24h</th><th class="num">expected</th><th style="width:100px">utilization</th><th class="num">failed</th><th class="num">last run</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>System health <small>— platform vitals</small></h2>
-    <p class="blurb">Vitals, worst first. Red = broken now. Yellow = degraded or held. <b>n</b> = count behind the check.</p>
-    <table id="tblHealth"><thead><tr>
-      <th>check</th><th>state</th><th class="num">n</th><th class="num">as of</th><th>detail</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>Data purification <small>— catches &amp; burn-down</small></h2>
-    <p class="blurb">Junk caught and cleaned — activity here is good. Watch <b>backlog</b>: growing on a quiet row = piling up.</p>
-    <table id="tblPurify"><thead><tr>
-      <th>stream</th><th class="num">backlog</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
-      <th>trend</th><th class="num">last activity</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>Mesh mail <small>— inner-office routes</small></h2>
-    <p class="blurb">Hub-to-hub letters. Aging unread or expired = a listener is asleep on that route.</p>
-    <table id="tblMail"><thead><tr>
-      <th>route</th><th class="num">5m</th><th class="num">60m</th><th class="num">24h</th>
-      <th class="num">unread</th><th class="num">oldest unread</th><th class="num">last sent</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-
-  <section>
-    <h2>Intel ticker <small>— switches, departures, hub conclusions</small></h2>
-    <p class="blurb">Detections as they land: switches (green), departures (yellow), hub conclusions. Quiet for days = detection lagging.</p>
-    <table id="tblTicker"><thead><tr>
-      <th class="num">when</th><th>kind</th><th>subject</th><th>detail</th>
-    </tr></thead><tbody></tbody></table>
-  </section>
-</main>
-
-<div id="tip" class="hidden"></div>
-
 <script>
-"use strict";
-/* ================= config ================= */
-const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
-const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk"];
-const POLL_MS = 5000;
-const HISTORY_MAX = 180;           /* 15 min of 5s samples */
-const DEMO = new URLSearchParams(location.search).has("demo");
+(function () {
+  "use strict";
 
-/* ================= state ================= */
-let deskKey = localStorage.getItem("desk_key") || "";
-let scBook = localStorage.getItem("desk_sc_book") || "both";
-document.addEventListener("click", (e) => {
-  const b = e.target.closest && e.target.closest(".bookBtn");
-  if (!b) return;
-  scBook = b.dataset.book; localStorage.setItem("desk_sc_book", scBook);
-  if (latest) renderScorecard(latest);
-});
-let skewMs = 0;                    /* serverNow - clientNow */
-let lastPollAt = null;
-let latest = null;
-const history = new Map();         /* key -> [{t, v}] */
-
-const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-
-/* ================= theme ================= */
-const savedTheme = localStorage.getItem("desk_theme");
-if (savedTheme) document.documentElement.dataset.theme = savedTheme;
-$("#themeBtn").onclick = () => {
-  const cur = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-  document.documentElement.dataset.theme = cur;
-  localStorage.setItem("desk_theme", cur);
-};
-
-/* ================= helpers ================= */
-function serverNow() { return Date.now() + skewMs; }
-function fmtAge(secs) {
-  if (secs == null || isNaN(secs)) return "—";
-  if (secs < 0) secs = 0;
-  if (secs < 90) return Math.round(secs) + "s";
-  if (secs < 5400) return Math.round(secs / 60) + "m";
-  if (secs < 172800) return (secs / 3600).toFixed(1) + "h";
-  return (secs / 86400).toFixed(1) + "d";
-}
-function ageSpan(ts, hotSecs) {
-  if (!ts) return '<span class="age cold" data-ts="">never</span>';
-  return `<span class="age" data-ts="${new Date(ts).getTime()}" data-hot="${hotSecs || 600}"></span>`;
-}
-function tickAges() {
-  const now = serverNow();
-  document.querySelectorAll(".age[data-ts]").forEach((el) => {
-    if (!el.dataset.ts) return;
-    const secs = (now - Number(el.dataset.ts)) / 1000;
-    el.textContent = fmtAge(secs) + " ago";
-    el.classList.toggle("hot", secs < Number(el.dataset.hot));
-    el.classList.toggle("cold", secs >= Number(el.dataset.hot) * 6);
-  });
-  $("#clock").textContent = new Date().toLocaleTimeString() + (Math.abs(skewMs) > 3000 ? ` (db skew ${(skewMs/1000).toFixed(0)}s)` : "");
-  if (lastPollAt) {
-    const s = (Date.now() - lastPollAt) / 1000;
-    $("#lastPoll").textContent = "updated " + fmtAge(s) + " ago";
-    if (s > 20) setConn("stale — no data for " + fmtAge(s), false);
-  }
-}
-setInterval(tickAges, 1000);
-
-function setConn(msg, ok) {
-  const el = $("#conn");
-  el.textContent = msg;
-  el.className = ok ? "ok" : "err";
-}
-function pushHistory(key, v) {
-  let arr = history.get(key);
-  if (!arr) { arr = []; history.set(key, arr); }
-  arr.push({ t: Date.now(), v: Number(v) || 0 });
-  if (arr.length > HISTORY_MAX) arr.shift();
-}
-function spark(key, w = 64, h = 22) {
-  const arr = history.get(key) || [];
-  if (arr.length < 2) return `<svg class="spark" width="${w}" height="${h}"><line class="base" x1="0" y1="${h-1}" x2="${w}" y2="${h-1}"/></svg>`;
-  const max = Math.max(...arr.map((p) => p.v), 1);
-  const pts = arr.map((p, i) => `${(i / (arr.length - 1)) * (w - 2) + 1},${h - 2 - (p.v / max) * (h - 6)}`).join(" ");
-  return `<svg class="spark" width="${w}" height="${h}" data-spark="${esc(key)}"><line class="base" x1="0" y1="${h-1}" x2="${w}" y2="${h-1}"/><polyline points="${pts}"/></svg>`;
-}
-/* sparkline hover tooltip */
-document.addEventListener("mousemove", (e) => {
-  const svg = e.target.closest && e.target.closest("svg.spark[data-spark]");
-  const tip = $("#tip");
-  if (!svg) { tip.classList.add("hidden"); return; }
-  const arr = history.get(svg.dataset.spark) || [];
-  if (!arr.length) return;
-  const r = svg.getBoundingClientRect();
-  const idx = Math.min(arr.length - 1, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * (arr.length - 1))));
-  const p = arr[idx];
-  tip.textContent = `${p.v} — ${fmtAge((Date.now() - p.t) / 1000)} ago`;
-  tip.style.left = e.clientX + 12 + "px";
-  tip.style.top = e.clientY - 10 + "px";
-  tip.classList.remove("hidden");
-});
-
-function stateChip(state, label) {
-  const cls = { ok: "ok", good: "ok", alive: "ok", warn: "warn", warning: "warn", gated: "warn",
-    starving: "serious", serious: "serious", stalled: "serious",
-    critical: "critical", failing: "critical", failed: "critical" }[state] || "";
-  return `<span class="chip ${cls}">${esc(label || state)}</span>`;
-}
-
-/* ================= renderers ================= */
-function renderStrip(d) {
-  const sb = (d.desk_status_board?.rows || [])[0] || {};
-  const sp = (d.desk_spend?.rows || [])[0] || {};
-  const fresh = d.desk_freshness?.rows || [];
-  const cronsBad = fresh.filter((r) => r.kind === "cron" && !r.ok).length;
-  const cronsAll = fresh.filter((r) => r.kind === "cron").length;
-  const tiles = [
-    ["spend gate", sp.gate_open ? "OPEN" : "CLOSED", `$${Number(sp.spend_mtd_usd ?? 0).toFixed(0)} / $${Number(sp.platform_cap_usd ?? 0).toFixed(0)} MTD`, sp.gate_open ? "good" : "critical"],
-    ["lanes alive", sb.lanes_alive ?? "—", `${sb.lanes_failing ?? 0} failing · ${sb.lanes_starving ?? 0} starving`, (sb.lanes_failing > 0) ? "critical" : "good"],
-    ["crons on time", `${cronsAll - cronsBad}/${cronsAll}`, cronsBad ? `${cronsBad} overdue or failed` : "all on schedule", cronsBad ? "warning" : "good"],
-    ["red flags", sb.red_flags ?? "—", "open live conditions", (sb.red_flags > 0) ? "warning" : "good"],
-    ["rulings waiting", sb.rulings_waiting ?? "—", "need Gazz", (sb.rulings_waiting > 0) ? "warning" : "good"],
-    ["domain queue", (sb.domain_queue_pending ?? 0).toLocaleString(), "pending adjudication", null],
-    ["exhaust queue", (sb.exhaust_queue_pending ?? 0).toLocaleString(), "pending crawl", null],
-    ["attributed", (sb.companies_attributed ?? 0).toLocaleString(), "companies", null],
+  /* ---------- route table: the whole platform, one place ---------- */
+  var ROUTES = [
+    { id:"desk",   file:"desk.html",   label:"Command Desk", hint:"ops, mesh scorecard, health", refresh:true  },
+    { id:"map",    file:"map.html",    label:"Coverage Map",  hint:"companies, pins, book",       refresh:true  },
+    { id:"ask",    file:"ask.html",    label:"AI Data Desk",  hint:"pulls, PEOs, renewal intel",  refresh:false },
+    { id:"send",   file:"send.html",   label:"Send Desk",     hint:"outbound gate + lanes",       refresh:true  },
+    { id:"review", file:"review.html", label:"Review",        hint:"adjudication queue",          refresh:false }
   ];
-  const playTotal = (d.desk_ready_plays?.rows || []).find((r) => r.angle_type === "TOTAL");
-  if (playTotal) {
-    const st = Number(playTotal.ready) > 0 && Number(playTotal.sendable) === 0 ? "warning"
-             : Number(playTotal.sendable) > 0 ? "good" : null;
-    tiles.unshift(["ready plays", Number(playTotal.ready).toLocaleString(),
-      `${Number(playTotal.sendable).toLocaleString()} sendable · ${Number(playTotal.minted_24h).toLocaleString()} minted 24h`, st]);
-  }
-  const sev = { critical: 0, warning: 1, good: 2 };
-  tiles.sort((a, b) => (sev[a[3]] ?? 3) - (sev[b[3]] ?? 3));
-  $("#strip").innerHTML = tiles.map(([k, v, dd, st]) => {
-    const color = st === "good" ? "var(--good)" : st === "critical" ? "var(--critical)" : st === "warning" ? "var(--warning)" : "var(--ink-1)";
-    return `<div class="tile"><div class="k">${esc(k)}</div><div class="v" style="color:${color}">${esc(String(v))}</div><div class="d">${esc(dd)}</div></div>`;
-  }).join("");
-}
+  var STALE_MS = 5 * 60 * 1000;   /* a refreshable surface hidden this long reloads on return */
 
-function renderLimits(d) {
-  const rows = d.desk_rate_limits?.rows || [];
-  const mesh = rows.filter((r) => String(r.resource).startsWith("mesh_mail:"));
-  const main = rows.filter((r) => !String(r.resource).startsWith("mesh_mail:"));
-  const meshMax = mesh.reduce((a, r) => Math.max(a, Number(r.used) || 0), 0);
-  const meshRow = mesh.length ? [{
-    resource: `mesh mail (${mesh.length} hubs)`, window_label: "today",
-    used: meshMax, cap: mesh[0].cap, pct_used: mesh[0].cap ? (meshMax * 100 / mesh[0].cap) : null,
-    state: mesh.some((r) => r.state === "critical") ? "critical" : mesh.some((r) => r.state === "warn") ? "warn" : "ok",
-    detail: "busiest hub today vs per-hub limit",
-  }] : [];
-  $("#tblLimits tbody").innerHTML = main.concat(meshRow).map((r) => {
-    const pct = r.pct_used == null ? null : Math.min(Number(r.pct_used), 100);
-    const meterCls = r.state === "critical" ? "critical" : r.state === "warn" ? "warn" : "";
-    return `<tr title="${esc(r.detail)}">
-      <td>${esc(r.resource)}</td>
-      <td class="age cold">${esc(r.window_label)}</td>
-      <td class="num">${Number(r.used).toLocaleString()}</td>
-      <td class="num">${r.cap == null ? "—" : Number(r.cap).toLocaleString()}</td>
-      <td>${pct == null ? "" : `<div class="meter ${meterCls}"><i style="width:${pct}%"></i></div>`}</td>
-      <td>${stateChip(r.state, r.state + (r.pct_used != null ? " · " + Number(r.pct_used).toFixed(0) + "%" : ""))}</td>
-    </tr>`;
-  }).join("");
-}
+  var stage   = document.getElementById("stage");
+  var nav     = document.getElementById("nav");
+  var loading = document.getElementById("loading");
+  var banner  = document.getElementById("banner");
+  var frames  = {};      /* id -> iframe */
+  var hiddenAt= {};      /* id -> epoch ms when it was last hidden */
+  var current = null;
 
-function renderAppend(d) {
-  const rows = (d.desk_append_live?.rows || []).slice().sort((a, b) => (b.done_5m - a.done_5m) || (b.done_60m - a.done_60m));
-  $("#tblAppend tbody").innerHTML = rows.map((r) => {
-    pushHistory("ap:" + r.pipeline, r.done_5m);
-    const state = r.done_5m > 0 ? "alive" : (Number(r.queue_pending) > 0 && r.done_60m === 0) ? "stalled" : r.done_60m > 0 ? "warn" : "idle";
-    const label = state === "alive" ? "appending" : state === "stalled" ? "stalled" : state === "warn" ? "slow" : "idle";
-    return `<tr title="${esc(r.note)}">
-      <td>${esc(r.pipeline)}<br>${stateChip(state, label)}</td>
-      <td class="num">${Number(r.queue_pending).toLocaleString()}</td>
-      <td class="num">${Number(r.done_5m).toLocaleString()}</td>
-      <td class="num">${Number(r.done_60m).toLocaleString()}</td>
-      <td class="num">${Number(r.done_24h).toLocaleString()}</td>
-      <td>${spark("ap:" + r.pipeline)}</td>
-      <td class="num">${ageSpan(r.last_activity_at, 300)}</td>
-    </tr>`;
-  }).join("");
-}
+  function ls(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+  function lset(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
 
-function renderApi(d) {
-  const rows = (d.desk_api_usage_live?.rows || []).slice().sort((a, b) => (b.calls_5m - a.calls_5m) || (b.calls_60m - a.calls_60m) || (b.calls_24h - a.calls_24h));
-  $("#tblApi tbody").innerHTML = rows.map((r) => {
-    const key = "api:" + r.source + ":" + r.module;
-    pushHistory(key, r.calls_5m);
-    return `<tr>
-      <td>${esc(r.module)} <span class="age cold">(${esc(r.source)})</span></td>
-      <td class="num">${Number(r.calls_5m).toLocaleString()}</td>
-      <td class="num">${Number(r.calls_60m).toLocaleString()}</td>
-      <td class="num">${Number(r.calls_24h).toLocaleString()}</td>
-      <td class="num">${r.usd_24h == null ? "—" : "$" + Number(r.usd_24h).toFixed(2)}</td>
-      <td>${spark(key)}</td>
-      <td class="num">${ageSpan(r.last_call_at, 300)}</td>
-    </tr>`;
-  }).join("") || '<tr><td colspan="7" class="age cold">no API calls in the last 24h</td></tr>';
-}
-
-function renderFresh(d) {
-  const fresh = d.desk_freshness?.rows || [];
-  const laneHealth = new Map((d.desk_lane_health?.rows || []).map((r) => [r.lane, r]));
-  const lanes = fresh.filter((r) => r.kind === "lane");
-  $("#freshLanes").innerHTML = `<table><thead><tr>
-      <th>lane</th><th class="num">cadence</th><th class="num">checked</th><th>state</th><th>meaning</th>
-    </tr></thead><tbody>` + lanes.map((r) => {
-    const lh = laneHealth.get(r.name) || {};
-    const st = (r.detail.match(/state=(\w+)/) || [])[1] || (r.ok ? "ok" : "failing");
-    return `<tr>
-      <td>${esc(r.name)}</td>
-      <td class="num">${fmtAge(r.expected_secs)}</td>
-      <td class="num">${ageSpan(r.last_seen_at, 1500)}</td>
-      <td>${stateChip(st, st)}</td>
-      <td class="age cold" style="white-space:normal">${esc(lh.meaning || r.detail)}</td>
-    </tr>`;
-  }).join("") + "</tbody></table>";
-
-  const crons = fresh.filter((r) => r.kind === "cron");
-  const bad = crons.filter((r) => !r.ok);
-  $("#freshCrons").innerHTML =
-    `<div class="age cold" style="margin-bottom:6px">crons: ${crons.length - bad.length}/${crons.length} on schedule</div>` +
-    (bad.length ? `<table><thead><tr><th>overdue / failed cron</th><th class="num">expected every</th><th class="num">last ran</th><th>detail</th></tr></thead><tbody>` +
-      bad.map((r) => `<tr>
-        <td>${esc(r.name)}</td>
-        <td class="num">${fmtAge(r.expected_secs)}</td>
-        <td class="num">${ageSpan(r.last_seen_at, r.expected_secs || 3600)}</td>
-        <td class="age cold" style="white-space:normal">${esc(r.detail)}</td>
-      </tr>`).join("") + "</tbody></table>"
-      : "");
-}
-
-function renderHealth(d) {
-  const rows = d.desk_system_health?.rows || [];
-  const rank = { critical: 0, warn: 1, ok: 2 };
-  rows.sort((a, b) => (rank[a.state] ?? 3) - (rank[b.state] ?? 3));
-  $("#tblHealth tbody").innerHTML = rows.map((r) => `<tr>
-      <td>${esc(r.item)}</td>
-      <td>${stateChip(r.state, r.state)}</td>
-      <td class="num">${r.metric == null ? "—" : Number(r.metric).toLocaleString()}</td>
-      <td class="num">${ageSpan(r.last_at, 3600)}</td>
-      <td class="age cold" style="white-space:normal">${esc(r.detail)}</td>
-    </tr>`).join("");
-}
-
-function renderPurify(d) {
-  const rows = (d.desk_purification_live?.rows || []).slice().sort((a, b) => (b.done_5m - a.done_5m) || (b.done_60m - a.done_60m) || (b.done_24h - a.done_24h));
-  $("#tblPurify tbody").innerHTML = rows.map((r) => {
-    pushHistory("pu:" + r.stream, r.done_5m);
-    const state = r.done_5m > 0 ? "alive" : r.done_60m > 0 ? "warn" : "idle";
-    const label = state === "alive" ? "active" : state === "warn" ? "slow" : "quiet";
-    return `<tr title="${esc(r.note)}">
-      <td>${esc(r.stream)}<br>${stateChip(state, label)}</td>
-      <td class="num">${r.backlog == null ? "—" : Number(r.backlog).toLocaleString()}</td>
-      <td class="num">${Number(r.done_5m).toLocaleString()}</td>
-      <td class="num">${Number(r.done_60m).toLocaleString()}</td>
-      <td class="num">${Number(r.done_24h).toLocaleString()}</td>
-      <td>${spark("pu:" + r.stream)}</td>
-      <td class="num">${ageSpan(r.last_activity_at, 3600)}</td>
-    </tr>`;
-  }).join("");
-}
-
-function renderMail(d) {
-  const rows = (d.desk_mesh_mail_live?.rows || []).slice().sort((a, b) => (b.sent_24h - a.sent_24h) || (b.unconsumed - a.unconsumed));
-  $("#tblMail tbody").innerHTML = rows.map((r) => `<tr title="${esc(r.last_kind || "")}">
-      <td>${esc(r.route)}${Number(r.expired_unread) > 0 ? " " + stateChip("warn", r.expired_unread + " expired unread") : ""}</td>
-      <td class="num">${Number(r.sent_5m).toLocaleString()}</td>
-      <td class="num">${Number(r.sent_60m).toLocaleString()}</td>
-      <td class="num">${Number(r.sent_24h).toLocaleString()}</td>
-      <td class="num">${Number(r.unconsumed).toLocaleString()}</td>
-      <td class="num">${ageSpan(r.oldest_unconsumed_at, 7200)}</td>
-      <td class="num">${ageSpan(r.last_sent_at, 3600)}</td>
-    </tr>`).join("") || '<tr><td colspan="7" class="age cold">no inner-office mail yet</td></tr>';
-}
-
-function renderTicker(d) {
-  const rows = d.desk_intel_ticker?.rows || [];
-  $("#tblTicker tbody").innerHTML = rows.map((r) => {
-    const cls = r.kind === "switch" ? "ok" : r.kind === "departure" ? "warn" : "";
-    return `<tr>
-      <td class="num">${ageSpan(r.at, 3600)}</td>
-      <td><span class="chip ${cls}">${esc(r.kind)}</span></td>
-      <td>${esc(r.subject)}</td>
-      <td class="age cold" style="white-space:normal">${esc(r.detail)}</td>
-    </tr>`;
-  }).join("") || '<tr><td colspan="4" class="age cold">no intelligence events yet</td></tr>';
-}
-
-function renderPlays(d) {
-  const rows = d.desk_ready_plays?.rows || [];
-  $("#tblPlays tbody").innerHTML = rows.map((r) => {
-    const total = r.angle_type === "TOTAL";
-    const ready = Number(r.ready), sendable = Number(r.sendable);
-    const chip = total ? "" : ready > 0 && sendable === 0 ? " " + stateChip("warn", "no contacts")
-               : sendable > 0 ? " " + stateChip("ok", "sendable") : "";
-    return `<tr${total ? ' style="font-weight:650"' : ""}>
-      <td>${esc(r.angle_type)}${chip}</td>
-      <td class="num">${Number(r.minted).toLocaleString()}</td>
-      <td class="num">${Number(r.live).toLocaleString()}</td>
-      <td class="num">${Number(r.in_window).toLocaleString()}</td>
-      <td class="num">${ready.toLocaleString()}</td>
-      <td class="num">${sendable.toLocaleString()}</td>
-      <td class="num">${Number(r.minted_24h).toLocaleString()}</td>
-      <td class="num">${ageSpan(r.last_minted_at, 86400)}</td>
-    </tr>`;
-  }).join("") || '<tr><td colspan="8" class="age cold">no plays minted yet</td></tr>';
-}
-
-function renderHubs(d) {
-  const rows = (d.desk_hub_utilization?.rows || []).slice().sort((a, b) => (b.fires_24h - a.fires_24h) || String(a.hub_slug).localeCompare(String(b.hub_slug)));
-  $("#tblHubs tbody").innerHTML = rows.map((r) => {
-    pushHistory("hub:" + r.hub_slug, r.fires_1h);
-    const stCls = { active: "ok", degraded: "warn", quiet: "serious", dormant: "serious", planned: "", "on-demand": "" }[r.state] || "";
-    const pct = r.utilization_pct == null ? null : Math.min(Number(r.utilization_pct), 100);
-    const meterCls = pct == null ? "" : pct >= 80 ? "" : pct >= 40 ? "warn" : "critical";
-    return `<tr title="${esc(r.hub_type)} · ${esc(String(r.crons_active))} active crons · ${esc(String(r.thoughts_24h))} brain thoughts 24h">
-      <td>${esc(r.hub_slug)}<br><span class="chip ${stCls}">${esc(r.state)}</span></td>
-      <td class="num">${Number(r.fires_1h).toLocaleString()}</td>
-      <td class="num">${Number(r.fires_24h).toLocaleString()}</td>
-      <td class="num">${r.expected_24h == null ? "—" : Number(r.expected_24h).toLocaleString()}</td>
-      <td>${pct == null ? '<span class="age cold">n/a</span>' : `<div class="meter ${meterCls}"><i style="width:${pct}%"></i></div>`}</td>
-      <td class="num"${Number(r.failed_24h) > 0 ? ' style="color:var(--critical);font-weight:650"' : ""}>${Number(r.failed_24h).toLocaleString()}</td>
-      <td class="num">${ageSpan(r.last_activity_at, 3600)}</td>
-    </tr>`;
-  }).join("");
-}
-
-function renderEnrich(d) {
-  const rows = d.desk_enrichment_progress?.rows || [];
-  const fmtDelta = (v) => {
-    if (v == null) return '<span style="color:var(--ink-muted)">—</span>';
-    if (v > 0) return `<span style="color:var(--good);font-weight:650">+${Number(v).toLocaleString()}</span>`;
-    if (v < 0) return `<span style="color:var(--serious)">${Number(v).toLocaleString()}</span>`;
-    return '<span style="color:var(--ink-muted)">0</span>';
-  };
-  $("#tblEnrich tbody").innerHTML = rows.map((r) => {
-    const pct = Number(r.pct) || 0;
-    return `<tr>
-      <td>${esc(r.label)}</td>
-      <td><div class="meter"><i style="width:${Math.max(pct, r.n > 0 ? 1 : 0)}%"></i></div></td>
-      <td class="num">${Number(r.n).toLocaleString()}</td>
-      <td class="num">${pct.toFixed(1)}%</td>
-      <td class="num">${fmtDelta(r.delta_24h)}</td>
-      <td class="num">${fmtDelta(r.delta_7d)}</td>
-    </tr>`;
-  }).join("");
-  const cap = rows[0];
-  $("#enrichFoot").innerHTML = cap
-    ? `universe: <b>${Number(cap.universe).toLocaleString()}</b> targetable companies · snapshot ${ageSpan(cap.captured_at, 1200)} · refreshed every 15 min`
-    : "";
-}
-
-function renderScorecard(d) {
-  const row = (d.desk_mesh_scorecard?.rows || [])[0];
-  if (!row) { $("#scNarr").textContent = "no scorecard run yet — run select public.mesh_scorecard_run() or wait for the 10:20 UTC daily run"; return; }
-  const m = row.metrics || {};
-  const L = m.lifecycle || {}, F = m.flow || {}, C = m.cost || {};
-  const FP = row.fingerprint || {};
-  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
-  const fmtD = (v, suffix = "") => {
-    if (v == null) return '<span class="delta-0">—</span>';
-    const n = Number(v);
-    if (n > 0) return `<span class="delta-up">+${n.toLocaleString()}${suffix}</span>`;
-    if (n < 0) return `<span class="delta-dn">${n.toLocaleString()}${suffix}</span>`;
-    return '<span class="delta-0">0</span>';
-  };
-  const vCls = { green: "ok", yellow: "warn", red: "critical" }[row.verdict] || "";
-  $("#scHead").innerHTML =
-    `<span class="chip ${vCls}">${esc(String(row.verdict || "?").toUpperCase())}</span>` +
-    `<span class="age cold">run ${ageSpan(row.run_at, 90000)}</span>` +
-    `<span class="age cold">window ${esc(String(m.hours ?? "?"))} h</span>` +
-    `<span class="age cold">${fmtN(m.universe)} companies tracked</span>` +
-    ((m.verdict_reasons || []).length ? `<span class="age cold" style="white-space:normal">— ${esc(m.verdict_reasons.join("; "))}</span>` : "") +
-    (row.last_attempt_ok === false ? `<span class="chip critical" style="white-space:normal">latest scheduled run FAILED ${ageSpan(row.last_attempt_at, 90000)} — ${esc(row.last_attempt_err || "")} (showing last good run)</span>` : "") +
-    (row.last_selftest_pass === false ? `<span class="chip critical" style="white-space:normal">self-test failing: ${esc(row.last_selftest_failed || "")}</span>` : "") +
-    (row.last_selftest_at && row.last_selftest_pass ? `<span class="age cold">self-test passed ${ageSpan(row.last_selftest_at, 700000)}</span>` : "");
-  $("#scNarr").textContent = row.narrative || "";
-
-  const tiles = [
-    ["records changed", fmtN(m.records_changed), `${fmtN(m.records_created)} brand new · ${fmtN(m.obs_landed)} data points`, Number(m.records_changed) > 0 ? "good" : null],
-    ["new PEO users", fmtN(L.entries), `${fmtN(L.entries_new_companies)} new to book · ${fmtN(L.entries_first_evidence_existing)} now source-backed`, Number(L.entries) > 0 ? "good" : null],
-    ["switches", fmtN(L.switches), `${fmtN(L.switches_competitive)} competitive · ${fmtN(L.switches_dated_day)} dated to the day`, Number(L.switches) > 0 ? "good" : null],
-    ["exits", fmtN(L.exits), `${fmtN(L.exits_confirmed)} confirmed · ${fmtN(L.exits_assumed)} presumed`, null],
-    ["2+ sources agree", fmtN(L.corroborated_total), `${L.corroborated_pct ?? "—"}% of book · ${fmtN(L.corroborated_public_total)} by public filings · +${fmtN(L.corroborated_new)} this run`, null],
-    ["through the mesh", fmtN(L.through_mesh), `${fmtN(L.through_mesh_with_new_data)} came back with new data`, null],
-    ["book reviewed this week", FP.review_coverage_pct != null ? `${Number(FP.review_coverage_pct).toFixed(1)}%` : "—", FP.review_coverage_pct != null ? `every record walked once a week · ${Number(FP.review_elapsed_pct ?? 0).toFixed(0)}% of the week gone · ${fmtN(FP.review_marriages)} newly matched to a source · ${fmtN(FP.review_no_source)} still with no source` : "review sweep has not reported yet", FP.review_coverage_pct != null && Number(FP.review_coverage_pct) >= Number(FP.review_elapsed_pct ?? 0) - 15 ? "good" : "warning"],
-    ["verified by federal filing", FP.fed_verified != null ? fmtN(Number(FP.fed_verified) + Number(FP.fed_adopted || 0)) : "—", FP.fed_verified != null ? `PEO named on a filed 5500 · ${fmtN(FP.fed_switch_minted)} switch signals minted · ${fmtN(FP.fed_pending)} married and still to decide` : "federal EIN lane has not reported yet", Number(FP.fed_verified) > 0 ? "good" : null],
-    ["federal filings cannot answer", FP.fed_no_record != null ? fmtN(Number(FP.fed_no_record) + Number(FP.fed_no_ein || 0) + Number(FP.fed_no_canonical || 0)) : "—", FP.fed_no_record != null ? `${fmtN(FP.fed_no_record)} EINs the corpus has never seen · ${fmtN(FP.fed_no_ein)} records hold no EIN to key on · ${fmtN(FP.fed_no_canonical)} filed under a sponsor we have not registered — the named questions the next hub inherits` : "", null],
-    ["seed facts on the ledger", FP.seed_obs != null ? fmtN(FP.seed_obs) : "—", FP.seed_obs != null ? `vendor-file facts now dated and testable · ${fmtN(FP.seed_corroborated)} agree with what we hold · ${fmtN(FP.seed_contradicted)} disagree and are now arguable · ${fmtN(FP.seed_replay_pending)} rows still to replay` : "seed replay has not reported yet", Number(FP.seed_obs) > 0 ? "good" : null],
-    ["unique EINs", FP.book_unique_eins != null ? fmtN(FP.book_unique_eins) : "—", FP.book != null ? `the count that counts · ${fmtN(FP.ein_pending)} locations known by name+address, EIN pending` : "", null],
-    ["self-healed (24h)", FP.heals_24h != null ? fmtN(FP.heals_24h) : "—", "collisions concluded by the healer: merges, EIN reroutes, address releases, ownership confirmations", Number(FP.heals_24h) > 0 ? "good" : null],
-    ["fingerprint depth", FP.with_5_plus_fields != null ? `${(100 * Number(FP.with_5_plus_fields) / Math.max(1, Number(FP.book))).toFixed(1)}%` : "—", FP.book != null ? `of book known by 5+ facts · ${fmtN(FP.with_10_plus_fields)} by 10+ · ${fmtN(FP.with_2_plus_hubs)} by 2+ sources · ${fmtN(FP.harvested_7d)} harvested this week · avg ${FP.avg_fields_observed ?? "—"} facts` : "harvester has not reported yet", null],
-    ["contradictions", fmtN(L.contradictions), `${fmtN(L.contested_facts)} contested facts`, Number(L.contradictions) > 100 ? "warning" : null],
-    ["messages", fmtN(F.letters_sent), `${fmtN(F.accepted)} accepted · ${fmtN(F.conflicting)} conflicting`, null],
-    ["waiting unread", fmtN(F.unread_backlog), F.oldest_unread_hours != null ? `oldest ${F.oldest_unread_hours} h` : "", Number(F.oldest_unread_hours) > 24 ? "critical" : null],
-    ["cost", C.anthropic_usd != null ? "$" + Number(C.anthropic_usd).toFixed(2) : "—", C.usd_per_accepted_fact != null ? `$${C.usd_per_accepted_fact} per accepted fact` : `${fmtN(C.serper_credits)} search credits`, null],
-  ];
-  $("#scTiles").innerHTML = tiles.map(([k, v, dd, st]) => {
-    const color = st === "good" ? "var(--good)" : st === "critical" ? "var(--critical)" : st === "warning" ? "var(--warning)" : "var(--ink-1)";
-    return `<div class="tile"><div class="k">${esc(k)}</div><div class="v" style="color:${color}">${esc(String(v))}</div><div class="d">${esc(dd)}</div></div>`;
-  }).join("");
-
-  document.querySelectorAll(".bookBtn").forEach((b) => b.classList.toggle("on", b.dataset.book === scBook));
-  const bookData = (scBook !== "both" && m.fields_by_book && m.fields_by_book[scBook]) ? m.fields_by_book[scBook] : null;
-  const bookMap = new Map((bookData?.fields || []).map((f) => [f.key, f]));
-  $("#scBookNote").textContent = m.book
-    ? (bookData ? `${fmtN(bookData.n)} ${scBook} PEO users` : `${fmtN(m.book.current)} current + ${fmtN(m.book.former)} former = ${fmtN(m.universe)}`)
-    : "";
-  $("#tblScFields tbody").innerHTML = (m.fields || []).map((f0) => {
-    const f = bookMap.has(f0.key) ? { ...f0, ...bookMap.get(f0.key), delta_filled: null } : f0;
-    const pct = Number(f.pct) || 0;
-    const meterCls = pct >= 60 ? "" : pct >= 30 ? "warn" : "critical";
-    return `<tr title="${esc(f.why || "")}">
-      <td class="num">${f.rank}</td>
-      <td class="nw">${esc(f.label)}</td>
-      <td><div class="meter ${meterCls}"><i style="width:${Math.max(pct, f.filled > 0 ? 1 : 0)}%"></i></div></td>
-      <td class="num">${pct.toFixed(1)}%</td>
-      <td class="num" title="${esc(f.strong_label || "")}">${f.strong_pct == null ? '<span class="age cold">—</span>' : Number(f.strong_pct).toFixed(1) + "%"}</td>
-      <td class="num">${fmtD(f.delta_filled)}</td>
-      <td class="num">${fmtN(f.obs_landed)}</td>
-      <td class="age cold">${esc(f.top_source || "—")}</td>
-    </tr>`;
-  }).join("");
-
-  $("#tblScSources tbody").innerHTML = (m.sources || []).slice(0, 12).map((s) => `<tr>
-      <td>${esc(s.display)}</td>
-      <td class="age cold">${esc(s.kind || "")}${s.state ? " · " + esc(s.state) : ""}</td>
-      <td class="num">${fmtN(s.subjects)}</td>
-      <td class="num">${fmtN(s.fields_touched)}</td>
-      <td class="num">${fmtN(s.letters_accepted)}</td>
-      <td class="num"${Number(s.letters_conflicting) > 0 ? ' style="color:var(--warning)"' : ""}>${fmtN(s.letters_conflicting)}</td>
-    </tr>`).join("") || '<tr><td colspan="6" class="age cold">no source delivered anything in this window</td></tr>';
-
-  const rank = (arr, key) => (arr || []).slice().sort((a, b) => Number(b.completeness_pct) - Number(a.completeness_pct)).slice(0, 10);
-  const rowsOf = (arr, key) => rank(arr, key).map((r) => {
-    const pct = Number(r.completeness_pct) || 0;
-    return `<tr>
-      <td>${esc(r[key])}</td>
-      <td class="num">${fmtN(r.companies)}</td>
-      <td><div class="meter"><i style="width:${pct}%"></i></div></td>
-      <td class="num">${pct.toFixed(1)}%</td>
-      <td class="num">${fmtD(r.delta_pts)}</td>
-      <td class="num">${fmtN(r.touched_in_window)}</td>
-    </tr>`;
-  }).join("");
-  $("#tblScStates tbody").innerHTML = rowsOf(m.states, "state") || '<tr><td colspan="6" class="age cold">—</td></tr>';
-  $("#tblScPeos tbody").innerHTML   = rowsOf(m.peos, "peo")     || '<tr><td colspan="6" class="age cold">—</td></tr>';
-
-  $("#tblScHist tbody").innerHTML = (row.history || []).slice(0, 7).map((h) => {
-    const cls = { green: "ok", yellow: "warn", red: "critical" }[h.verdict] || "";
-    return `<tr>
-      <td class="num">${ageSpan(h.run_at, 90000)}</td>
-      <td><span class="chip ${cls}">${esc(h.verdict || "?")}</span></td>
-      <td class="num">${fmtN(h.entries)}</td>
-      <td class="num">${fmtN(h.switches)}</td>
-      <td class="num">${fmtN(h.exits)}</td>
-      <td class="num">${fmtN(h.corroborated_total)}</td>
-      <td class="num">${fmtN(h.accepted)}</td>
-    </tr>`;
-  }).join("");
-}
-
-function renderDecisions(d) {
-  const b = (d.desk_status_board?.rows || [])[0] || {};
-  const rows = d.desk_decision_desk?.rows || [];
-
-  const n = (v) => Number(v || 0).toLocaleString();
-  const ago = (ts) => {
-    if (!ts) return "never";
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (m < 1) return "just now";
-    if (m < 60) return m + "m ago";
-    if (m < 1440) return Math.floor(m / 60) + "h ago";
-    return Math.floor(m / 1440) + "d ago";
+  /* ---------- theme (shared with every surface via desk_theme) ---------- */
+  var saved = ls("desk_theme");
+  if (saved) document.documentElement.dataset.theme = saved;
+  document.getElementById("themeBtn").onclick = function () {
+    var next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    lset("desk_theme", next);
   };
 
-  const needs = Number(b.rulings_need_gazz || 0);
-  const blocked = Number(b.rulings_blocked || 0);
-  const summary = [
-    stateChip("ok", n(b.rulings_applied) + " applied"),
-    stateChip(Number(b.rulings_queued) > 0 ? "warn" : "ok", n(b.rulings_queued) + " queued"),
-    stateChip(blocked > 0 ? "serious" : "ok", n(blocked) + " blocked"),
-    stateChip(needs > 0 ? "critical" : "ok", needs + " need Gazz"),
-    stateChip("ok", (b.decided_without_gazz_pct == null ? "—" : b.decided_without_gazz_pct + "%") + " decided without you"),
-    stateChip("ok", n(b.judge_verdicts_total) + " verdicts / $" + Number(b.judge_spend_usd || 0).toFixed(2)),
-  ].join(" ");
-  $("#decSummary").innerHTML = summary +
-    ' <span style="opacity:.7">judge ' + esc(ago(b.judge_last_at)) +
-    ' · executor ' + esc(ago(b.executor_last_at)) + '</span>';
-
-  const CHIP = { applied: "ok", queued: "ok", in_window: "warn", blocked: "serious",
-                 opinion_for_gazz: "critical", awaiting_judge: "warn" };
-  const LABEL = { applied: "applied", queued: "queued", in_window: "in window",
-                  blocked: "blocked", opinion_for_gazz: "needs Gazz", awaiting_judge: "awaiting judge" };
-
-  $("#tblDecisions tbody").innerHTML = rows.map((r) => {
-    const st = String(r.state || "");
-    return `<tr>
-      <td class="num">${esc(String(r.id))}</td>
-      <td>${esc(r.subsystem || "")}</td>
-      <td class="num">${esc(String(r.tier))}</td>
-      <td>${stateChip(CHIP[st] || "warn", LABEL[st] || st)}</td>
-      <td>${esc(r.decided_by === "ruling_judge" ? "judge" : (r.decided_by || ""))}</td>
-      <td class="num">${r.confidence == null ? "—" : Number(r.confidence).toFixed(2)}</td>
-      <td class="num">${r.attempts == null ? "—" : esc(String(r.attempts))}</td>
-      <td class="num">${r.days_open == null ? "—" : esc(String(r.days_open))}</td>
-      <td style="max-width:520px">${esc(String(r.outcome || r.question || "").slice(0, 200))}</td>
-    </tr>`;
-  }).join("");
-}
-
-function renderAll(d) {
-  renderScorecard(d);
-  renderDecisions(d);
-  renderStrip(d);
-  renderPlays(d);
-  renderEnrich(d);
-  renderHubs(d);
-  renderLimits(d);
-  renderAppend(d);
-  renderApi(d);
-  renderFresh(d);
-  renderHealth(d);
-  renderPurify(d);
-  renderMail(d);
-  renderTicker(d);
-  tickAges();
-}
-
-/* ================= polling ================= */
-async function poll() {
-  if (DEMO) { renderAll(demoData()); setConn("demo data", true); lastPollAt = Date.now(); return; }
-  if (!deskKey) return;
-  try {
-    const res = await fetch(`${API}?view=${VIEWS.join(",")}`, {
-      headers: { "Authorization": `Bearer ${ANON}`, "x-desk-key": deskKey },
-    });
-    if (res.status === 401 || res.status === 403) {
-      localStorage.removeItem("desk_key"); deskKey = "";
-      setConn("key rejected", false);
-      showOverlay("That key was rejected.");
-      return;
+  /* ---------- desk key status (same origin => one key for all surfaces) ---------- */
+  function keyStatus() {
+    var k = ls("desk_key") || ls("peo_dash_key");
+    var chip = document.getElementById("keychip");
+    if (k) { chip.className = "ok"; chip.textContent = "desk key set"; banner.className = ""; }
+    else {
+      chip.className = "no"; chip.textContent = "no desk key";
+      banner.textContent = "No desk key in this browser. Sign in on any surface below (Vault: desk_access_key) — it unlocks all of them.";
+      banner.className = "show";
     }
-    if (!res.ok) { setConn(`error ${res.status}`, false); return; }
-    const body = await res.json();
-    latest = body.views || {};
-    lastPollAt = Date.now();
-    const clockRow = (latest.desk_freshness?.rows || []).find((r) => r.kind === "clock");
-    if (clockRow) skewMs = new Date(clockRow.last_seen_at).getTime() - Date.now();
-    else if (body.served_at) skewMs = new Date(body.served_at).getTime() - Date.now();
-    renderAll(latest);
-    setConn("live", true);
-  } catch (e) {
-    setConn("unreachable — " + (e.message || e), false);
   }
-}
+  setInterval(keyStatus, 3000);
 
-/* ================= key overlay ================= */
-function showOverlay(err) {
-  $("#overlay").classList.remove("hidden");
-  $("#keyErr").textContent = err || "";
-  $("#keyInput").focus();
-}
-$("#keyGo").onclick = async () => {
-  deskKey = $("#keyInput").value.trim();
-  if (!deskKey) return;
-  localStorage.setItem("desk_key", deskKey);
-  $("#overlay").classList.add("hidden");
-  await poll();
-};
-$("#keyInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#keyGo").click(); });
+  /* ---------- nav ---------- */
+  ROUTES.forEach(function (r, i) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.title = r.hint;
+    b.innerHTML = '<span class="n">' + (i + 1) + '</span>' + r.label;
+    b.onclick = function () { location.hash = "#/" + r.id; };
+    b.dataset.route = r.id;
+    nav.appendChild(b);
+  });
 
-/* ================= demo data (layout preview only) ================= */
-function demoData() {
-  const now = new Date().toISOString();
-  const ago = (s) => new Date(Date.now() - s * 1000).toISOString();
-  return {
-    desk_mesh_scorecard: { rows: [{ run_at: ago(3600), verdict: "yellow", fingerprint: { book: 231494, with_5_plus_fields: 98040, with_10_plus_fields: 31200, with_2_plus_hubs: 44100, harvested_7d: 12800, avg_fields_observed: 6.4, book_unique_eins: 121855, ein_pending: 93200, heals_24h: 7081, review_coverage_pct: 41.2, review_elapsed_pct: 38, review_marriages: 1840, review_no_source: 52110 }, narrative: "Since the last check (24.0 hours): 62,503 new data points were recorded on 33,894 companies out of 231,494 tracked. 14,260 companies were newly identified as PEO users (first spotted mostly by fl_wc). 1,097 switched PEOs. 16 left the PEO model entirely. Verdict: YELLOW — silent hubs: ca_sos.",
-      metrics: { hours: 24, universe: 231494, verdict: "yellow", verdict_reasons: ["silent hubs: ca_sos"],
-        lifecycle: { entries: 14260, switches: 1097, switches_competitive: 566, switches_dated_day: 0, exits: 16, corroborated_total: 8040, corroborated_pct: 3.5, corroborated_new: 1956, through_mesh: 381, through_mesh_with_new_data: 318, contradictions: 0, contested_facts: 0 },
-        flow: { letters_sent: 431, accepted: 356, conflicting: 70, unread_backlog: 5, oldest_unread_hours: 111 },
-        cost: { anthropic_usd: 10.14, serper_credits: 0, usd_per_accepted_fact: 0.0285 },
-        fields: [ { rank: 1, label: "Health renewal month", filled: 80009, pct: 34.6, strong_pct: null, delta_filled: 150, obs_landed: 0, top_source: null }, { rank: 9, label: "Domain", filled: 151902, pct: 65.6, strong_pct: 29.5, delta_filled: 20, obs_landed: 0, top_source: "enrichment" } ],
-        sources: [ { display: "FL WC data hub", kind: "state_wc", state: "FL", subjects: 20090, fields_touched: 5, letters_accepted: 200, letters_conflicting: 12 } ],
-        states: [ { state: "MO", companies: 3000, completeness_pct: 66.1, delta_pts: 0.2, touched_in_window: 40 } ],
-        peos: [ { peo: "adp_totalsource", companies: 20000, completeness_pct: 61.6, delta_pts: 0.1, touched_in_window: 300 } ] },
-      history: [ { run_at: ago(3600), verdict: "yellow", entries: 14260, switches: 1097, exits: 16, corroborated_total: 8040, accepted: 356 } ] }] },
-    desk_status_board: { rows: [{ lanes_alive: 4, lanes_failing: 0, lanes_starving: 1, red_flags: 2, rulings_waiting: 1, domain_queue_pending: 66830, exhaust_queue_pending: 107865, companies_attributed: 8123 }] },
-    desk_spend: { rows: [{ gate_open: false, spend_mtd_usd: 439.17, platform_cap_usd: 400 }] },
-    desk_rate_limits: { rows: [
-      { resource: "serper_credits", window_label: "credit pool", used: 31624, cap: 50000, remaining: 18376, pct_used: 63.2, state: "ok", detail: "gate closes at 500" },
-      { resource: "serper_today", window_label: "today", used: 1240, cap: null, remaining: null, pct_used: null, state: "ok", detail: "credits burned today" },
-      { resource: "anthropic_month", window_label: "month to date", used: 439.17, cap: 400, remaining: -39.17, pct_used: 109.8, state: "critical", detail: "spend gate CLOSED" },
-      { resource: "anthropic_credits", window_label: "credit pool", used: 757.77, cap: 100, remaining: -657.77, pct_used: 100, state: "critical", detail: "drawn since anchor" },
-      { resource: "mesh_mail:intent", window_label: "today", used: 12, cap: 500, pct_used: 2.4, state: "ok", detail: "" },
-      { resource: "mesh_mail:mesh", window_label: "today", used: 3, cap: 500, pct_used: 0.6, state: "ok", detail: "" },
-    ] },
-    desk_api_usage_live: { rows: [
-      { source: "anthropic", module: "domain-resolve", calls_5m: 14, calls_60m: 122, calls_24h: 289, usd_24h: 26.28, last_call_at: ago(12) },
-      { source: "serper", module: "serper:search", calls_5m: 9, calls_60m: 80, calls_24h: 1893, usd_24h: null, last_call_at: ago(40) },
-      { source: "anthropic", module: "sonnet-escalate", calls_5m: 0, calls_60m: 3, calls_24h: 47, usd_24h: 3.52, last_call_at: ago(4200) },
-    ] },
-    desk_append_live: { rows: [
-      { pipeline: "exhaust_crawl", queue_pending: 107865, done_5m: 150, done_60m: 1794, done_24h: 39710, per_min_60m: 29.9, last_activity_at: ago(20), note: "crawl requests fired" },
-      { pipeline: "exhaust_mine", queue_pending: 12, done_5m: 150, done_60m: 1790, done_24h: 36253, per_min_60m: 29.8, last_activity_at: ago(60), note: "responses mined" },
-      { pipeline: "domain_resolve", queue_pending: 66830, done_5m: 0, done_60m: 0, done_24h: 5779, per_min_60m: 0, last_activity_at: ago(80596), note: "domains adjudicated" },
-      { pipeline: "serper_enrich", queue_pending: 16074, done_5m: 0, done_60m: 0, done_24h: 1013, per_min_60m: 0, last_activity_at: ago(67176), note: "companies enriched" },
-    ] },
-    desk_freshness: { rows: [
-      { kind: "clock", name: "db_now", expected_secs: null, last_seen_at: now, age_secs: 0, ok: true, detail: "server time" },
-      { kind: "lane", name: "exhaust_crawl", expected_secs: 1800, last_seen_at: ago(300), ok: true, detail: "state=alive consecutive_bad=0" },
-      { kind: "lane", name: "domain_resolve", expected_secs: 600, last_seen_at: ago(300), ok: true, detail: "state=gated consecutive_bad=0 (spend-gated)" },
-      { kind: "lane", name: "snippet_miner", expected_secs: 5400, last_seen_at: ago(300), ok: true, detail: "state=starving consecutive_bad=13" },
-      { kind: "cron", name: "hub_contract_sentinel", expected_secs: 3600, last_seen_at: ago(537), ok: false, detail: "schedule=0 * * * * last_status=failed" },
-      { kind: "cron", name: "watchdog", expected_secs: 300, last_seen_at: ago(60), ok: true, detail: "schedule=*/5 * * * * last_status=succeeded" },
-    ] },
-    desk_lane_health: { rows: [
-      { lane: "exhaust_crawl", meaning: "firing and mining normally" },
-      { lane: "domain_resolve", meaning: "waiting on spend gate" },
-    ] },
-    desk_system_health: { rows: [
-      { item: "anthropic_reachability", state: "critical", metric: 429, last_at: ago(120), detail: "rate_limit_error: monthly usage threshold crossed" },
-      { item: "health_check", state: "warn", metric: null, last_at: ago(400), detail: "status=RED" },
-      { item: "operator_holds", state: "warn", metric: 13, last_at: ago(19000), detail: "entity_resolve_drain, serper_enrich_drain, ..." },
-      { item: "edge_errors_60m", state: "ok", metric: 0, last_at: null, detail: "no edge errors in the last hour" },
-      { item: "exceptions_open", state: "ok", metric: 0, last_at: null, detail: "exception desk clear" },
-    ] },
-    desk_purification_live: { rows: [
-      { stream: "quality_flags", backlog: 85, done_5m: 1, done_60m: 4, done_24h: 66, last_activity_at: ago(60), note: "flags raised (backlog = still open)" },
-      { stream: "ingest_quarantine", backlog: 17339, done_5m: 0, done_60m: 0, done_24h: 570, last_activity_at: ago(56000), note: "bad writes caught at the gate" },
-      { stream: "noncompete_quarantine", backlog: 720, done_5m: 0, done_60m: 0, done_24h: 15, last_activity_at: ago(22000), note: "noncompete entities pulled" },
-      { stream: "attribution_adjudication", backlog: 390, done_5m: 0, done_60m: 0, done_24h: 0, last_activity_at: ago(140000), note: "suspect groups resolved" },
-    ] },
-    desk_mesh_mail_live: { rows: [
-      { route: "efast_5500 -> tx_wc", sent_5m: 0, sent_60m: 2, sent_24h: 11, unconsumed: 1, oldest_unconsumed_at: ago(4000), expired_unread: 0, last_sent_at: ago(1300), last_kind: "offer/ein" },
-      { route: "peo_intel -> fingerprint", sent_5m: 0, sent_60m: 0, sent_24h: 3, unconsumed: 0, oldest_unconsumed_at: null, expired_unread: 2, last_sent_at: ago(30000), last_kind: "fact/peo" },
-    ] },
-    desk_hub_utilization: { rows: [
-      { hub_slug: "ca_sos", hub_type: "reporter", crons_active: 3, fires_1h: 240, fires_24h: 5331, failed_24h: 0, expected_24h: 5760, utilization_pct: 93, thoughts_24h: 0, last_activity_at: ago(30), state: "active" },
-      { hub_slug: "efast_5500", hub_type: "reporter", crons_active: 4, fires_1h: 63, fires_24h: 1400, failed_24h: 0, expected_24h: 1513, utilization_pct: 93, thoughts_24h: 0, last_activity_at: ago(45), state: "active" },
-      { hub_slug: "fingerprint", hub_type: "thinker", crons_active: 8, fires_1h: 36, fires_24h: 821, failed_24h: 0, expected_24h: 889, utilization_pct: 92, thoughts_24h: 0, last_activity_at: ago(70), state: "active" },
-      { hub_slug: "enrichment", hub_type: "thinker", crons_active: 1, fires_1h: 2, fires_24h: 45, failed_24h: 18, expected_24h: 48, utilization_pct: 94, thoughts_24h: 0, last_activity_at: ago(500), state: "active" },
-      { hub_slug: "postmaster", hub_type: "thinker", crons_active: 0, fires_1h: 0, fires_24h: 0, failed_24h: 0, expected_24h: 0, utilization_pct: null, thoughts_24h: 0, last_activity_at: ago(200000), state: "dormant" },
-      { hub_slug: "fl_wc", hub_type: "reporter", crons_active: 0, fires_1h: 0, fires_24h: 0, failed_24h: 0, expected_24h: 0, utilization_pct: null, thoughts_24h: 0, last_activity_at: null, state: "planned" },
-    ] },
-    desk_ready_plays: { rows: [
-      { angle_type: "TOTAL", minted: 12029, live: 12029, in_window: 4480, ready: 4480, sendable: 0, ready_companies: 4480, minted_24h: 0, last_minted_at: ago(100000) },
-      { angle_type: "acquisition_disruption", minted: 6091, live: 6091, in_window: 2802, ready: 2802, sendable: 0, ready_companies: 2802, minted_24h: 0, last_minted_at: ago(250000) },
-      { angle_type: "cpeo_cert_risk", minted: 1024, live: 1024, in_window: 1024, ready: 1024, sendable: 0, ready_companies: 1024, minted_24h: 0, last_minted_at: ago(160000) },
-      { angle_type: "proven_switcher", minted: 636, live: 636, in_window: 636, ready: 636, sendable: 0, ready_companies: 636, minted_24h: 0, last_minted_at: ago(100000) },
-      { angle_type: "acquired_book", minted: 4060, live: 4060, in_window: 0, ready: 0, sendable: 0, ready_companies: 0, minted_24h: 0, last_minted_at: ago(160000) },
-    ] },
-    desk_intel_ticker: { rows: [
-      { at: ago(300), kind: "switch", subject: "ACME STAFFING LLC", detail: "insperity -> adp_totalsource (tx_wc_lcf)" },
-      { at: ago(2000), kind: "departure", subject: "BLUE MESA FOODS", detail: "left justworks after 2025 [candidate]" },
-      { at: ago(3600), kind: "hub:efast_5500", subject: "wring_merge_complete", detail: "load_progress" },
-    ] },
+  function route(id) {
+    var r = null, i;
+    for (i = 0; i < ROUTES.length; i++) if (ROUTES[i].id === id) r = ROUTES[i];
+    return r;
+  }
+
+  function show(id) {
+    var r = route(id);
+    if (!r) { location.hash = "#/" + ROUTES[0].id; return; }
+    if (current === id) return;
+
+    if (current && frames[current]) {
+      frames[current].classList.remove("live");
+      hiddenAt[current] = Date.now();
+    }
+    current = id;
+
+    var f = frames[id];
+    if (!f) {
+      f = document.createElement("iframe");
+      f.src = r.file;
+      f.title = r.label;
+      f.setAttribute("allow", "clipboard-write");
+      loading.classList.add("show");
+      f.addEventListener("load", function () { loading.classList.remove("show"); });
+      frames[id] = f;
+      stage.appendChild(f);
+    } else if (r.refresh && hiddenAt[id] && (Date.now() - hiddenAt[id]) > STALE_MS) {
+      loading.classList.add("show");
+      f.contentWindow.location.reload();
+    }
+    f.classList.add("live");
+
+    var btns = nav.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) {
+      if (btns[i].dataset.route === id) btns[i].setAttribute("aria-current", "page");
+      else btns[i].removeAttribute("aria-current");
+    }
+    document.title = "PEO Engine — " + r.label;
+  }
+
+  document.getElementById("reloadBtn").onclick = function () {
+    if (frames[current]) { loading.classList.add("show"); frames[current].contentWindow.location.reload(); }
   };
-}
+  document.getElementById("popBtn").onclick = function () {
+    var r = route(current); if (r) window.open(r.file, "_blank", "noopener");
+  };
 
-/* ================= boot ================= */
-if (DEMO) { poll(); }
-else if (!deskKey) { showOverlay(); }
-else { poll(); }
-setInterval(poll, POLL_MS);
+  /* ---------- keyboard 1..5 ---------- */
+  document.addEventListener("keydown", function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var t = e.target || {};
+    if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
+    var n = parseInt(e.key, 10);
+    if (n >= 1 && n <= ROUTES.length) location.hash = "#/" + ROUTES[n - 1].id;
+  });
+
+  function fromHash() {
+    var h = (location.hash || "").replace(/^#\/?/, "").split("?")[0];
+    show(h || ROUTES[0].id);
+  }
+  window.addEventListener("hashchange", fromHash);
+
+  keyStatus();
+  if (!location.hash) location.replace("#/" + ROUTES[0].id);
+  fromHash();
+})();
 </script>
 </body>
 </html>
