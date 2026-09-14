@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.34 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.35 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -214,6 +214,10 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .peo-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
 .peo-row:hover{background:rgba(99,144,238,.08)}
 .peo-row .vis{width:13px;height:13px;margin:0;flex:none;accent-color:var(--accent);cursor:pointer}
+.peo-row.child{padding-left:20px;margin-left:8px;border-left:1px solid var(--grid)}
+.peo-row.child .nm{font-size:12px;color:var(--muted)}
+.peo-row.child.on .nm{color:var(--ink2)}
+.peo-row.child .sw{width:8px;height:8px}
 .peo-row .sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--ring)}
 .peo-row .nm{flex:1;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peo-row.on .nm{color:var(--ink)}
@@ -332,7 +336,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.34 · 2026-09-14</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.35 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -438,7 +442,18 @@ var S={
   map:null, logoCache:{}, hover:null, rev:0
 };
 function bump(){ S.rev++; }
-function selMap(){ if(!S.sel[S.grain]){ var m={}; catRows().forEach(function(r){m[r.slug]=true}); m['unattributed']=true; S.sel[S.grain]=m; } return S.sel[S.grain]; }
+function selMapFor(g){
+  if(!S.sel[g]){ var m={}; ((g==='brand')?(S.catalog.brands||[]):(S.catalog.families||[])).forEach(function(r){m[r.slug]=true}); m['unattributed']=true; S.sel[g]=m; }
+  return S.sel[g];
+}
+function selMap(){ return selMapFor(S.grain); }
+// Family view carves by PEO: a child PEO unchecked under its family hides only that PEO's pins.
+function brandOk(d,i){
+  if(S.grain!=='family') return true;
+  if(!d.brds||!d.bis) return true;
+  var bs=S.sel['brand']; if(!bs) return true;
+  return bs[d.brds[d.bis[i]]]!==false;
+}
 function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
 function colorOf(slug){ return S.colors[S.grain][slug]||OTHER; }
 function dispOf(slug){ return S.displays[S.grain][slug]||slug; }
@@ -865,6 +880,7 @@ function draw(){
       if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
       if(S.minSrc && d2.detail && d2.detail.cs && d2.detail.cs[i2]<S.minSrc) continue;
       if(!heatOk(d2,i2)) continue;
+      if(!brandOk(d2,i2)) continue;
       var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
       if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
       if(dotMode){
@@ -1101,6 +1117,7 @@ function terrResults(){
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       if(!heatOk(d,i)) continue;
+      if(!brandOk(d,i)) continue;
       var dx=MX[i]-t.cmx, dy=MY[i]-t.cmy;
       if(dx*dx+dy*dy > t.rMerc*t.rMerc) continue;
       total++;
@@ -1266,27 +1283,57 @@ function buildPeoPanel(){
     return py-px || String(x.display||x.slug).localeCompare(String(y.display||y.slug));
   });
   var sel=selMap();
+  // Gazz 2026-09-14: in Family view the list is a TREE — the family, then every PEO that trees up
+  // to it, indented, each with its own checkbox. Unchecking a child carves that one PEO out of the
+  // family's pins; the family checkbox still turns the whole family on or off.
+  function placedOf(r){ return Math.max(0,(Number(r.n_clients)||0)-(Number(r.n_unplaced)||0)); }
+  var kids={};
+  if(S.grain==='family'){
+    (S.catalog.brands||[]).forEach(function(bb){
+      var f=bb.family_slug||bb.slug;
+      if(!f || bb.slug===f) return;
+      (kids[f]=kids[f]||[]).push(bb);
+    });
+    Object.keys(kids).forEach(function(f){
+      kids[f].sort(function(x,y){ return placedOf(y)-placedOf(x) || String(x.display||x.slug).localeCompare(String(y.display||y.slug)); });
+    });
+  }
+  var bsel=(S.grain==='family')?selMapFor('brand'):null;
   $('peo-count').textContent='('+rows.length+')';
-  rows.forEach(function(r){
-    if(q && String(r.display||r.slug).toLowerCase().indexOf(q)<0) return;
-    var on=sel[r.slug]!==false;
-    var d=document.createElement('div'); d.className='peo-row '+(on?'on':'off');
+
+  function addRow(r, child){
+    var map = child ? bsel : sel;
+    var on = map[r.slug]!==false;
+    var d=document.createElement('div'); d.className='peo-row '+(on?'on':'off')+(child?' child':'');
     var sw=document.createElement('span'); sw.className='sw'; sw.style.background=r.color_hex||OTHER;
-    var nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.display||r.slug; nm.title=(r.display||r.slug)+' · slug: '+r.slug+(r.color_basis?' · color: '+r.color_basis:'');
+    var nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.display||r.slug;
+    nm.title=(r.display||r.slug)+' · slug: '+r.slug+(child?' · trees up to '+(dispOf(r.family_slug)||r.family_slug):'')+(r.color_basis?' · color: '+r.color_basis:'');
     var ct=document.createElement('span'); ct.className='ct';
-    var unpl=Number(r.n_unplaced)||0, placed=Math.max(0, Number(r.n_clients)-unpl);   // v3.17: placed vs location-pending (0588)
+    var unpl=Number(r.n_unplaced)||0, placed=placedOf(r);
     ct.textContent=placed.toLocaleString();
     ct.title=Number(r.n_clients).toLocaleString()+' clients attributed · '+placed.toLocaleString()+' placed on the map'+(unpl?' · '+unpl.toLocaleString()+' location pending (recorded at the PEO’s own address — real address being resolved)':'');
     if(unpl) ct.className+=' pend';
-    var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
-    so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
     var cb=document.createElement('input'); cb.type='checkbox'; cb.className='vis'; cb.checked=on;
     cb.title=(on?'showing':'hidden')+' on the map — click to toggle';
     cb.setAttribute('aria-label',(r.display||r.slug)+' visible on the map');
-    cb.onclick=function(e){ e.stopPropagation(); sel[r.slug]=cb.checked; afterSel(); };
-    d.onclick=function(){ sel[r.slug]=sel[r.slug]===false?true:false; afterSel(); };
-    d.appendChild(cb); d.appendChild(sw); d.appendChild(nm); d.appendChild(ct); d.appendChild(so);
+    cb.onclick=function(e){ e.stopPropagation(); map[r.slug]=cb.checked; afterSel(); };
+    d.appendChild(cb); d.appendChild(sw); d.appendChild(nm); d.appendChild(ct);
+    if(!child){
+      var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
+      so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
+      d.appendChild(so);
+    }
+    d.onclick=function(){ map[r.slug]=map[r.slug]===false?true:false; afterSel(); };
     host.appendChild(d);
+  }
+
+  rows.forEach(function(r){
+    var hit = !q || String(r.display||r.slug).toLowerCase().indexOf(q)>=0;
+    var ch  = kids[r.slug]||[];
+    var chHits = ch.filter(function(bb){ return !q || String(bb.display||bb.slug).toLowerCase().indexOf(q)>=0; });
+    if(!hit && !chHits.length) return;
+    addRow(r,false);
+    (hit?ch:chHits).forEach(function(bb){ addRow(bb,true); });
   });
   syncBeaconGlyph();
 }
@@ -1565,6 +1612,7 @@ function computeViewLegend(){
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       if(!heatOk(d,i)) continue;
+      if(!brandOk(d,i)) continue;
       if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
       if(S.terr){ var tdx=MX[i]-S.terr.cmx, tdy=MY[i]-S.terr.cmy;
                   if(tdx*tdx+tdy*tdy > S.terr.rMerc*S.terr.rMerc) continue; }
