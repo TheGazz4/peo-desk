@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.27 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.28 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -332,7 +332,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.27 · 2026-09-14</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.28 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -349,7 +349,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div class="seg"><button id="lens-peo" class="on">Off</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC</button></div>
         <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">Headquarters</h2>
         <label class="chk"><input type="checkbox" id="hqlogo-on" checked> PEO HQ pins (logos)</label>
-        <label class="chk" title="Administrative offices ◆ and unverified HQ candidates ✩ — extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Administrative beacons ◆</label>
+        <label class="chk" title="A PEO's own administrative offices ◆ and unverified HQ candidates ✩ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <h2 style="margin-top:10px" title="How confident we are in the PEO shown on each pin. Cross-verified = independently confirmed.">Confidence</h2>
         <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
@@ -1245,6 +1245,16 @@ function buildPeoPanel(){
     d.appendChild(cb); d.appendChild(sw); d.appendChild(nm); d.appendChild(ct); d.appendChild(so);
     host.appendChild(d);
   });
+  syncBeaconGlyph();
+}
+// the ◆ in the toggle is a key, not a decoration: with one PEO shown it wears that PEO's
+// assigned colour, exactly as its beacons do on the map; with several it stays neutral.
+function syncBeaconGlyph(){
+  var g=$('beaconGlyph'); if(!g) return;
+  var sel=selMap(), rows=catRows(), on=[];
+  for(var i=0;i<rows.length;i++){ if(sel[rows[i].slug]!==false){ on.push(rows[i].slug); if(on.length>1) break; } }
+  if(on.length===1){ g.style.color=colorOf(on[0]); g.title='diamonds render in the PEO colour — currently '+dispOf(on[0]); }
+  else { g.style.color='var(--muted)'; g.title='each diamond renders in its own PEO colour'; }
 }
 function afterSel(){ bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl(); }
 $('peo-search').addEventListener('input',buildPeoPanel);
