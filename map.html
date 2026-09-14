@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.29 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.30 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -332,7 +332,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.29 · 2026-09-14</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.30 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1225,7 +1225,14 @@ function buildStatePanel(){
 function buildPeoPanel(){
   var host=$('peo-list'); host.innerHTML='';
   var q=($('peo-search').value||'').toLowerCase();
-  var rows=catRows(); var sel=selMap();
+  // Gazz 2026-09-14: the list reads in order of the count it SHOWS (clients placed on the map),
+  // not the raw attributed count — otherwise a PEO with many location-pending clients jumps the queue.
+  var rows=catRows().slice().sort(function(x,y){
+    var px=Math.max(0,(Number(x.n_clients)||0)-(Number(x.n_unplaced)||0));
+    var py=Math.max(0,(Number(y.n_clients)||0)-(Number(y.n_unplaced)||0));
+    return py-px || String(x.display||x.slug).localeCompare(String(y.display||y.slug));
+  });
+  var sel=selMap();
   $('peo-count').textContent='('+rows.length+')';
   rows.forEach(function(r){
     if(q && String(r.display||r.slug).toLowerCase().indexOf(q)<0) return;
