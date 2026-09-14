@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.36 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.37 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -338,7 +338,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.36 · 2026-09-14</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.37 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -634,9 +634,10 @@ function commitDetail(st,r){
   var cOk=r.cs&&r.cs.length===n&&r.cx&&r.cx.length===n;   // v3.21: corroboration (optional — older bakes)
   d.mxA=mxA; d.myA=myA; d.mxZ=mxZ; d.myZ=myZ;
   var fOk=r.osc&&r.osc.length===n;   // 1122/1123: footprint verdict + the operating-state list
+  var zOk=r.z5&&r.z5.length===n;    // ZIP carried for grouping a searched area, never for hover display
   d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
             hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null,
-            osc:fOk?r.osc:null, os:fOk?r.os:null};
+            osc:fOk?r.osc:null, os:fOk?r.os:null, z5:zOk?r.z5:null};
   d.lat0=null; d.lng0=null;
 }
 function loadDetail(st,retried){
@@ -919,7 +920,7 @@ function draw(){
     }
   }
   // territory circle (preview while drawing, persistent after)
-  if(S.terr){
+  if(S.terr && S.terr.rMerc>0){
     var tx=(S.terr.cmx-cx)*scale+W/2, ty=(S.terr.cmy-cy)*scale+H/2, tr=S.terr.rMerc*scale;
     ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle='rgba(99,144,238,.95)'; ctx.setLineDash([6,5]);
     ctx.arc(tx,ty,tr,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
@@ -1104,6 +1105,23 @@ function onDrawUp(){
   $('mapwrap').style.cursor='';
   if(S.terr&&S.terr.rMerc>0) terrResults(); else { S.terr=null; scheduleDraw(); }
 }
+// A SELECTION IS A SELECTION (Gazz 2026-09-14): a drawn circle, a ZIP, a city or a state all
+// produce the same panel. S.terr carries either a radius or a named area.
+function inArea(a, st, d, i){
+  if(!a) return true;
+  if(a.kind==='state') return st===a.state;
+  if(a.kind==='city')  return (!a.state||st===a.state) && d.detail && String(d.detail.cities[i]||'').toUpperCase()===a.city.toUpperCase();
+  if(a.kind==='zip')   return !!(d.detail && d.detail.z5 && d.detail.z5[i]===a.zip);
+  return false;
+}
+function openArea(area){
+  S.drawMode=false; $('draw-btn').className='ghost';
+  if(S.map) S.map.setOptions({draggable:true});
+  $('mapwrap').style.cursor='';
+  S.terr={cmx:0,cmy:0,rMerc:0,area:area};
+  terrResults(); scheduleDraw(); updateStats();
+  try{ computeViewLegend(); }catch(_){}
+}
 function terrResults(){
   var t=S.terr; if(!t) return;
   var sel=selMap(); var byKey={}; var members=[]; var total=0;
@@ -1120,8 +1138,9 @@ function terrResults(){
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       if(!heatOk(d,i)) continue;
       if(!brandOk(d,i)) continue;
-      var dx=MX[i]-t.cmx, dy=MY[i]-t.cmy;
-      if(dx*dx+dy*dy > t.rMerc*t.rMerc) continue;
+      if(t.area){ if(!inArea(t.area, st, d, i)) continue; }
+      else { var dx=MX[i]-t.cmx, dy=MY[i]-t.cmy;
+             if(dx*dx+dy*dy > t.rMerc*t.rMerc) continue; }
       total++;
       var sl=slugArr[IDX[i]]; byKey[sl]=(byKey[sl]||0)+1;
       if(members.length<300) members.push([st,i,sl]);
@@ -1136,8 +1155,11 @@ function terrResults(){
   var list=members.map(function(mm){
     var d=S.pinData[mm[0]]; var nm=d.detail?(d.detail.names[mm[1]]||'—'):'(loading…)'; var city=d.detail?(d.detail.cities[mm[1]]||''):'';
     return '<div class="tr" data-st="'+mm[0]+'" data-i="'+mm[1]+'"><span class="dot" style="background:'+colorOf(mm[2])+'"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(nm)+'</span><span style="color:var(--muted);font-size:10.5px">'+esc(city)+'</span></div>'; }).join('');
-  el.innerHTML='<div class="hd">'+total.toLocaleString()+' clients in circle <button class="x" id="terr-x">×</button></div>'+
-    '<div class="sub">~'+miles+' mi radius · results stay on screen — nothing exports</div>'+
+  var areaLbl = t.area ? t.area.label : 'circle';
+  var areaSub = t.area ? (t.area.kind==='zip'?'ZIP '+t.area.zip:(t.area.kind==='city'?'city':'state'))+' · results stay on screen — nothing exports'
+                       : '~'+miles+' mi radius · results stay on screen — nothing exports';
+  el.innerHTML='<div class="hd">'+total.toLocaleString()+' clients in '+esc(areaLbl)+' <button class="x" id="terr-x">×</button></div>'+
+    '<div class="sub">'+esc(areaSub)+'</div>'+
     '<div class="tops" id="terr-tops">'+tops+'</div>'+
     '<div class="list" id="terr-list">'+list+(total>300?'<div class="sub">showing first 300 — zoom the circle tighter for a full list</div>':'')+'</div>';
   el.style.display='flex';
@@ -1616,7 +1638,8 @@ function computeViewLegend(){
       if(!heatOk(d,i)) continue;
       if(!brandOk(d,i)) continue;
       if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
-      if(S.terr){ var tdx=MX[i]-S.terr.cmx, tdy=MY[i]-S.terr.cmy;
+      if(S.terr&&S.terr.area){ if(!inArea(S.terr.area, st, d, i)) continue; }
+      else if(S.terr&&S.terr.rMerc>0){ var tdx=MX[i]-S.terr.cmx, tdy=MY[i]-S.terr.cmy;
                   if(tdx*tdx+tdy*tdy > S.terr.rMerc*S.terr.rMerc) continue; }
       var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
     }
@@ -1638,8 +1661,8 @@ function computeViewLegend(){
     var a=counts[visSel[0].slug]||0, b3=counts[visSel[1].slug]||0;
     $('vl-total').innerHTML='Head-to-head here: <b style="color:'+colorOf(visSel[0].slug)+'">'+esc(visSel[0].display)+'</b> '+a.toLocaleString()+' vs <b style="color:'+colorOf(visSel[1].slug)+'">'+esc(visSel[1].display)+'</b> '+b3.toLocaleString();
   } else {
-    var where_=S.terr?' clients in the circle':' clients in this view';
-    $('vl-total').textContent=total?total.toLocaleString()+where_:(S.terr?'no clients in the circle':'no clients in this view');
+    var whereName = S.terr ? (S.terr.area ? S.terr.area.label : 'the circle') : 'this view';
+    $('vl-total').textContent=(total?total.toLocaleString()+' clients in ':'no clients in ')+whereName;
   }
   if(S.hist&&S.histData&&histN>0){ $('vl-total').innerHTML+=' <span style="color:var(--muted);font-weight:500">· '+histN.toLocaleString()+' former (historical)</span>'; }
   var host=$('viewlegend'); host.innerHTML='';
@@ -1678,9 +1701,25 @@ function runSearch(v){
       });
     }
     if((r.cities||[]).length){ hd('Places');
-      r.cities.forEach(function(c){ row('&#128205; '+esc(c.city+', '+c.state),function(){ $('q-drop').style.display='none'; flyTo(c.lat,c.lng,11); }); });
+      r.cities.forEach(function(c){ row('&#128205; '+esc(c.city+', '+c.state)+'<span class="sub">'+Number(c.n||0).toLocaleString()+' clients</span>',
+        function(){ $('q-drop').style.display='none'; flyTo(c.lat,c.lng,11);
+          openArea({kind:'city', city:c.city, state:c.state, label:c.city+', '+c.state}); }); });
     }
-    (r.zips||[]).forEach(function(z){ row('&#128205; ZIP '+esc(z.zip)+'<span class="sub">'+esc(z.state||'')+'</span>',function(){ $('q-drop').style.display='none'; flyTo(z.lat,z.lng,12.5); }); });
+    (r.zips||[]).forEach(function(z){ row('&#128205; ZIP '+esc(z.zip)+'<span class="sub">'+esc(z.state||'')+'</span>',
+      function(){ $('q-drop').style.display='none'; flyTo(z.lat,z.lng,12.5);
+        openArea({kind:'zip', zip:String(z.zip), state:z.state, label:'ZIP '+z.zip}); }); });
+    // a state code or state name types straight through to the same panel
+    (function(){
+      var q2=String(v||'').trim().toUpperCase(), hitSt=null;
+      Object.keys(S.states).forEach(function(st){
+        if(st===q2 || String(STATE_NAMES[st]||'').toUpperCase()===q2) hitSt=st;
+      });
+      if(hitSt){ hd('State');
+        row('&#128205; '+esc((STATE_NAMES[hitSt]||hitSt)+' ('+hitSt+')'),
+          function(){ $('q-drop').style.display='none';
+            openArea({kind:'state', state:hitSt, label:(STATE_NAMES[hitSt]||hitSt)}); });
+      }
+    })();
     d.style.display=d.children.length?'block':'none';
   }).catch(function(){});
 }
