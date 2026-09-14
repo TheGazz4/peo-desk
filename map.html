@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.28 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.29 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -332,7 +332,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.28 · 2026-09-14</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.29 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -355,7 +355,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
-          <label class="chk"><input type="checkbox" id="hist-on"> Former clients — departures ◯</label>
+          <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO user departures">Both</button><button id="hist-2" title="Former PEO user departures only — current pins hidden">Former only</button></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:5px">Former PEO user — departure ◯ rings carry the colour of the last PEO we have for them.</div>
         </div>
         <details id="moreopts" style="margin-top:10px">
           <summary style="cursor:pointer;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">More options</summary>
@@ -504,7 +505,7 @@ function boot(){
     S.flags=S.catalog.flags||{};
     if(S.flags.historical_layer){
       $('histsec').style.display='block';
-      if(S.hist){ $('hist-on').checked=true; loadHist(); }
+      if(S.hist){ setHistMode(S.histOnly?2:1); }
     } else { S.hist=false; }
     buildStatePanel(); buildPeoPanel(); updateStats();
     startPinLoads(); scheduleDraw();
@@ -850,6 +851,7 @@ function draw(){
   var dsz = z<5 ? 2.3 : (z<6.5 ? 3 : 0);   // fillRect size; 0 = use dot sprite (v3.12: bumped)
   var buckets = dsz ? {} : null;
   for(var st2 in S.pinData){
+    if(S.histOnly) break;                      // former-only view: current pins are hidden
     if(S.states[st2]===false) continue;
     var d2=S.pinData[st2];
     var MX2=(S.placement==='zip')?d2.mxZ:d2.mxA, MY2=(S.placement==='zip')?d2.myZ:d2.myA;
@@ -1083,6 +1085,7 @@ function terrResults(){
   var t=S.terr; if(!t) return;
   var sel=selMap(); var byKey={}; var members=[]; var total=0;
   for(var st in S.pinData){
+    if(S.histOnly) break;
     if(S.states[st]===false) continue;
     var d=S.pinData[st];
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
@@ -1262,12 +1265,19 @@ $('peo-all').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(func
 $('peo-none').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=false}); afterSel(); };
 $('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
 $('hqlogo-on').onchange=function(){ S.hqLogos=$('hqlogo-on').checked; scheduleDraw(); writeUrl(); };
-$('hist-on').onchange=function(){
-  S.hist=$('hist-on').checked;
+// HISTORICAL VIEW (Gazz 2026-09-14): current / both / former only. Current-only is the default —
+// former PEO users never show unless asked for. "Former only" hides the current pins entirely so the
+// departure book can be read on its own.
+function setHistMode(m){
+  S.histMode=m; S.hist=(m>0); S.histOnly=(m===2);
+  ['hist-0','hist-1','hist-2'].forEach(function(id,i){ var bt=$(id); if(bt) bt.className=(i===m?'on':''); });
   if(S.hist) loadHist();
-  bump(); scheduleDraw(); writeUrl();
+  bump(); scheduleDraw(); updateStats(); writeUrl();
   try{ computeViewLegend(); }catch(_){}
-};
+}
+$('hist-0').onclick=function(){ setHistMode(0); };
+$('hist-1').onclick=function(){ setHistMode(1); };
+$('hist-2').onclick=function(){ setHistMode(2); };
 $('g-family').onclick=function(){ switchGrain('family') };
 $('g-brand').onclick=function(){ switchGrain('brand') };
 function switchGrain(g){
@@ -1375,6 +1385,27 @@ function basisWord(b){
   if(/_floor$|_precedence$|_ledger$/.test(s)) return 'verified';
   return 'unverified';
 }
+// FOOTPRINT DISPLAY LAW (1122): every record says single / multi / not yet established, and a
+// confirmed multi-state record LISTS its operating states. Read from the detail wave (osc/os).
+function fpOf(cid){
+  for(var st in S.pinData){
+    var d=S.pinData[st];
+    if(!d||!d.detail||!d.detail.ids) continue;
+    var j=d.detail.ids.indexOf(cid);
+    if(j>=0) return { c:(d.detail.osc?d.detail.osc[j]:2), s:(d.detail.os?d.detail.os[j]:null) };
+  }
+  return null;
+}
+function fpText(p){
+  var f=fpOf(p.company_id);
+  var cls=f?f.c:(p.is_multistate===true?1:(p.is_multistate===false?0:2));
+  if(cls===1){
+    var list=(f&&f.s)?f.s.split(','):null;
+    return list&&list.length?('Multi-state ('+list.length+') — '+list.join(', ')):'Multi-state';
+  }
+  if(cls===0) return 'Single state'+(p.state?' — '+p.state:'');
+  return 'not yet established';
+}
 function openCard(p,slug,history){
   var c=$('card');
   // v3.22: basis fields arrive as tier words/classes from map-data v2.10 (never raw source text); basisWord() is the belt-and-braces.
@@ -1395,7 +1426,7 @@ function openCard(p,slug,history){
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
     (p.historical?'':(kv('Health renewal',hren)+kv('WC renewal',ren)))+
     kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
-    (p.historical?'':(kv('With PEO since',since)+kv('Multistate',p.is_multistate?'yes':'no')))+
+    (p.historical?'':(kv('With PEO since',since)+kv('Operating footprint',fpText(p))))+
     (p.historical?'':kv('Confidence',(function(){
         var n=Number(p.peo_source_count)||0;
         var t=n>=2?'cross-verified':(n===1?'verified':'pending verification');
@@ -1442,7 +1473,7 @@ function buildUrl(){
     if(S.msOnly) p.set('ms','1');
     if(S.minSrc) p.set('src',String(S.minSrc));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
-    if(S.hist) p.set('hist','1');
+    if(S.hist) p.set('hist', S.histOnly?'2':'1');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
     return location.origin+location.pathname+'?'+p.toString();
   }catch(e){ return location.href; }
@@ -1463,7 +1494,8 @@ function readUrl(){
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
     else if(lz==='wc'){ S.lens='wc'; syncLensButtons(); renderLensLegend(); }
-    if(p.get('hist')==='1'){ S.hist=true; }   // honored only if the flag renders the toggle (boot)
+    if(p.get('hist')==='1'){ S.hist=true; S.histOnly=false; }
+    else if(p.get('hist')==='2'){ S.hist=true; S.histOnly=true; }   // honored only if the flag renders the toggle (boot)
     S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
   }catch(e){}
 }
@@ -1481,6 +1513,7 @@ function computeViewLegend(){
   var x1=mercX(sw.lng()), x2=mercX(ne.lng()), y1=mercY(ne.lat()), y2=mercY(sw.lat());
   var sel=selMap(); var counts={}; var total=0;
   for(var st in S.pinData){
+    if(S.histOnly) break;
     if(S.states[st]===false) continue;
     var d=S.pinData[st];
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
