@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.33 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.34 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -332,7 +332,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.33 · 2026-09-14</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.34 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -344,7 +344,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
     <div id="panel">
       <div class="sec">
         <h2>View by</h2>
-        <div class="seg"><button id="g-family" class="on">Family brand</button><button id="g-brand">PEO specific</button></div>
+        <div class="seg"><button id="g-brand" class="on">PEO specific</button><button id="g-family">Family brand</button></div>
         <h2 style="margin-top:10px" title="Colors every pin by how soon its renewal month comes up — health/benefits is the trigger event that matters; WC is secondary. Off = each PEO's brand color.">Renewal heat</h2>
         <div class="seg"><button id="lens-peo" class="on">Off</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC</button></div>
         <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">Headquarters</h2>
@@ -427,8 +427,8 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'family', placement:'address', msOnly:false, minSrc:0, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
-  lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,
+  grain:'brand', placement:'address', msOnly:false, minSrc:0, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
+  lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
   sel:{family:null,brand:null}, states:{},
