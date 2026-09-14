@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.26 · 2026-09-07 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.27 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -213,6 +213,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #peo-list{overflow-y:auto;flex:1;padding:4px 6px}
 .peo-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
 .peo-row:hover{background:rgba(99,144,238,.08)}
+.peo-row .vis{width:13px;height:13px;margin:0;flex:none;accent-color:var(--accent);cursor:pointer}
 .peo-row .sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--ring)}
 .peo-row .nm{flex:1;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peo-row.on .nm{color:var(--ink)}
@@ -268,6 +269,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
   background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:6px 14px;font-size:11px;color:var(--ink2)}
 #lenslegend span{display:inline-flex;align-items:center;gap:5px;margin:0 4px}
 #lenslegend i{width:9px;height:9px;border-radius:3px;display:inline-block}
+#lenslegend label{display:inline-flex;align-items:center;gap:5px;margin:0 4px;cursor:pointer;user-select:none}
+#lenslegend label input{width:12px;height:12px;margin:0;accent-color:var(--accent);cursor:pointer}
 #terr{position:absolute;bottom:24px;right:12px;z-index:37;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:52%;overflow:hidden;flex-direction:column}
 #terr .hd{padding:9px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink);font-weight:650}
 #terr .hd .x{float:right;background:none;border:0;color:var(--muted);cursor:pointer;font-size:15px}
@@ -329,7 +332,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.26 · 2026-09-07</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.27 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -817,12 +820,14 @@ function sprite(kind,hex,ps){
 }
 // renewal-heat lens (v3.4: 3-way — health is the PRIMARY renewal trigger per owner; WC secondary).
 // B.7 law everywhere: basis class labeled, inferred timing never silently treated as known.
-var URG_COLORS=['#de6b5f','#e0985c','#bd8a35','#5b7f96','#9aa5ad'];
-var URG_LABELS=['Renews ≤2 mo','3–4 mo out','5–6 mo out','7+ mo out','Unknown'];
+var URG_COLORS=['#43a566','#fab219','#d03b3b','#71808b'];
+var URG_LABELS=['Renews ≤4 mo','5–6 mo out','7+ mo out','Unknown'];
 var RMB_LABELS=['','unverified','reasoned','verified'];
 function renLens(){ return S.lens==='health'||S.lens==='wc'; }
 function lensMonth(d,i){ var dd=d.detail; if(!dd) return 0; return S.lens==='health'?((dd.hrm&&dd.hrm[i])||0):((dd.rm&&dd.rm[i])||0); }
-function urgClass(rm){ if(!rm) return 4; var mu=((rm-1)-(new Date().getMonth())+12)%12; return mu<=1?0:(mu<=3?1:(mu<=5?2:3)); }
+function urgClass(rm){ if(!rm) return 3; var mu=((rm-1)-(new Date().getMonth())+12)%12; return mu<=4?0:(mu<=6?1:2); }
+function heatSel(){ if(!S.heat) S.heat=[true,true,true,true]; return S.heat; }
+function heatOk(d,i){ if(!renLens()) return true; return heatSel()[urgClass(lensMonth(d,i))]!==false; }
 function pinColorAt(d,i,slug){ return renLens() ? URG_COLORS[urgClass(lensMonth(d,i))] : (S.colors[S.grain][slug]||OTHER); }
 function draw(){
   if(!S.map) return;
@@ -854,6 +859,7 @@ function draw(){
       if(!vis2[IDX2[i2]]) continue;
       if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
       if(S.minSrc && d2.detail && d2.detail.cs && d2.detail.cs[i2]<S.minSrc) continue;
+      if(!heatOk(d2,i2)) continue;
       var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
       if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
       if(dotMode){
@@ -1086,6 +1092,7 @@ function terrResults(){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
+      if(!heatOk(d,i)) continue;
       var dx=MX[i]-t.cmx, dy=MY[i]-t.cmy;
       if(dx*dx+dy*dy > t.rMerc*t.rMerc) continue;
       total++;
@@ -1230,8 +1237,12 @@ function buildPeoPanel(){
     if(unpl) ct.className+=' pend';
     var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
     so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
+    var cb=document.createElement('input'); cb.type='checkbox'; cb.className='vis'; cb.checked=on;
+    cb.title=(on?'showing':'hidden')+' on the map — click to toggle';
+    cb.setAttribute('aria-label',(r.display||r.slug)+' visible on the map');
+    cb.onclick=function(e){ e.stopPropagation(); sel[r.slug]=cb.checked; afterSel(); };
     d.onclick=function(){ sel[r.slug]=sel[r.slug]===false?true:false; afterSel(); };
-    d.appendChild(sw); d.appendChild(nm); d.appendChild(ct); d.appendChild(so);
+    d.appendChild(cb); d.appendChild(sw); d.appendChild(nm); d.appendChild(ct); d.appendChild(so);
     host.appendChild(d);
   });
 }
@@ -1281,7 +1292,10 @@ function renderLensLegend(){
   var l=$('lenslegend');
   if(!renLens()){ l.style.display='none'; return; }
   l.innerHTML='<span style="font-weight:650">'+(S.lens==='health'?'Health renewal':'WC renewal')+'</span>'+
-    URG_LABELS.map(function(t,i){ return '<span><i style="background:'+URG_COLORS[i]+'"></i>'+t+'</span>'; }).join('');
+    URG_LABELS.map(function(t,i){ return '<label title="show or hide this heat band"><input type="checkbox" data-h="'+i+'"'+(heatSel()[i]!==false?' checked':'')+'><i style="background:'+URG_COLORS[i]+'"></i>'+t+'</label>'; }).join('');
+  Array.prototype.forEach.call(l.querySelectorAll('input[data-h]'), function(cb){
+    cb.onchange=function(){ heatSel()[+cb.getAttribute('data-h')]=cb.checked; bump(); scheduleDraw(); updateStats(); };
+  });
   l.style.display='block';
 }
 function setMsOnly(v){
@@ -1466,6 +1480,7 @@ function computeViewLegend(){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
+      if(!heatOk(d,i)) continue;
       if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
       var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
     }
