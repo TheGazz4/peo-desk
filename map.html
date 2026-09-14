@@ -640,7 +640,7 @@ function commitDetail(st,r){
   d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
             hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null,
             osc:fOk?r.osc:null, os:fOk?r.os:null, z5:zOk?r.z5:null,
-            hg:gOk?r.hg:null, ws:sOk?r.ws:null};
+            hg:gOk?r.hg:null, ws:sOk?r.ws:null, ld:(r.ld&&r.ld.length===n)?r.ld:null};
   d.lat0=null; d.lng0=null;
 }
 function loadDetail(st,retried){
@@ -1233,6 +1233,7 @@ function onMove(e){
               renLine+='WC renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+ww+')</span><br>'; }
       else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
       renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
+      if(d.detail.ld&&d.detail.ld[h.i]){ renLine+='<span style="color:#ff7b72">! address disputed — a public listing puts this exact company name in another state</span><br>'; }   // v3.39
     }
     tipShow('<b>'+esc(nm)+'</b><br>'+
       '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
