@@ -209,6 +209,15 @@
   </section>
 
   <section>
+    <h2>Decision desk <small>— what the platform decided without you</small></h2>
+    <p class="blurb">Every question the platform raises lands here. The <b>judge</b> researches it against project history and rules tiers 1 and 2; the <b>executor</b> then fixes, audits and re-tests it, and nothing is marked applied without a live-passing acceptance test. Tier 3 — sends, deletes, spend caps, security, or two of your own laws in conflict — is always yours, with an opinion attached.</p>
+    <p class="blurb" id="decSummary">&nbsp;</p>
+    <table id="tblDecisions"><thead><tr>
+      <th class="num">#</th><th>subsystem</th><th class="num">tier</th><th>state</th><th>decided by</th><th class="num">conf</th><th class="num">tries</th><th class="num">age (d)</th><th>outcome</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
     <h2>Ready plays <small>— the funnel to actionable</small></h2>
     <p class="blurb">Plays ready to fire: live, in timing window, not suppressed. Sendable = also has a contact.</p>
     <table id="tblPlays"><thead><tr>
@@ -308,7 +317,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -767,8 +776,58 @@ function renderScorecard(d) {
   }).join("");
 }
 
+function renderDecisions(d) {
+  const b = (d.desk_status_board?.rows || [])[0] || {};
+  const rows = d.desk_decision_desk?.rows || [];
+
+  const n = (v) => Number(v || 0).toLocaleString();
+  const ago = (ts) => {
+    if (!ts) return "never";
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return m + "m ago";
+    if (m < 1440) return Math.floor(m / 60) + "h ago";
+    return Math.floor(m / 1440) + "d ago";
+  };
+
+  const needs = Number(b.rulings_need_gazz || 0);
+  const blocked = Number(b.rulings_blocked || 0);
+  const summary = [
+    stateChip("ok", n(b.rulings_applied) + " applied"),
+    stateChip(Number(b.rulings_queued) > 0 ? "warn" : "ok", n(b.rulings_queued) + " queued"),
+    stateChip(blocked > 0 ? "serious" : "ok", n(blocked) + " blocked"),
+    stateChip(needs > 0 ? "critical" : "ok", needs + " need Gazz"),
+    stateChip("ok", (b.decided_without_gazz_pct == null ? "—" : b.decided_without_gazz_pct + "%") + " decided without you"),
+    stateChip("ok", n(b.judge_verdicts_total) + " verdicts / $" + Number(b.judge_spend_usd || 0).toFixed(2)),
+  ].join(" ");
+  $("#decSummary").innerHTML = summary +
+    ' <span style="opacity:.7">judge ' + esc(ago(b.judge_last_at)) +
+    ' · executor ' + esc(ago(b.executor_last_at)) + '</span>';
+
+  const CHIP = { applied: "ok", queued: "ok", in_window: "warn", blocked: "serious",
+                 opinion_for_gazz: "critical", awaiting_judge: "warn" };
+  const LABEL = { applied: "applied", queued: "queued", in_window: "in window",
+                  blocked: "blocked", opinion_for_gazz: "needs Gazz", awaiting_judge: "awaiting judge" };
+
+  $("#tblDecisions tbody").innerHTML = rows.map((r) => {
+    const st = String(r.state || "");
+    return `<tr>
+      <td class="num">${esc(String(r.id))}</td>
+      <td>${esc(r.subsystem || "")}</td>
+      <td class="num">${esc(String(r.tier))}</td>
+      <td>${stateChip(CHIP[st] || "warn", LABEL[st] || st)}</td>
+      <td>${esc(r.decided_by === "ruling_judge" ? "judge" : (r.decided_by || ""))}</td>
+      <td class="num">${r.confidence == null ? "—" : Number(r.confidence).toFixed(2)}</td>
+      <td class="num">${r.attempts == null ? "—" : esc(String(r.attempts))}</td>
+      <td class="num">${r.days_open == null ? "—" : esc(String(r.days_open))}</td>
+      <td style="max-width:520px">${esc(String(r.outcome || r.question || "").slice(0, 200))}</td>
+    </tr>`;
+  }).join("");
+}
+
 function renderAll(d) {
   renderScorecard(d);
+  renderDecisions(d);
   renderStrip(d);
   renderPlays(d);
   renderEnrich(d);
