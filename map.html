@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.30 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.31 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -332,8 +332,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.30 · 2026-09-14</span>
-    <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.31 · 2026-09-14</span>
+    <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
     <span id="stats">loading…</span>
@@ -1127,7 +1127,35 @@ function terrResults(){
   });
   scheduleDraw();
 }
-function closeTerr(){ S.terr=null; $('terr').style.display='none'; scheduleDraw(); }
+function closeTerr(){ S.terr=null; $('terr').style.display='none'; scheduleDraw(); updateStats(); try{ computeViewLegend(); }catch(_){} }
+
+// RESET (Gazz 2026-09-14): one button back to the default display — every PEO on, every state on,
+// current PEO users only, renewal heat off with all bands on, confidence Any, address placement,
+// no circle, no multi-state-only.
+function resetAll(){
+  closeTerr();
+  S.drawMode=false; $('draw-btn').className='ghost';
+  if(S.map) S.map.setOptions({draggable:true});
+  $('mapwrap').style.cursor='';
+  ['family','brand'].forEach(function(g){ var m=S.sel[g]; if(m) Object.keys(m).forEach(function(k){ m[k]=true; }); });
+  Object.keys(S.states).forEach(function(s){ S.states[s]=true; });
+  S.heat=[true,true,true,true];
+  S.lens='peo'; try{ syncLensButtons(); renderLensLegend(); }catch(_){}
+  S.minSrc=0; try{ syncSrcButtons(); }catch(_){}
+  S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
+  S.placement='address'; try{ syncPlacementButtons(); }catch(_){}
+  setHistMode(0);
+  var q=$('peo-search'); if(q) q.value='';
+  buildStatePanel(); buildPeoPanel(); bump(); scheduleDraw(); updateStats(); writeUrl();
+  try{ computeViewLegend(); }catch(_){}
+}
+$('reset-btn').onclick=resetAll;
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape') return;
+  var t=e.target||{}; if(t.tagName==='INPUT'||t.tagName==='TEXTAREA') return;
+  if(S.terr||S.drawMode){ S.drawMode=false; $('draw-btn').className='ghost';
+    if(S.map) S.map.setOptions({draggable:true}); $('mapwrap').style.cursor=''; closeTerr(); }
+});
 
 var hoverRaf=false;
 function onMove(e){
@@ -1532,6 +1560,8 @@ function computeViewLegend(){
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       if(!heatOk(d,i)) continue;
       if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
+      if(S.terr){ var tdx=MX[i]-S.terr.cmx, tdy=MY[i]-S.terr.cmy;
+                  if(tdx*tdx+tdy*tdy > S.terr.rMerc*S.terr.rMerc) continue; }
       var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
     }
   }
@@ -1552,7 +1582,8 @@ function computeViewLegend(){
     var a=counts[visSel[0].slug]||0, b3=counts[visSel[1].slug]||0;
     $('vl-total').innerHTML='Head-to-head here: <b style="color:'+colorOf(visSel[0].slug)+'">'+esc(visSel[0].display)+'</b> '+a.toLocaleString()+' vs <b style="color:'+colorOf(visSel[1].slug)+'">'+esc(visSel[1].display)+'</b> '+b3.toLocaleString();
   } else {
-    $('vl-total').textContent=total?total.toLocaleString()+' clients in this view':'no clients in this view';
+    var where_=S.terr?' clients in the circle':' clients in this view';
+    $('vl-total').textContent=total?total.toLocaleString()+where_:(S.terr?'no clients in the circle':'no clients in this view');
   }
   if(S.hist&&S.histData&&histN>0){ $('vl-total').innerHTML+=' <span style="color:var(--muted);font-weight:500">· '+histN.toLocaleString()+' former (historical)</span>'; }
   var host=$('viewlegend'); host.innerHTML='';
