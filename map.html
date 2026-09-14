@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
-<!-- map v3.35 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+<!-- map v3.36 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -308,13 +308,15 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .q-row .dot{width:9px;height:9px;border-radius:3px;flex:none}
 .q-row .sub{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
 .q-hd{padding:6px 10px 2px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
-#viewlegend .vl-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;color:var(--ink2);cursor:pointer}
-#viewlegend .vl-row:hover{color:var(--ink)}
-#viewlegend .dot{width:9px;height:9px;border-radius:3px;flex:none}
-#viewlegend .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
-#viewlegend .bar{height:4px;border-radius:2px;flex:1;background:var(--grid);overflow:hidden}
-#viewlegend .bar i{display:block;height:100%}
-#viewlegend .ct{font-size:10.5px;color:var(--muted);min-width:38px;text-align:right}
+.vl-row{display:flex;align-items:center;gap:9px;padding:3px 0;font-size:12px;color:var(--ink2);cursor:pointer}
+.vl-row:hover{color:var(--ink)}
+.vl-row .dot{width:9px;height:9px;border-radius:3px;flex:none}
+.vl-row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
+.vl-row .bar{height:4px;border-radius:2px;flex:1;min-width:24px;background:var(--grid);overflow:hidden;margin:0 2px}
+.vl-row .bar i{display:block;height:100%}
+.vl-row .ct{font-size:10.5px;color:var(--muted);min-width:46px;text-align:right;font-variant-numeric:tabular-nums;padding-left:8px}
+#terr .tops .vl-row{cursor:default}
+#terr .tops .vl-row .nm{max-width:150px}
 #vl-total{font-size:11px;color:var(--muted);margin-bottom:6px}
 #aidock{position:absolute;left:12px;bottom:24px;z-index:36;width:330px;background:var(--surface);border:1px solid var(--border);border-radius:12px;
   box-shadow:0 10px 34px rgba(0,0,0,.55)}
@@ -336,7 +338,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.35 · 2026-09-14</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.36 · 2026-09-14</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
