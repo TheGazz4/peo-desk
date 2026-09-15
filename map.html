@@ -1234,8 +1234,8 @@ function onMove(e){
       else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
       renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
       if(d.detail.ld&&d.detail.ld[h.i]){ renLine+='<span style="color:#ff7b72">! address disputed — a public listing puts this exact company name in another state</span><br>'; }   // v3.39
-      if(d.detail.ec){ var EC=['not testable — no roster covers this company yet','UNCONFIRMED — not on any PEO roster that covers this name','confirmed on a public PEO roster','confirmed by a second source'];
-        var ecc=['#71808b','#d03b3b','#43a566','#43a566'][d.detail.ec[h.i]]||'#71808b';
+      if(d.detail.ec){ var EC=['not testable — no roster covers this company yet','UNCONFIRMED — not on any PEO roster that covers this name','likely — a name variant is on a public PEO roster','confirmed on a public PEO roster','confirmed by a second source'];
+        var ecc=['#71808b','#d03b3b','#fab219','#43a566','#43a566'][d.detail.ec[h.i]]||'#71808b';
         renLine+='<span style="color:'+ecc+'">'+esc(EC[d.detail.ec[h.i]]||EC[0])+'</span><br>'; }   // v3.40
     }
     tipShow('<b>'+esc(nm)+'</b><br>'+
