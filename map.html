@@ -1262,7 +1262,7 @@ function onMove(e){
     var renLine='';
     if(d.detail){
       var hm=(d.detail.hrm&&d.detail.hrm[h.i])||0, hb=(d.detail.hrmb&&d.detail.hrmb[h.i])||0;
-      if(hm){ var hw=(d.detail.hg&&d.detail.hg[h.i])?'PEO plan year — not this client''s date':(RMB_LABELS[hb]||'unverified');
+      if(hm){ var hw=(d.detail.hg&&d.detail.hg[h.i])?'PEO plan year — not this client’s date':(RMB_LABELS[hb]||'unverified');
               renLine+='Health renews ~'+MONTHS[hm]+' <span class="mut">('+hw+')</span><br>'; }
       else if(S.lens==='health'){ renLine+='<span class="mut">Health renewal month unknown</span><br>'; }
       if(d.detail.rm[h.i]){ var ww=(d.detail.ws&&d.detail.ws[h.i])?'policy expired — not a current renewal':RMB_LABELS[d.detail.rmb[h.i]];
@@ -1578,7 +1578,7 @@ function openCard(p,slug,history){
     histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+'</div>';
   });
   var formerBanner=p.historical?'<div class="note" style="margin-top:0;margin-bottom:6px;font-weight:650">FORMER PEO client — shown from the historical layer</div>':'';
-  var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(fpr&&fpr.hg?'PEO plan year — not this client''s date':basisWord(p.health_renewal_basis))+')':'unknown';
+  var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(fpr&&fpr.hg?'PEO plan year — not this client’s date':basisWord(p.health_renewal_basis))+')':'unknown';
   var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(basisWord(p.peo_current_since_basis))+')':'unknown';
   c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
     '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div></div>'+
