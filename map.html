@@ -332,14 +332,48 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #ai-send:disabled{opacity:.5}
 #ai-desc{margin-top:7px;width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:7px;padding:5px 0;font-size:11.5px;cursor:pointer}
 #ai-desc:hover{border-color:var(--accent);color:var(--ink)}
+/* ---- TABLE VIEW (v3.41, owner 2026-09-15). Same filtered set as the map, read as records instead of pins.
+   z-index 38: over the map furniture, UNDER #card (40) so a row click still opens the company card. ---- */
+#tablepane{position:absolute;inset:0;z-index:38;background:var(--bg);display:none;flex-direction:column}
+#tablepane.on{display:flex}
+#tablepane .thd{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--grid);flex:none;flex-wrap:wrap}
+#tablepane .thd .big{font-size:14.5px;font-weight:700;color:var(--ink)}
+#tablepane .thd .sub{font-size:11.5px;color:var(--muted)}
+#tablepane .thd input{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--ink);padding:5px 9px;font-size:12px;width:210px;outline:none}
+#tablepane .thd input:focus{border-color:var(--accent)}
+#tablepane .cov{display:flex;gap:16px;flex-wrap:wrap;padding:7px 14px;border-bottom:1px solid var(--grid);font-size:11px;color:var(--muted);flex:none}
+#tablepane .cov b{color:var(--ink2);font-weight:650}
+#tablepane .cov i{font-style:normal;color:var(--muted)}
+#tablepane .twrap{flex:1;overflow:auto}
+#tablepane table{border-collapse:collapse;width:100%;font-size:12px}
+#tablepane th{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);padding:7px 10px;text-align:left;color:var(--ink2);font-weight:650;white-space:nowrap;cursor:pointer;z-index:2;user-select:none}
+#tablepane th:hover{color:var(--ink)}
+#tablepane th .ar{color:var(--accent);font-size:9.5px;margin-left:3px}
+#tablepane td{padding:6px 10px;border-bottom:1px solid var(--grid);color:var(--ink2);white-space:nowrap}
+#tablepane td.nm{color:var(--ink);font-weight:600;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+#tablepane tbody tr{cursor:pointer}
+#tablepane tbody tr:hover td{background:rgba(99,144,238,.07);color:var(--ink)}
+#tablepane .dot{display:inline-block;width:8px;height:8px;border-radius:2.5px;margin-right:6px;vertical-align:middle;flex:none}
+#tablepane .mut{color:var(--muted)}
+#tablepane .tier{font-size:10px;color:var(--muted);margin-left:5px}
+#tablepane .flag{color:#d9822b;font-weight:650}
+#tablepane .empty{padding:40px 14px;text-align:center;color:var(--muted);font-size:13px}
+#tablepane .tfoot{flex:none;padding:8px 14px;border-top:1px solid var(--grid);font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#tablepane .tfoot button{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--ink2);padding:3px 10px;font-size:11.5px;cursor:pointer}
+#tablepane .tfoot button:hover:not(:disabled){color:var(--ink);border-color:var(--accent)}
+#tablepane .tfoot button:disabled{opacity:.35;cursor:default}
+/* non-owner surfaces: the rendered rows are not a selectable block (1158 deterrent, not a defence) */
+#tablepane.noselect .twrap{user-select:none;-webkit-user-select:none}
+#table-btn.on{background:var(--accent);color:#0b1220;border-color:var(--accent)}
+@media (max-width:760px){ #tablepane .thd input{width:140px} #tablepane .cov{display:none} }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.38 · 2026-09-14</span>
-    <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.41 · 2026-09-15</span>
+    <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
     <span id="stats">loading…</span>
@@ -397,6 +431,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
       <div id="sharepanel"></div>
       <div id="lenslegend"></div>
       <div id="terr"></div>
+      <div id="tablepane"></div>
       <div id="aidock" class="min">
         <div class="hd" id="ai-hd">✦ Ask the map <span style="font-weight:500;font-size:10.5px;color:var(--muted)">Claude (Anthropic)</span> <span class="min" id="ai-min">▴</span></div>
         <div class="bd">
@@ -574,6 +609,7 @@ function commitDetailAll(d){
     var dd=S.pinData[sd.st]; if(!dd||sd.n!==dd.n) return;
     commitDetail(sd.st, sd);
   });
+  try{ scheduleTable(); }catch(_){}    // v3.41: fill the table in as each detail wave lands
 }
 function startPinLoadsLegacy(){
   var byN={}; (S.catalog.states||[]).forEach(function(r){ byN[r.state]=Number(r.n)||0; });
@@ -1474,6 +1510,7 @@ function updateStats(){
   var stOn=Object.keys(S.states).filter(function(s){return S.states[s]}).length;
   $('stats').textContent=nSel+' PEOs · '+stOn+' states';
   scheduleViewLegend();
+  try{ scheduleTable(); }catch(_){}    // v3.41: the table follows every filter change (never pan/zoom)
 }
 
 // ------------------------- tooltips & card -------------------------
@@ -1780,6 +1817,299 @@ function applyFilterSpec(fs){
   if(Array.isArray(fs.off)) fs.off.forEach(function(s){sel[String(s)]=false});
   bump(); buildPeoPanel(); scheduleDraw(); updateStats(); writeUrl();
 }
+
+// ======================= TABLE VIEW (v3.41, owner 2026-09-15) =======================
+// Gazz: "when i use the filters on the map to see visually what i want - i want to be able to toggle or see
+// a different page with the actual data detail in a table format" + "We will put a max of 100 that we display
+// in the table even if the view encompasses 1,500 ... none of this will be exportable" + "display the total i
+// have in my view ... restrict it to future users to a max of 100 ... i want to use it for a data quality check".
+//
+// The table reads the SAME in-browser arrays the pin layer draws from, so a row can never disagree with a pin.
+// It deliberately IGNORES pan and zoom (a filter is a filter; the viewport is not) but DOES honour a drawn
+// circle or a searched area. Sorting is applied to the FULL matched set before the cap is taken, so "top N by
+// employees" is the true top N. The cap comes from the server (mode=entitlements) and is never read from the
+// page, a URL, or storage; any failure leaves the customer cap of 100 in place. No export affordance exists.
+// Laws: map_table_view_law (1157), table_row_cap_law (1158).
+var TBL={open:false,cap:100,owner:false,capLoaded:false,built:false,q:'',sortKey:'hc',sortDir:-1,page:0,timer:null,total:0,shown:0};
+var TBL_PAGE=250;
+var MON=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var TBL_COLS=[
+  {k:'nm', t:'Company'},
+  {k:'loc',t:'City, ST ZIP'},
+  {k:'peo',t:'PEO'},
+  {k:'hc', t:'Employees (est)'},
+  {k:'hrm',t:'Health renewal'},
+  {k:'rm', t:'WC renewal'},
+  {k:'pcs',t:'With PEO since'},
+  {k:'fp', t:'Footprint'},
+  {k:'cs', t:'Confidence'},
+  {k:'gq', t:'Pin quality'}
+];
+
+function tblLoadCap(){
+  return api({mode:'entitlements'}).then(function(r){
+    var c=Number(r&&r.table_row_cap);
+    if(isFinite(c)&&c>=1){ TBL.cap=Math.floor(c); TBL.owner=!!r.is_owner; }
+    else { TBL.cap=100; TBL.owner=false; }
+    TBL.capLoaded=true;
+  }).catch(function(){ TBL.cap=100; TBL.owner=false; TBL.capLoaded=true; });
+}
+function tblCap(){ return TBL.capLoaded?TBL.cap:100; }   // fail closed, always
+
+function tblMU(m){ if(!m) return 99; return ((m-1)-(new Date().getMonth())+12)%12; }
+
+// ONE pass, applying exactly the map filters minus the viewport. Coverage is counted across the WHOLE
+// matched set (that is the data-quality reading), not across the page being rendered.
+function tblSelect(){
+  var sel=selMap(); var hits=[]; var qq=TBL.q.trim().toUpperCase();
+  var cov={hc:0,hrm:0,rm:0,pcs:0,zip:0,street:0,cross:0,disputed:0,nodetail:0};
+  for(var st in S.pinData){
+    if(S.histOnly) break;
+    if(S.states[st]===false) continue;
+    var d=S.pinData[st], dd=d.detail;
+    var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    for(var i=0;i<d.n;i++){
+      if(!vis[IDX[i]]) continue;
+      if(S.msOnly && dd && !dd.ms[i]) continue;
+      if(S.minSrc && dd && dd.cs && dd.cs[i]<S.minSrc) continue;
+      if(!heatOk(d,i)) continue;
+      if(!brandOk(d,i)) continue;
+      if(S.terr&&S.terr.area){ if(!inArea(S.terr.area, st, d, i)) continue; }
+      else if(S.terr&&S.terr.rMerc>0){ var dx=MX[i]-S.terr.cmx, dy=MY[i]-S.terr.cmy;
+              if(dx*dx+dy*dy > S.terr.rMerc*S.terr.rMerc) continue; }
+      if(qq){
+        var nq=dd?String(dd.names[i]||''):'', cq=dd?String(dd.cities[i]||''):'';
+        var zq=(dd&&dd.z5)?String(dd.z5[i]||''):'';
+        if(nq.toUpperCase().indexOf(qq)<0 && cq.toUpperCase().indexOf(qq)<0 && st.indexOf(qq)<0 && zq.indexOf(qq)<0) continue;
+      }
+      hits.push([st,i,slugArr[IDX[i]]]);
+      if(!dd){ cov.nodetail++; continue; }
+      if(dd.hc&&dd.hc[i]) cov.hc++;
+      if(dd.hrm&&dd.hrm[i]) cov.hrm++;
+      if(dd.rm&&dd.rm[i]) cov.rm++;
+      if(dd.pcs&&dd.pcs[i]) cov.pcs++;
+      if(dd.z5&&dd.z5[i]) cov.zip++;
+      if(dd.street&&dd.street[i]) cov.street++;
+      if(dd.cs&&dd.cs[i]>=2) cov.cross++;
+      if(dd.ld&&dd.ld[i]) cov.disputed++;
+    }
+  }
+  return {hits:hits,total:hits.length,cov:cov};
+}
+
+function tblKey(h,key){
+  var d=S.pinData[h[0]], dd=d?d.detail:null, i=h[1];
+  if(key==='nm')  return dd?String(dd.names[i]||''):'';
+  if(key==='loc') return (dd?String(dd.cities[i]||''):'')+' '+h[0];
+  if(key==='peo') return String(dispOf(h[2])||'');
+  if(key==='hc')  return (dd&&dd.hc)?(dd.hc[i]||0):0;
+  if(key==='hrm') return tblMU((dd&&dd.hrm)?dd.hrm[i]:0);
+  if(key==='rm')  return tblMU((dd&&dd.rm)?dd.rm[i]:0);
+  if(key==='pcs') return (dd&&dd.pcs&&dd.pcs[i])?String(dd.pcs[i]):'';
+  if(key==='fp')  return (dd&&dd.osc!=null)?dd.osc[i]:2;
+  if(key==='cs')  return (dd&&dd.cs)?dd.cs[i]:-1;
+  if(key==='gq')  return ((dd&&dd.street&&dd.street[i])?2:0) - ((dd&&dd.ld&&dd.ld[i])?1:0);
+  return '';
+}
+// fp / cs / gq have meaningful zeros; the rest treat 0 / blank / 99 as "we do not know" and sink it.
+function tblBlank(key,v){
+  if(key==='fp'||key==='cs'||key==='gq') return false;
+  return v===''||v==null||v===0||v===99;
+}
+function tblSort(hits){
+  var key=TBL.sortKey, dir=TBL.sortDir;
+  var dec=hits.map(function(h){ return [tblKey(h,key), tblKey(h,'nm'), h]; });
+  dec.sort(function(a,b){
+    var ba=tblBlank(key,a[0]), bb=tblBlank(key,b[0]);
+    if(ba!==bb) return ba?1:-1;                       // unknowns sit at the bottom whichever way you sort
+    if(a[0]<b[0]) return -dir;
+    if(a[0]>b[0]) return dir;
+    return a[1]<b[1]?-1:(a[1]>b[1]?1:0);
+  });
+  return dec.map(function(x){ return x[2]; });
+}
+
+function tblRen(m,b){
+  if(!m) return '<span class="mut">—</span>';
+  return '<span class="dot" style="background:'+URG_COLORS[urgClass(m)]+'"></span>'+MON[m]+
+         '<span class="tier">'+esc(RMB_LABELS[b||0]||'unverified')+'</span>';
+}
+function tblFpCell(dd,i){
+  var c=(dd&&dd.osc!=null)?dd.osc[i]:2;
+  if(c===1){ var l=(dd&&dd.os&&dd.os[i])?String(dd.os[i]).split(','):null;
+             return l&&l.length?('<span title="'+esc(l.join(', '))+'">Multi ('+l.length+')</span>'):'Multi'; }
+  if(c===0) return 'Single';
+  return '<span class="mut">not established</span>';
+}
+function tblConfCell(dd,i){
+  var cs=(dd&&dd.cs)?dd.cs[i]:null;
+  var t=(cs==null)?'<span class="mut">pending</span>'
+       :(cs>=2?'cross-verified':(cs===1?'verified':'<span class="mut">pending</span>'));
+  if(dd&&dd.cx&&dd.cx[i]) t+=' <span class="flag">· review</span>';
+  return t;
+}
+function tblGqCell(dd,i){
+  if(!dd) return '<span class="mut">—</span>';
+  var s=(dd.street&&dd.street[i])?'street':'<span class="mut">ZIP centre</span>';
+  if(dd.ld&&dd.ld[i]) s+=' <span class="flag" title="Two sources disagree about where this company is">⚑</span>';
+  return s;
+}
+
+function tblBuildShell(){
+  var host=$('tablepane');
+  var bs='background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--ink2);padding:5px 11px;font-size:12px;cursor:pointer';
+  host.innerHTML=
+    '<div class="thd">'+
+      '<span class="big" id="tbl-count">reading…</span>'+
+      '<span class="sub" id="tbl-what"></span>'+
+      '<span style="flex:1"></span>'+
+      '<input id="tbl-q" placeholder="Filter these records…" autocomplete="off">'+
+      '<button id="tbl-x" style="'+bs+'">✕ Back to map</button>'+
+    '</div>'+
+    '<div class="cov" id="tbl-cov"></div>'+
+    '<div class="twrap" id="tbl-wrap"><table><thead id="tbl-head"></thead><tbody id="tbl-body"></tbody></table></div>'+
+    '<div class="tfoot" id="tbl-foot"></div>';
+  $('tbl-x').onclick=closeTable;
+  var qt=null;
+  $('tbl-q').addEventListener('input',function(){
+    var v=this.value;
+    if(qt) clearTimeout(qt);
+    qt=setTimeout(function(){ TBL.q=v; TBL.page=0; tblPaint(); },220);
+  });
+  $('tbl-head').addEventListener('click',function(ev){
+    var th=ev.target.closest('th[data-k]'); if(!th) return;
+    var k=th.dataset.k;
+    if(TBL.sortKey===k) TBL.sortDir=-TBL.sortDir;
+    else { TBL.sortKey=k; TBL.sortDir=(k==='nm'||k==='loc'||k==='peo'||k==='pcs')?1:-1; }
+    TBL.page=0; tblPaint();
+  });
+  $('tbl-body').addEventListener('click',function(ev){
+    var tr=ev.target.closest('tr[data-st]'); if(!tr) return;
+    var d=S.pinData[tr.dataset.st]; if(!d||!d.detail) return;
+    var id=d.detail.ids[+tr.dataset.i]; if(!id) return;
+    api({mode:'company',id:id}).then(function(res){ if(res.company) openCard(res.company, tr.dataset.slug); });
+  });
+  $('tbl-foot').addEventListener('click',function(ev){
+    var b=ev.target.closest('button[data-pg]'); if(!b) return;
+    TBL.page=Math.max(0,TBL.page+Number(b.dataset.pg));
+    tblPaint(); $('tbl-wrap').scrollTop=0;
+  });
+  TBL.built=true;
+}
+
+function tblPaint(){
+  if(!TBL.open) return;
+  var host=$('tablepane');
+  host.className = TBL.owner ? 'on' : 'on noselect';
+  if(S.histOnly){
+    $('tbl-count').textContent='Former PEO users are not in the table yet';
+    $('tbl-what').textContent='';
+    $('tbl-cov').innerHTML='';
+    $('tbl-head').innerHTML='';
+    $('tbl-body').innerHTML='<tr><td class="empty" colspan="10">The table lists current PEO users. Switch Historical to Current or Both to use it.</td></tr>';
+    $('tbl-foot').innerHTML='';
+    return;
+  }
+  var r=tblSelect();
+  var hits=tblSort(r.hits);
+  var cap=tblCap();
+  TBL.total=r.total;
+  TBL.shown=Math.min(TBL.total,cap);
+  var maxPage=Math.max(0,Math.ceil(TBL.shown/TBL_PAGE)-1);
+  if(TBL.page>maxPage) TBL.page=maxPage;
+  var from=TBL.page*TBL_PAGE, to=Math.min(TBL.shown,from+TBL_PAGE);
+
+  // the count is always honest: what was FOUND, then what is being SHOWN
+  $('tbl-count').textContent = TBL.total.toLocaleString()+(TBL.total===1?' record':' records')+' match your filters';
+  var stOn=Object.keys(S.states).filter(function(s){return S.states[s]}).length;
+  var stAll=Object.keys(S.states).length;
+  var nSel=0; catRows().forEach(function(x){ if(selMap()[x.slug]!==false) nSel++; });
+  var bits=[nSel+' of '+catRows().length+' PEOs', (stOn>=stAll?'all states':stOn+' states')];
+  if(S.terr) bits.push(S.terr.area?('in '+S.terr.area.label):'inside the circle');
+  if(renLens()) bits.push('renewal heat on');
+  if(S.minSrc) bits.push(S.minSrc>=2?'cross-verified only':'verified only');
+  if(S.msOnly) bits.push('multi-state only');
+  if(S.hist) bits.push('current users only (former records are on the map, not here)');
+  $('tbl-what').textContent='· '+bits.join(' · ')+' · ignores pan and zoom';
+
+  var pc=function(n){ return TBL.total?Math.round(100*n/TBL.total)+'%':'—'; };
+  $('tbl-cov').innerHTML = TBL.total
+    ? 'Filled across all '+TBL.total.toLocaleString()+' matched: '+
+      '<span><b>'+pc(r.cov.hc)+'</b> <i>employees</i></span>'+
+      '<span><b>'+pc(r.cov.hrm)+'</b> <i>health renewal</i></span>'+
+      '<span><b>'+pc(r.cov.rm)+'</b> <i>WC renewal</i></span>'+
+      '<span><b>'+pc(r.cov.pcs)+'</b> <i>PEO start</i></span>'+
+      '<span><b>'+pc(r.cov.zip)+'</b> <i>ZIP</i></span>'+
+      '<span><b>'+pc(r.cov.street)+'</b> <i>street-placed</i></span>'+
+      '<span><b>'+pc(r.cov.cross)+'</b> <i>cross-verified</i></span>'+
+      (r.cov.disputed?'<span class="flag"><b>'+r.cov.disputed.toLocaleString()+'</b> location disputed</span>':'')+
+      (r.cov.nodetail?'<span class="flag"><b>'+r.cov.nodetail.toLocaleString()+'</b> still loading</span>':'')
+    : '';
+
+  $('tbl-head').innerHTML='<tr>'+TBL_COLS.map(function(c){
+    var ar=(TBL.sortKey===c.k)?('<span class="ar">'+(TBL.sortDir===1?'▲':'▼')+'</span>'):'';
+    return '<th data-k="'+c.k+'" title="Sort by '+esc(c.t)+' across all '+TBL.total.toLocaleString()+' matched records">'+esc(c.t)+ar+'</th>';
+  }).join('')+'</tr>';
+
+  if(!TBL.total){
+    $('tbl-body').innerHTML='<tr><td class="empty" colspan="10">Nothing matches these filters. Loosen them, or press ↺ Reset.</td></tr>';
+    $('tbl-foot').innerHTML='';
+    return;
+  }
+
+  var out=[];
+  for(var j=from;j<to;j++){
+    var h=hits[j], st=h[0], i=h[1], slug=h[2];
+    var d=S.pinData[st], dd=d?d.detail:null;
+    var nm=dd?String(dd.names[i]||'—'):'loading…';
+    var city=dd?String(dd.cities[i]||''):'';
+    var zip=(dd&&dd.z5)?String(dd.z5[i]||''):'';
+    var loc=(city?city+', ':'')+st+(zip?' '+zip:'');
+    var hc=(dd&&dd.hc&&dd.hc[i])?Number(dd.hc[i]).toLocaleString():'<span class="mut">—</span>';
+    var since=(dd&&dd.pcs&&dd.pcs[i])?(esc(String(dd.pcs[i]))+'<span class="tier">'+esc(RMB_LABELS[(dd.pcsb?dd.pcsb[i]:0)]||'unverified')+'</span>'):'<span class="mut">—</span>';
+    out.push('<tr data-st="'+esc(st)+'" data-i="'+i+'" data-slug="'+esc(slug)+'" title="Open this company">'+
+      '<td class="nm">'+esc(nm)+'</td>'+
+      '<td>'+esc(loc)+'</td>'+
+      '<td><span class="dot" style="background:'+colorOf(slug)+'"></span>'+esc(dispOf(slug))+'</td>'+
+      '<td>'+hc+'</td>'+
+      '<td>'+tblRen((dd&&dd.hrm)?dd.hrm[i]:0,(dd&&dd.hrmb)?dd.hrmb[i]:0)+'</td>'+
+      '<td>'+tblRen((dd&&dd.rm)?dd.rm[i]:0,(dd&&dd.rmb)?dd.rmb[i]:0)+'</td>'+
+      '<td>'+since+'</td>'+
+      '<td>'+tblFpCell(dd,i)+'</td>'+
+      '<td>'+tblConfCell(dd,i)+'</td>'+
+      '<td>'+tblGqCell(dd,i)+'</td>'+
+    '</tr>');
+  }
+  $('tbl-body').innerHTML=out.join('');
+
+  var capped=TBL.total>TBL.shown;
+  var foot='Showing '+(from+1).toLocaleString()+'–'+to.toLocaleString()+' of '+TBL.shown.toLocaleString();
+  if(capped) foot+=' · <span class="flag">display limit '+cap.toLocaleString()+'</span> of '+TBL.total.toLocaleString()+' matched — tighten the filters to reach the rest';
+  foot+=' · sorted by '+esc((TBL_COLS.filter(function(c){return c.k===TBL.sortKey})[0]||{t:''}).t)+' across every matched record';
+  foot+=' · <b>on screen only — nothing exports</b>';
+  $('tbl-foot').innerHTML='<button data-pg="-1"'+(TBL.page<=0?' disabled':'')+'>‹ Prev</button>'+
+    '<button data-pg="1"'+(TBL.page>=maxPage?' disabled':'')+'>Next ›</button><span>'+foot+'</span>';
+}
+
+function openTable(){
+  TBL.open=true; TBL.page=0;
+  $('table-btn').className='ghost on';
+  var host=$('tablepane'); host.className='on';
+  if(!TBL.built) tblBuildShell();
+  $('tbl-count').textContent='reading your filtered set…';
+  var go=function(){ tblPaint(); };
+  if(!TBL.capLoaded) tblLoadCap().then(go, go); else go();
+}
+function closeTable(){ TBL.open=false; $('table-btn').className='ghost'; $('tablepane').className=''; }
+function toggleTable(){ TBL.open?closeTable():openTable(); }
+function scheduleTable(){
+  if(!TBL.open) return;
+  if(TBL.timer) clearTimeout(TBL.timer);
+  TBL.timer=setTimeout(function(){ TBL.timer=null; tblPaint(); },130);
+}
+$('table-btn').onclick=toggleTable;
 
 // ------------------------- start -------------------------
 S.panelOpen=!isMobile();          // mobile: map first, drawer on ☰
