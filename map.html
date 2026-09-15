@@ -1999,10 +1999,23 @@ function tblBuildShell(){
   TBL.built=true;
 }
 
-function tblPaint(){
+function tblPaint(){ try{ tblPaintInner(); }catch(e){ try{ $('tbl-count').textContent='The table could not be drawn — the map is unaffected.'; }catch(_){} } }
+function tblPaintInner(){
   if(!TBL.open) return;
   var host=$('tablepane');
   host.className = TBL.owner ? 'on' : 'on noselect';
+  // The catalog is null until the page has booted (not signed in yet, or the first waves are still in
+  // flight). selMap()/catRows() both read it, so the table waits rather than throwing — scheduleTable()
+  // fires again from commitDetailAll as each wave lands, so this state clears itself.
+  if(!S.catalog){
+    $('tbl-count').textContent='Still loading…';
+    $('tbl-what').textContent='';
+    $('tbl-cov').innerHTML='';
+    $('tbl-head').innerHTML='';
+    $('tbl-body').innerHTML='<tr><td class="empty" colspan="10">Waiting for the book to load. The table fills in on its own.</td></tr>';
+    $('tbl-foot').innerHTML='';
+    return;
+  }
   if(S.histOnly){
     $('tbl-count').textContent='Former PEO users are not in the table yet';
     $('tbl-what').textContent='';
