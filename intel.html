@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEO Engine — Industry Intel</title>
+<!--
+  INDUSTRY INTEL surface v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
+  Pick a PEO from the dropdown -> Industry Intel panel (size, market share, size-group yardsticks, model, checks,
+  12-month outlook, open flags) + the full PEO profile (template v1).
+  Data: dash-ai mode 'sql' (read-only, desk key) calling
+    dash_industry_intel_peo_list · industry_intel_for_peo(slug) · industry_intel_profile_chunks(slug)
+  Naming law: industry figures are always "Industry verified stats"; models and projections are labelled as such.
+  Publish door: desk_assets('intel.html') -> desk_asset_commit('intel.html', ...)
+-->
+<style>
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d; --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7; --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6; --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--page); color: var(--ink-1);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--series-1); }
+
+  header { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--border);
+    padding: 12px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  header h1 { font-size: 15px; margin: 0; letter-spacing: .06em; white-space: nowrap; }
+  .picker { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1 1 520px; }
+  .picker input[type=search] { flex: 0 1 220px; min-width: 150px; }
+  .picker select { flex: 1 1 320px; min-width: 220px; }
+  input, select, button { font: inherit; font-size: 13px; color: var(--ink-1); background: var(--surface-1);
+    border: 1px solid var(--baseline); border-radius: 8px; padding: 6px 10px; }
+  button { cursor: pointer; }
+  label.chk { font-size: 12px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  #status { font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+  #status.err { color: var(--critical); }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 16px 20px 40px; }
+  .empty { color: var(--ink-muted); padding: 40px 0; text-align: center; }
+
+  .title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin: 4px 0 12px; }
+  .title h2 { margin: 0; font-size: 22px; }
+  .title .meta { color: var(--ink-2); font-size: 13px; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; }
+  .tabs button { background: none; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
+    color: var(--ink-2); padding: 7px 14px; }
+  .tabs button[aria-selected="true"] { color: var(--ink-1); border-color: var(--border); background: var(--surface-1); font-weight: 600; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .tile .k { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .tile .v { font-size: 20px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .d { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+  section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; overflow-x: auto; }
+  section h3 { font-size: 12px; margin: 0 0 8px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .08em; }
+  .blurb { font-size: 12px; color: var(--ink-2); margin: -2px 0 10px; max-width: 80ch; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--ink-muted); font-weight: 500; font-size: 11px; border-bottom: 1px solid var(--grid); padding: 4px 8px 6px 0; }
+  td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .muted { color: var(--ink-muted); }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-muted); }
+  .chip.strong { border-color: color-mix(in srgb, var(--good) 55%, transparent); background: color-mix(in srgb, var(--good) 14%, transparent); }
+  .chip.strong::before { background: var(--good); }
+  .chip.good { border-color: color-mix(in srgb, var(--series-1) 55%, transparent); background: color-mix(in srgb, var(--series-1) 14%, transparent); }
+  .chip.good::before { background: var(--series-1); }
+  .chip.fair { border-color: color-mix(in srgb, var(--warning) 55%, transparent); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+  .chip.fair::before { background: var(--warning); }
+  .chip.weak { border-color: color-mix(in srgb, var(--serious) 60%, transparent); background: color-mix(in srgb, var(--serious) 16%, transparent); }
+  .chip.weak::before { background: var(--serious); }
+
+  .band { position: relative; height: 10px; background: var(--grid); border-radius: 5px; min-width: 140px; margin-top: 6px; }
+  .band .iqr { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--series-1) 35%, transparent); border-radius: 5px; }
+  .band .med { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink-2); }
+  .band .you { position: absolute; top: -4px; width: 10px; height: 18px; margin-left: -5px; border-radius: 3px; background: var(--series-1); border: 2px solid var(--page); }
+
+  .flag { border-left: 3px solid var(--warning); padding: 6px 10px; margin: 6px 0; background: color-mix(in srgb, var(--warning) 8%, transparent); border-radius: 0 8px 8px 0; font-size: 13px; }
+  .note { font-size: 12px; color: var(--ink-muted); margin-top: 8px; }
+  .source { font-size: 12px; color: var(--ink-muted); margin: 6px 0 0; }
+
+  /* rendered profile */
+  .md { max-width: 980px; }
+  .md h1 { font-size: 22px; margin: 4px 0 2px; }
+  .md h2 { font-size: 16px; margin: 22px 0 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .md h3 { font-size: 14px; margin: 16px 0 6px; color: var(--ink-2); }
+  .md p { margin: 6px 0; max-width: 90ch; }
+  .md ul { margin: 6px 0; padding-left: 20px; }
+  .md table { margin: 8px 0 12px; }
+  .md .tw { overflow-x: auto; }
+  .md td, .md th { white-space: normal; }
+
+  #overlay { position: fixed; inset: 0; background: var(--page); display: flex; align-items: center; justify-content: center; z-index: 20; }
+  #overlay .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; width: 360px; }
+  #overlay h2 { margin: 0 0 6px; font-size: 15px; }
+  #overlay p { color: var(--ink-2); font-size: 13px; }
+  #overlay input { width: 100%; }
+  #overlay button { margin-top: 12px; width: 100%; background: var(--series-1); color: #fff; border: none; font-weight: 600; }
+  #overlay .err { color: var(--critical); font-size: 12px; min-height: 16px; margin-top: 8px; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 720px) {
+    header { padding: 10px 12px; }
+    main { padding: 12px; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="overlay" class="hidden">
+  <div class="card">
+    <h2>Industry Intel</h2>
+    <p>Enter your desk access key. It is stored only in this browser and unlocks every desk surface.</p>
+    <input id="keyInput" type="password" placeholder="desk key" autocomplete="off">
+    <div class="err" id="keyErr"></div>
+    <button id="keyGo" type="button">Open</button>
+  </div>
+</div>
+
+<header>
+  <h1>INDUSTRY INTEL</h1>
+  <div class="picker">
+    <input id="q" type="search" placeholder="Type to filter PEOs…" autocomplete="off">
+    <select id="peo" aria-label="Choose a PEO"><option value="">Loading PEOs…</option></select>
+    <label class="chk"><input id="onlyEst" type="checkbox"> only PEOs with a size estimate</label>
+  </div>
+  <span id="status"></span>
+</header>
+
+<main id="main">
+  <div class="empty">Choose a PEO from the dropdown to see its Industry Intel and full profile.</div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var SB = "https://lzasgflrxxrssjntrfmt.supabase.co";
+  var FN = SB + "/functions/v1/dash-ai";
+  var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+
+  var mem = {};
+  function sget(k) { try { return localStorage.getItem(k); } catch (e) { return mem[k] || null; } }
+  function sset(k, v) { try { localStorage.setItem(k, v); } catch (e) { mem[k] = v; } }
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+
+  var saved = sget("desk_theme");
+  if (saved) document.documentElement.dataset.theme = saved;
+  window.addEventListener("storage", function (e) { if (e.key === "desk_theme" && e.newValue) document.documentElement.dataset.theme = e.newValue; });
+
+  var KEY = sget("desk_key") || sget("peo_dash_key") || "";
+  var ALL = [];
+  var current = null;
+  var loadToken = 0;
+
+  function setStatus(msg, err) { var s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
+
+  /* ---------- data: dash-ai read-only SQL ---------- */
+  function sql(q, label, ms) {
+    var h = { "Content-Type": "application/json", "apikey": ANON, "Authorization": "Bearer " + ANON };
+    if (KEY) h["x-desk-key"] = KEY;
+    var opts = { method: "POST", headers: h, body: JSON.stringify({ mode: "sql", sql: q, label: label, quiet: true }) };
+    if (window.AbortSignal && AbortSignal.timeout) opts.signal = AbortSignal.timeout(ms || 45000);
+    return fetch(FN, opts).then(function (r) {
+      return r.json().then(function (j) {
+        if (r.status === 401 || r.status === 403) { askKey("That key was not accepted."); throw new Error("unauthorized"); }
+        if (!r.ok || j.error) throw new Error((j && (j.detail || j.error)) || ("HTTP " + r.status));
+        return j;
+      });
+    });
+  }
+
+  function askKey(msg) {
+    $("overlay").classList.remove("hidden");
+    $("keyErr").textContent = msg || "";
+    $("keyInput").focus();
+  }
+  $("keyGo").onclick = function () {
+    var k = $("keyInput").value.trim();
+    if (!k) { $("keyErr").textContent = "Enter the key."; return; }
+    KEY = k; sset("desk_key", k); sset("peo_dash_key", k);
+    $("overlay").classList.add("hidden");
+    loadList();
+  };
+  $("keyInput").addEventListener("keydown", function (e) { if (e.key === "Enter") $("keyGo").click(); });
+
+  /* ---------- formatting ---------- */
+  function n0(v) { return v == null || v === "" || isNaN(v) ? "—" : Math.round(Number(v)).toLocaleString(); }
+  function n1(v) { return v == null || v === "" || isNaN(v) ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }); }
+  function usd(v) {
+    if (v == null || isNaN(v)) return "—";
+    var x = Number(v), a = Math.abs(x);
+    if (a >= 1e9) return "$" + (x / 1e9).toFixed(1) + "B";
+    if (a >= 1e6) return "$" + (x / 1e6).toFixed(1) + "M";
+    if (a >= 1e4) return "$" + Math.round(x / 1e3).toLocaleString() + "K";
+    return "$" + Math.round(x).toLocaleString();
+  }
+  function unitFmt(v, unit) {
+    if (v == null || isNaN(v)) return "—";
+    if (unit === "usd") return "$" + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (unit === "pct") return n1(v) + "%";
+    return n1(v);
+  }
+  function range(lo, hi) { if (lo == null && hi == null) return "—"; if (Number(lo) === Number(hi)) return n0(lo); return n0(lo) + "–" + n0(hi); }
+  function dateFmt(d) { if (!d) return "—"; var t = new Date(String(d).slice(0, 10) + "T00:00:00"); return isNaN(t) ? String(d) : t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); }
+  var GROUP = { smallest_lt2500: "Under 2,500", medium_2500_10000: "2,500–10,000", largest_gt10000: "Over 10,000" };
+  var GRADE_WORD = { strong: "strong", good: "good", fair: "fair", weak: "weak", above_median: "above middle", below_median: "below middle" };
+
+  /* ---------- dropdown ---------- */
+  function loadList() {
+    setStatus("loading PEOs…");
+    var base = "select family_slug, peo_name, sold_as, entity_class, wse_low, wse_high, wse_status, size_group from dash_industry_intel_peo_list order by lower(peo_name), family_slug";
+    var pages = [0, 450];
+    Promise.all(pages.map(function (off) { return sql(base + " limit 450 offset " + off, "industry intel list", 30000); }))
+      .then(function (res) {
+        ALL = [];
+        res.forEach(function (j) { ALL = ALL.concat(j.rows || []); });
+        var seen = {};
+        ALL = ALL.filter(function (r) { if (seen[r.family_slug]) return false; seen[r.family_slug] = 1; return true; });
+        ALL.sort(function (a, b) { return String(a.peo_name).toLowerCase().localeCompare(String(b.peo_name).toLowerCase()) || String(a.family_slug).localeCompare(String(b.family_slug)); });
+        drawOptions();
+        setStatus(ALL.length.toLocaleString() + " PEOs");
+        var want = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1] || sget("intel_last_peo");
+        if (want && ALL.some(function (r) { return r.family_slug === want; })) { $("peo").value = want; open(want); }
+      })
+      .catch(function (e) { if (String(e.message) !== "unauthorized") setStatus("could not load PEOs: " + e.message, true); });
+  }
+
+  function drawOptions() {
+    var q = $("q").value.trim().toLowerCase();
+    var only = $("onlyEst").checked;
+    var sel = $("peo"), keep = sel.value;
+    var rows = ALL.filter(function (r) {
+      if (only && r.wse_high == null) return false;
+      if (!q) return true;
+      return (String(r.peo_name) + " " + (r.sold_as || "") + " " + r.family_slug).toLowerCase().indexOf(q) >= 0;
+    });
+    var html = '<option value="">' + (rows.length ? "Choose a PEO (" + rows.length.toLocaleString() + ")" : "No PEOs match") + "</option>";
+    html += rows.map(function (r) {
+      var size = r.wse_high != null ? " — " + range(r.wse_low, r.wse_high) + " WSEs" : "";
+      var sold = r.sold_as && r.sold_as !== r.peo_name ? " (sold as " + r.sold_as + ")" : "";
+      return '<option value="' + esc(r.family_slug) + '">' + esc(r.peo_name + sold + size) + "</option>";
+    }).join("");
+    sel.innerHTML = html;
+    if (keep && rows.some(function (r) { return r.family_slug === keep; })) sel.value = keep;
+  }
+  $("q").addEventListener("input", drawOptions);
+  $("onlyEst").addEventListener("change", drawOptions);
+  $("peo").addEventListener("change", function () { if (this.value) open(this.value); });
+
+  /* ---------- open one PEO ---------- */
+  function open(slug) {
+    if (!/^[a-z0-9_]+$/.test(slug)) return;
+    current = slug;
+    sset("intel_last_peo", slug);
+    try { history.replaceState(null, "", "#peo=" + slug); } catch (e) { /* ignore */ }
+    var tok = ++loadToken;
+    var row = ALL.filter(function (r) { return r.family_slug === slug; })[0] || { peo_name: slug };
+    $("main").innerHTML =
+      '<div class="title"><h2>' + esc(row.peo_name) + '</h2><span class="meta" id="titleMeta"></span></div>' +
+      '<div class="tabs" role="tablist">' +
+        '<button type="button" role="tab" data-tab="intel" aria-selected="true">Industry Intel</button>' +
+        '<button type="button" role="tab" data-tab="profile" aria-selected="false">PEO profile</button>' +
+      "</div>" +
+      '<div id="tab-intel"><div class="empty">Loading Industry Intel…</div></div>' +
+      '<div id="tab-profile" class="hidden"><div class="empty">Loading the full profile… (large PEOs take up to 15 seconds)</div></div>';
+    Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
+      b.onclick = function () { showTab(b.dataset.tab); };
+    });
+    setStatus("loading " + row.peo_name + "…");
+
+    sql("select industry_intel_for_peo('" + slug + "') as j", "industry intel panel", 45000)
+      .then(function (res) { if (tok !== loadToken) return; renderIntel((res.rows && res.rows[0] && res.rows[0].j) || {}); setStatus(""); })
+      .catch(function (e) { if (tok !== loadToken) return; $("tab-intel").innerHTML = '<div class="empty">Could not load Industry Intel: ' + esc(e.message) + "</div>"; setStatus("error", true); });
+
+    sql("select part, body from industry_intel_profile_chunks('" + slug + "') order by part", "industry intel profile", 60000)
+      .then(function (res) {
+        if (tok !== loadToken) return;
+        var text = (res.rows || []).slice().sort(function (a, b) { return a.part - b.part; }).map(function (r) { return r.body || ""; }).join("");
+        $("tab-profile").innerHTML = text ? '<div class="md">' + md(text) + "</div>" : '<div class="empty">No profile text for this PEO yet.</div>';
+      })
+      .catch(function (e) { if (tok !== loadToken) return; $("tab-profile").innerHTML = '<div class="empty">Could not load the profile: ' + esc(e.message) + "</div>"; });
+  }
+
+  function showTab(t) {
+    Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) { b.setAttribute("aria-selected", b.dataset.tab === t ? "true" : "false"); });
+    $("tab-intel").classList.toggle("hidden", t !== "intel");
+    $("tab-profile").classList.toggle("hidden", t !== "profile");
+  }
+
+  /* ---------- Industry Intel panel ---------- */
+  function band(p25, med, p75, you) {
+    var vals = [p25, med, p75, you].filter(function (v) { return v != null && !isNaN(v); }).map(Number);
+    if (vals.length < 3) return "";
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    var pad = (hi - lo) * 0.15 || 1; lo -= pad; hi += pad;
+    var pos = function (v) { return ((Number(v) - lo) / (hi - lo) * 100).toFixed(1) + "%"; };
+    var s = '<div class="band" title="Shaded = middle half of PEOs this size; line = middle; marker = this PEO">';
+    if (p25 != null && p75 != null) s += '<span class="iqr" style="left:' + pos(p25) + ";width:calc(" + pos(p75) + " - " + pos(p25) + ')"></span>';
+    if (med != null) s += '<span class="med" style="left:' + pos(med) + '"></span>';
+    if (you != null) s += '<span class="you" style="left:' + pos(you) + '"></span>';
+    return s + "</div>";
+  }
+
+  function renderIntel(j) {
+    if (j.error) { $("tab-intel").innerHTML = '<div class="empty">' + esc(j.error) + "</div>"; return; }
+    var e = j.estimate || {};
+    var meta = [];
+    if (j.sold_as && j.sold_as !== j.name) meta.push("sold as " + j.sold_as);
+    if (j.entity_class) meta.push(j.entity_class);
+    if (j.head_office) meta.push(j.head_office);
+    if (j.irs_certified) meta.push(j.irs_certified === "certified" ? "IRS-certified PEO" : "not IRS-certified");
+    $("titleMeta").textContent = meta.join(" · ");
+
+    var h = "";
+
+    /* tiles */
+    var share = j.market_share_pct;
+    h += '<div class="tiles">' +
+      tile("Worksite employees", e.low != null ? range(e.low, e.high) : "no estimate",
+           e.low != null ? (e.status === "published" ? "published by the PEO" : "estimate") + " · newest data " + dateFmt(e.newest_data) : "no size estimate on file yet") +
+      tile("Clients we see", n0(j.clients_seen), "current clients in our records (a floor)") +
+      tile("Size group", GROUP[j.size_group] || "All PEOs", j.size_group === "all" ? "no estimate, compared with all PEOs" : "WSEs" + (j.range_crosses_groups ? " · range spans two groups" : "")) +
+      tile("Share of PEO industry", share ? (share.low === share.high ? n1(share.low) + "%" : n1(share.low) + "–" + n1(share.high) + "%") : "—",
+           share ? "of " + n0(share.industry_wse_total) + " worksite employees" : "needs a size estimate") +
+      "</div>";
+
+    /* flags */
+    if ((j.flags || []).length) {
+      h += "<section><h3>Open flags</h3>";
+      j.flags.forEach(function (f) {
+        var d = f.detail || {};
+        var txt = f.kind === "wse_estimate_below_industry_yardstick"
+          ? "The size estimate looks low for the clients we see: at most " + n1(d.max_wse_per_visible_client) + " WSEs per client, where even the lowest quarter of small PEOs run " + n1(d.yardstick_wse_per_client_p25_smallest_cohort) + " WSEs per client."
+          : f.kind;
+        h += '<div class="flag"><b>' + esc(txt) + "</b><br><span class=\"muted\">" + esc(f.what_to_do || "") + " · as of " + esc(dateFmt(f.as_of)) + "</span></div>";
+      });
+      h += "</section>";
+    }
+
+    h += '<div class="grid2">';
+
+    /* WSE per client check */
+    var c = j.wse_per_client_check;
+    h += "<section><h3>Employees per client</h3>";
+    if (c) {
+      h += '<p class="blurb">' + esc(c.reading) + "</p>" +
+        "<table><tr><th>This PEO</th><th class=\"num\">Lowest 25%</th><th class=\"num\">Middle</th><th class=\"num\">Top 25%</th><th>Grade</th></tr>" +
+        "<tr><td class=\"num\" style=\"text-align:left\">" + (c.low === c.high ? n1(c.high) : n1(c.low) + "–" + n1(c.high)) + "</td>" +
+        "<td class=\"num\">" + n1(c.p25) + "</td><td class=\"num\">" + n1(c.median) + "</td><td class=\"num\">" + n1(c.p75) + "</td>" +
+        "<td>" + (c.low === c.high || c.grade_of_low === c.grade_of_high ? gradeChip(c.grade_of_high) : gradeChip(c.grade_of_low) + " to " + gradeChip(c.grade_of_high)) + "</td></tr></table>" + band(c.p25, c.median, c.p75, c.high);
+    } else {
+      h += '<p class="muted">Needs both a size estimate and clients we can see.</p>';
+    }
+    h += '<p class="source">Industry verified stats · FY2024 · ' + esc(j.size_group_label || "") + "</p></section>";
+
+    /* outlook */
+    var o = j.outlook_12m;
+    h += "<section><h3>Next 12 months if typical</h3>";
+    if (o) {
+      h += '<p class="blurb">What happens if this PEO grows and keeps clients like the typical PEO its size.</p><table>' +
+        "<tr><td>Worksite employees</td><td class=\"num\">" + range(o.wse_low, o.wse_high) + "</td><td class=\"muted\">at " + n1(o.growth_pct_used) + "% a year</td></tr>" +
+        "<tr><td>Clients kept</td><td class=\"num\">" + n1(o.client_retention_pct) + "%</td><td class=\"muted\">typical for its size</td></tr>" +
+        "<tr><td>Clients it would lose</td><td class=\"num\">" + n0(o.clients_lost_if_typical) + "</td><td class=\"muted\">of the clients we see</td></tr>" +
+        '</table><p class="note">Projected from Industry verified stats FY2024. Not a forecast for this PEO.</p>';
+    } else {
+      h += '<p class="muted">Needs a size estimate.</p>';
+    }
+    h += "</section>";
+    h += "</div>";
+
+    /* model */
+    var ml = j.model_low, mh = j.model_high;
+    h += "<section><h3>What a PEO this size typically looks like</h3>";
+    if (ml) {
+      var same = !mh || Number(ml.wse) === Number(mh.wse);
+      h += '<p class="blurb">A model built from the typical figures for its size group. It is not this PEO’s reported financials. Revenue here counts worksite wages; many PEOs report revenue without them.</p>' +
+        "<table><tr><th>Figure</th><th class=\"num\">" + (same ? "At " + n0(ml.wse) + " WSEs" : "Low end (" + n0(ml.wse) + ")") + "</th>" + (same ? "" : "<th class=\"num\">High end (" + n0(mh.wse) + ")</th>") + "</tr>" +
+        modelRow("Worksite payroll", "wse_payroll_est_usd", ml, mh, same, usd) +
+        modelRow("Revenue (wages included)", "gross_revenue_est_usd", ml, mh, same, usd) +
+        modelRow("Gross profit", "gross_profit_est_usd", ml, mh, same, usd) +
+        modelRow("Operating costs", "operating_expense_est_usd", ml, mh, same, usd) +
+        modelRow("Operating income", "operating_income_est_usd", ml, mh, same, usd) +
+        modelRow("Internal staff (not sales)", "internal_staff_excl_sales_est", ml, mh, same, n0) +
+        modelRow("Clients expected", "clients_est", ml, mh, same, n0) +
+        "</table>";
+      if (!same && ml.cohort !== mh.cohort) h += '<p class="note">The low and high ends fall in different size groups, so each uses its own group’s figures.</p>';
+      h += '<p class="source">Model estimate from Industry verified stats · FY2024</p>';
+    } else {
+      h += '<p class="muted">Needs a size estimate.</p>';
+    }
+    h += "</section>";
+
+    /* yardsticks */
+    h += "<section><h3>Industry yardsticks for its size group</h3>" +
+      '<p class="blurb">Where PEOs of this size sat in FY2024. Use the middle; the lowest and top 25% show the normal spread. n = number of PEOs behind the figure.</p>' +
+      "<table><tr><th>Measure</th><th class=\"num\">Lowest 25%</th><th class=\"num\">Middle</th><th class=\"num\">Top 25%</th><th class=\"num\">All PEOs, middle</th><th class=\"num\">n</th></tr>";
+    (j.benchmarks || []).forEach(function (b) {
+      h += "<tr><td>" + esc(plainLabel(b.metric, b.label)) + "</td><td class=\"num\">" + unitFmt(b.p25, b.unit) + "</td><td class=\"num\"><b>" + unitFmt(b.median, b.unit) +
+        "</b></td><td class=\"num\">" + unitFmt(b.p75, b.unit) + "</td><td class=\"num\">" + unitFmt(b.all_median, b.unit) + "</td><td class=\"num muted\">" + (b.n == null ? "—" : b.n) + "</td></tr>";
+    });
+    h += '</table><p class="source">Industry verified stats · FY2024 · ' + esc(j.size_group_label || "") + "</p></section>";
+
+    /* estimate method */
+    if (e.method) {
+      h += "<section><h3>How the size figure was built</h3><p>" + esc(e.method) + "</p>" +
+        (e.carried_forward ? '<p class="muted">' + esc(e.carried_forward) + "</p>" : "") + "</section>";
+    }
+
+    $("tab-intel").innerHTML = h;
+  }
+
+  function tile(k, v, d) { return '<div class="tile"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div><div class="d">' + esc(d) + "</div></div>"; }
+  function gradeChip(g) { if (!g) return '<span class="muted">—</span>'; return '<span class="chip ' + esc(g.replace("_median", "")) + '">' + esc(GRADE_WORD[g] || g) + "</span>"; }
+  function modelRow(label, key, ml, mh, same, f) { return "<tr><td>" + esc(label) + "</td><td class=\"num\">" + f(ml[key]) + "</td>" + (same ? "" : "<td class=\"num\">" + f(mh[key]) + "</td>") + "</tr>"; }
+  var PLAIN = {
+    gp_per_wse: "Gross profit per WSE", operating_income_per_wse: "Operating income per WSE", wse_avg_gross_pay: "Average WSE pay",
+    gross_markup_ratio: "Revenue as % of WSE wages", wse_per_client: "WSEs per client", client_retention_ratio: "Clients kept per year",
+    wse_retention_ratio: "WSEs kept per year", revenue_growth_rate: "Revenue growth", wse_growth_rate: "WSE growth",
+    wse_per_internal_employee_excl_sales: "WSEs per internal employee (not sales)", overhead_ratio: "Operating costs as % of gross profit"
+  };
+  function plainLabel(m, l) { return PLAIN[m] || l || m; }
+
+  /* ---------- tiny markdown renderer for the profile ---------- */
+  function inline(s) {
+    s = esc(s);
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+    s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<i>$2</i>");
+    s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+    return s;
+  }
+  function md(text) {
+    var lines = text.replace(/\r/g, "").split("\n"), out = [], i = 0;
+    while (i < lines.length) {
+      var l = lines[i];
+      if (/^\s*$/.test(l)) { i++; continue; }
+      var m = l.match(/^(#{1,4})\s+(.*)$/);
+      if (m) { var lv = Math.min(m[1].length, 3); out.push("<h" + lv + ">" + inline(m[2]) + "</h" + lv + ">"); i++; continue; }
+      if (/^\s*\|/.test(l)) {
+        var rows = [];
+        while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(lines[i]); i++; }
+        var cells = function (r) { return r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(function (c) { return c.trim(); }); };
+        var t = '<div class="tw"><table>', start = 0;
+        if (rows.length > 1 && /^\s*\|?\s*:?-{2,}/.test(rows[1].replace(/\|/g, "|"))) {
+          var head = cells(rows[0]);
+          if (head.some(function (x) { return x; })) t += "<tr>" + head.map(function (x) { return "<th>" + inline(x) + "</th>"; }).join("") + "</tr>";
+          start = 2;
+        }
+        for (var r = start; r < rows.length; r++) {
+          t += "<tr>" + cells(rows[r]).map(function (x) { return /^[\d$,.%–\- ]+$/.test(x) && /\d/.test(x) ? '<td class="num">' + inline(x) + "</td>" : "<td>" + inline(x) + "</td>"; }).join("") + "</tr>";
+        }
+        out.push(t + "</table></div>");
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(l)) {
+        var items = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push("<li>" + inline(lines[i].replace(/^\s*[-*]\s+/, "")) + "</li>"); i++; }
+        out.push("<ul>" + items.join("") + "</ul>");
+        continue;
+      }
+      var para = [];
+      while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,4})\s/.test(lines[i]) && !/^\s*\|/.test(lines[i]) && !/^\s*[-*]\s+/.test(lines[i])) { para.push(lines[i]); i++; }
+      out.push("<p>" + inline(para.join(" ")) + "</p>");
+    }
+    return out.join("\n");
+  }
+
+  /* ---------- start ---------- */
+  if (!KEY) askKey(); else loadList();
+})();
+</script>
+</body>
+</html>
