@@ -122,7 +122,8 @@
     { id:"map",    file:"map.html",    label:"Coverage Map",  hint:"companies, pins, book",       refresh:true  },
     { id:"ask",    file:"ask.html",    label:"AI Data Desk",  hint:"pulls, PEOs, renewal intel",  refresh:false },
     { id:"send",   file:"send.html",   label:"Send Desk",     hint:"outbound gate + lanes",       refresh:true  },
-    { id:"review", file:"review.html", label:"Review",        hint:"adjudication queue",          refresh:false }
+    { id:"review", file:"review.html", label:"Review",        hint:"adjudication queue",          refresh:false },
+    { id:"intel",  file:"intel.html",  label:"Industry Intel", hint:"pick a PEO: industry yardsticks + full profile", refresh:false }
   ];
   var STALE_MS = 5 * 60 * 1000;   /* a refreshable surface hidden this long reloads on return */
 
@@ -178,7 +179,7 @@
 
   /* ---------- keep cross-links between surfaces inside the shell ---------- */
   var FILE2ID = { "index.html":"desk", "":"desk", "desk.html":"desk", "map.html":"map",
-                  "ask.html":"ask", "send.html":"send", "review.html":"review" };
+                  "ask.html":"ask", "send.html":"send", "review.html":"review", "intel.html":"intel" };
   function wire(f) {
     var d;
     try { d = f.contentDocument; } catch (e) { return; }
@@ -238,7 +239,7 @@
     var r = route(current); if (r) window.open(r.file, "_blank", "noopener");
   };
 
-  /* ---------- keyboard 1..5 ---------- */
+  /* ---------- keyboard 1..6 ---------- */
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     var t = e.target || {};
