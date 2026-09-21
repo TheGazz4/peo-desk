@@ -233,8 +233,10 @@
         <table id="tblCsFind"><thead><tr><th>check</th><th>severity</th><th class="num">count</th><th>handled</th></tr></thead><tbody></tbody></table>
       </div>
       <div>
-        <h3>Top carriers &amp; PEOs in the timeline</h3>
-        <table id="tblCsTop"><thead><tr><th>carrier</th><th class="num">clients</th><th>PEO family</th><th class="num">clients</th></tr></thead><tbody></tbody></table>
+        <h3>Carriers — distinct clients with at least one dated period on that carrier, 2020–2026</h3>
+        <table id="tblCsTop"><thead><tr><th>carrier</th><th class="num">clients</th></tr></thead><tbody></tbody></table>
+        <h3 style="margin-top:10px">PEOs — distinct clients with any carrier fact (separate ranking; rows are not paired with the carriers above)</h3>
+        <table id="tblCsTopPeo"><thead><tr><th>PEO family</th><th class="num">clients</th></tr></thead><tbody></tbody></table>
         <h3 style="margin-top:10px">Run history</h3>
         <table id="tblCsHist"><thead><tr><th class="num">run</th><th>finished</th><th>status</th><th class="num">written</th><th class="num">closed</th><th class="num">on file</th></tr></thead><tbody></tbody></table>
       </div>
@@ -896,9 +898,8 @@ function renderCarrierSupervisor(d) {
   fb.innerHTML = (row.findings || []).map((f) =>
     `<tr><td>${esc(f.check)}</td><td><span class="chip ${sev[f.severity] || ""}">${esc(f.severity)}</span></td><td class="num">${fmtN(f.n)}</td><td>${esc(f.disposition)}</td></tr>`).join("") || `<tr><td colspan="4">no findings</td></tr>`;
   const tc = m.top_carriers || [], tf = m.top_families || [];
-  const n = Math.max(tc.length, tf.length);
-  $("#tblCsTop tbody").innerHTML = Array.from({ length: n }, (_, i) =>
-    `<tr><td>${esc(tc[i]?.carrier || "")}</td><td class="num">${tc[i] ? fmtN(tc[i].clients) : ""}</td><td>${esc(tf[i]?.family || "")}</td><td class="num">${tf[i] ? fmtN(tf[i].clients) : ""}</td></tr>`).join("");
+  $("#tblCsTop tbody").innerHTML = tc.map((x) => `<tr><td>${esc(x.carrier)}</td><td class="num">${fmtN(x.clients)}</td></tr>`).join("");
+  $("#tblCsTopPeo tbody").innerHTML = tf.map((x) => `<tr><td>${esc(x.family)}</td><td class="num">${fmtN(x.clients)}</td></tr>`).join("");
   const hist = [{ run_id: row.run_id, finished_at: row.finished_at, status: row.status, inserted: r.inserted, reversions: r.reversions, current: m.current_determinations }].concat(row.history || []);
   $("#tblCsHist tbody").innerHTML = hist.slice(0, 10).map((h) =>
     `<tr><td class="num">${esc(String(h.run_id))}</td><td>${h.finished_at ? ageSpan(h.finished_at, 90000) : "—"}</td><td><span class="chip ${({ verified: "ok", unverified: "warn", red: "critical", error: "critical" })[h.status] || ""}">${esc(h.status || "")}</span></td><td class="num">${fmtN(h.inserted)}</td><td class="num">${fmtN(h.reversions)}</td><td class="num">${fmtN(h.current)}</td></tr>`).join("");
