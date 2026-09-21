@@ -221,6 +221,26 @@
     </div>
   </section>
 
+  <section class="wide" id="carrierSup">
+    <h2>Health-carrier supervisor <small>— who carried each client, for exactly which dates</small></h2>
+    <p class="blurb">Nightly agent (04:53 UTC, after the carrier layer rebuilds). A client carrier fact is written only for the overlap of the client's dated PEO window and that PEO's dated Schedule A policy term — never guessed, never open-ended. Unmapped carrier names are held back and researched by the AI lane; judgment calls go to the decision desk.</p>
+    <div class="sc-head" id="csHead"></div>
+    <div class="sc-narr" id="csNarr">waiting for the first supervisor run…</div>
+    <div class="sc-tiles" id="csTiles"></div>
+    <div class="sc-grid">
+      <div>
+        <h3>Findings this run</h3>
+        <table id="tblCsFind"><thead><tr><th>check</th><th>severity</th><th class="num">count</th><th>handled</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div>
+        <h3>Top carriers &amp; PEOs in the timeline</h3>
+        <table id="tblCsTop"><thead><tr><th>carrier</th><th class="num">clients</th><th>PEO family</th><th class="num">clients</th></tr></thead><tbody></tbody></table>
+        <h3 style="margin-top:10px">Run history</h3>
+        <table id="tblCsHist"><thead><tr><th class="num">run</th><th>finished</th><th>status</th><th class="num">written</th><th class="num">closed</th><th class="num">on file</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
   <section>
     <h2>Decision desk <small>— what the platform decided without you</small></h2>
     <p class="blurb">Every question the platform raises lands here. The <b>judge</b> researches it against project history and rules tiers 1 and 2; the <b>executor</b> then fixes, audits and re-tests it, and nothing is marked applied without a live-passing acceptance test. Tier 3 — sends, deletes, spend caps, security, or two of your own laws in conflict — is always yours, with an opinion attached.</p>
@@ -330,7 +350,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -846,8 +866,47 @@ function renderDecisions(d) {
   }).join("");
 }
 
+function renderCarrierSupervisor(d) {
+  const row = (d.desk_carrier_supervisor?.rows || [])[0];
+  if (!row) { $("#csNarr").textContent = "no supervisor run yet — run select public.carrier_supervisor_run() or wait for the 04:53 UTC nightly run"; return; }
+  const m = row.metrics || {}, r = row.reconciliation || {};
+  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
+  const sCls = { verified: "ok", unverified: "warn", red: "critical", error: "critical" }[row.status] || "";
+  $("#csHead").innerHTML =
+    `<span class="chip ${sCls}">${esc(String(row.status || "?").toUpperCase())}</span>` +
+    `<span class="age cold">run ${ageSpan(row.finished_at, 90000)}</span>` +
+    `<span class="age cold">${esc(String(row.trigger || ""))}</span>` +
+    (Number(row.names_pending) > 0 ? `<span class="chip warn">${fmtN(row.names_pending)} carrier names awaiting research</span>` : `<span class="chip ok">carrier names all mapped</span>`) +
+    (Number(row.rulings_open) > 0 ? `<span class="chip warn">${fmtN(row.rulings_open)} open on the decision desk</span>` : "") +
+    (r.balanced === false ? `<span class="chip critical">reconciliation did not balance</span>` : "");
+  $("#csNarr").textContent = row.narrative || "";
+  const tiles = [
+    ["dated carrier periods on file", fmtN(m.current_determinations), `${fmtN(m.known)} known · ${fmtN(m.likely)} likely`, null],
+    ["client companies covered", fmtN(m.current_companies), `${esc(m.years_covered?.from || "?")} → ${esc(m.years_covered?.to || "?")}`, null],
+    ["written this run", fmtN(r.inserted), `${fmtN(r.already_current)} already on file`, Number(r.inserted) > 0 ? "good" : null],
+    ["closed this run", fmtN(r.reversions), "window or policy term no longer supports them", null],
+    ["isolation leaks", fmtN(m.leaks), "unsettled filers in carrier stats (must be 0)", Number(m.leaks) > 0 ? "critical" : "good"],
+    ["PEO-years with no carrier", fmtN(m.family_years_without_carrier), `${fmtN(m.split_programs)} too split to name one`, null],
+    ["client windows with no carrier data", fmtN(m.client_windows_without_carrier_data), "PEO has no Schedule A for those years", null],
+  ];
+  $("#csTiles").innerHTML = tiles.map(([k, v, dd, tone]) =>
+    `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="d">${dd}</div></div>`).join("");
+  const fb = $("#tblCsFind tbody");
+  const sev = { RED: "critical", WARN: "warn", INFO: "" };
+  fb.innerHTML = (row.findings || []).map((f) =>
+    `<tr><td>${esc(f.check)}</td><td><span class="chip ${sev[f.severity] || ""}">${esc(f.severity)}</span></td><td class="num">${fmtN(f.n)}</td><td>${esc(f.disposition)}</td></tr>`).join("") || `<tr><td colspan="4">no findings</td></tr>`;
+  const tc = m.top_carriers || [], tf = m.top_families || [];
+  const n = Math.max(tc.length, tf.length);
+  $("#tblCsTop tbody").innerHTML = Array.from({ length: n }, (_, i) =>
+    `<tr><td>${esc(tc[i]?.carrier || "")}</td><td class="num">${tc[i] ? fmtN(tc[i].clients) : ""}</td><td>${esc(tf[i]?.family || "")}</td><td class="num">${tf[i] ? fmtN(tf[i].clients) : ""}</td></tr>`).join("");
+  const hist = [{ run_id: row.run_id, finished_at: row.finished_at, status: row.status, inserted: r.inserted, reversions: r.reversions, current: m.current_determinations }].concat(row.history || []);
+  $("#tblCsHist tbody").innerHTML = hist.slice(0, 10).map((h) =>
+    `<tr><td class="num">${esc(String(h.run_id))}</td><td>${h.finished_at ? ageSpan(h.finished_at, 90000) : "—"}</td><td><span class="chip ${({ verified: "ok", unverified: "warn", red: "critical", error: "critical" })[h.status] || ""}">${esc(h.status || "")}</span></td><td class="num">${fmtN(h.inserted)}</td><td class="num">${fmtN(h.reversions)}</td><td class="num">${fmtN(h.current)}</td></tr>`).join("");
+}
+
 function renderAll(d) {
   renderScorecard(d);
+  renderCarrierSupervisor(d);
   renderDecisions(d);
   renderStrip(d);
   renderPlays(d);
