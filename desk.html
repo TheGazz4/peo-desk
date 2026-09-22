@@ -884,7 +884,7 @@ function renderCarrierSupervisor(d) {
   $("#csNarr").textContent = row.narrative || "";
   const tiles = [
     ["dated carrier periods on file", fmtN(m.current_determinations), `${fmtN(m.known)} known · ${fmtN(m.likely)} likely`, null],
-    ["from filings vs inferred", `${fmtN(m.filed_periods)} / ${fmtN(m.inferred_periods)}`, `inferred = PEO's carrier carried into unfiled months (${fmtN(m.inferred_companies)} companies), always LIKELY, replaced when the filing lands`, null],
+    ["filed / inferred / researched", `${fmtN(m.filed_periods)} / ${fmtN(m.inferred_periods)} / ${fmtN(m.research_periods)}`, `inferred = PEO's stable carrier carried into unfiled months; researched = Owner-ruled PEO profile intel (${fmtN(m.client_placed_periods)} say "no PEO master plan - client keeps own carrier"); both LIKELY, replaced when a filing lands`, null],
     ["client companies covered", fmtN(m.current_companies), `${esc(m.years_covered?.from || "?")} → ${esc(m.years_covered?.to || "?")}`, null],
     ["written this run", fmtN(r.inserted), `${fmtN(r.already_current)} already on file`, Number(r.inserted) > 0 ? "good" : null],
     ["closed this run", fmtN(r.reversions), "window or policy term no longer supports them", null],
