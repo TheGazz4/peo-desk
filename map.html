@@ -392,7 +392,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.42 · 2026-09-22</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.43 · 2026-09-22</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2192,14 +2192,14 @@ function ramp(hex){
   if(rampCache[hex]) return rampCache[hex];
   var hsl=hexToHsl(hex), out=[];
   for(var s=0;s<=100;s++){
-    var t=s/100, sat=15+80*t, lig=DARK?(38+32*t):(82-46*t), a=0.05+0.90*Math.pow(t,1.4);
+    var t=s/100, sat=12+83*t, lig=DARK?(34+36*t):(84-48*t), a=0.04+0.92*Math.pow(t,1.6);
     out.push('hsla('+hsl[0].toFixed(0)+','+sat.toFixed(0)+'%,'+lig.toFixed(0)+'%,'+a.toFixed(3)+')');
   }
   return rampCache[hex]=out;
 }
 function bandOf(s){ return s>=55?3:(s>=45?2:(s>=35?1:0)); }
 // colour depth spans the real range (15%..65% of registered local clinicians signed) so strong areas read deep
-function ri(s){ return Math.max(0,Math.min(100,Math.round((s-15)*2))); }
+function ri(s){ return Math.max(0,Math.min(100,Math.round((s-25)*100/37))); }   // v3.43: depth stretched over the real 25%..62% range
 
 // ---------- UI ----------
 function buildSection(){
@@ -2252,7 +2252,7 @@ function renderList(){
   if(!N.cat||!(N.cat.networks||[]).length){ box.innerHTML='<div class="netmut">No MEP networks scored yet.</div>'; return; }
   N.cat.networks.forEach(function(n){
     var dim=N.tiers[n.tier]===false||N.carriersOff[n.carrier];
-    var plans=(n.plans||[]).map(function(p){ return '<div class="netplan">'+p.peo+' <span class="netlbl">'+p.label+'</span>'+
+    var plans=(n.plans||[]).map(function(p){ return '<div class="netplan">'+p.peo+(/inferred/i.test(p.label||'')?' <span class="netlbl">Inferred</span>':'')+
       (p.plan_year_from?' <span class="netmut">plan yr '+fmtDate(p.plan_year_from)+' – '+fmtDate(p.plan_year_to)+'</span>':'')+'</div>'; }).join('');
     var row=document.createElement('label'); row.className='netrow'+(dim?' dim':'');
     row.innerHTML='<input type="checkbox" '+(N.nets[n.network_key]?'checked':'')+'>'+
@@ -2313,40 +2313,46 @@ function drawNet(){
   legend();
 }
 function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
-  var n=L.n, s=L.s, m=L.m, B=N.bands;
-  if(z<8.2){
-    // glow surface: paint cells on a half-resolution buffer, then blur-composite (soft gradient, no blanket)
-    var hw=Math.ceil(W/2), hh=Math.ceil(H/2);
-    if(!off){ off=document.createElement('canvas'); octx=off.getContext('2d'); }
-    if(off.width!==hw||off.height!==hh){ off.width=hw; off.height=hh; }
-    octx.clearRect(0,0,hw,hh);
-    for(var i=0;i<n;i++){
-      var sc=s[i]; if(!B[bandOf(sc)]) continue;
-      var x=((L.mx[i]-cx)*scale+W/2)/2, y=((L.my[i]-cy)*scale+H/2)/2;
-      var sz=Math.max(1.6, L.cz[i]*scale*0.62);
-      if(x<-sz||x>hw+sz||y<-sz||y>hh+sz) continue;
-      var a=0.35+0.65*(m[i]/100);
-      octx.globalAlpha=a; octx.fillStyle=rp[ri(sc)]; octx.fillRect(x-sz/2,y-sz/2,sz,sz);
-    }
-    octx.globalAlpha=1;
-    var blur=Math.max(2,Math.min(9,11-z));
-    nctx.save(); try{ nctx.filter='blur('+blur+'px)'; }catch(_){}
-    nctx.drawImage(off,0,0,W,H); nctx.restore();
-    nctx.save(); nctx.globalAlpha=0.55; nctx.drawImage(off,0,0,W,H); nctx.restore();   // crisp core under the glow
-  } else {
-    // street/metro zoom: true hexagons
-    if(typeof h3==='undefined'||!h3.cellToBoundary) return;
-    for(var j=0;j<n;j++){
-      var sc2=s[j]; if(!B[bandOf(sc2)]) continue;
-      var px=(L.mx[j]-cx)*scale+W/2, py=(L.my[j]-cy)*scale+H/2, r=L.cz[j]*scale;
-      if(px<-r||px>W+r||py<-r||py>H+r) continue;
-      var pl=L.poly[j]; if(!pl){ var bd=h3.cellToBoundary(L.h[j]); pl=L.poly[j]=bd.map(function(v){ return [mercX(v[1]),mercY(v[0])]; }); }
-      nctx.beginPath();
-      for(var q=0;q<pl.length;q++){ var X=(pl[q][0]-cx)*scale+W/2, Y=(pl[q][1]-cy)*scale+H/2; if(q) nctx.lineTo(X,Y); else nctx.moveTo(X,Y); }
-      nctx.closePath(); nctx.globalAlpha=0.45+0.55*(m[j]/100); nctx.fillStyle=rp[ri(sc2)]; nctx.fill();
-    }
-    nctx.globalAlpha=1;
+  // v3.43 (owner 2026-09-22 "as you zoom in it should rightsize, not a big blur"): crisp hexagons at every zoom,
+  // with the grid itself refining as you zoom — ~4,800 sq mi cells nationally down to ~14 sq mi at metro zoom.
+  if(typeof h3==='undefined'||!h3.cellToBoundary) return;
+  var res=netRes(z), V=netLevel(L,res), B=N.bands;
+  for(var j=0;j<V.n;j++){
+    var sc=V.s[j]; if(!B[bandOf(sc)]) continue;
+    var px=(V.mx[j]-cx)*scale+W/2, py=(V.my[j]-cy)*scale+H/2, r=V.cz[j]*scale;
+    if(px<-r||px>W+r||py<-r||py>H+r) continue;
+    var pl=V.poly[j]; if(!pl){ pl=V.poly[j]=h3.cellToBoundary(V.h[j]).map(function(v){ return [mercX(v[1]),mercY(v[0])]; }); }
+    nctx.beginPath();
+    for(var q=0;q<pl.length;q++){ var X=(pl[q][0]-cx)*scale+W/2, Y=(pl[q][1]-cy)*scale+H/2; if(q) nctx.lineTo(X,Y); else nctx.moveTo(X,Y); }
+    nctx.closePath();
+    nctx.globalAlpha=0.30+0.70*(V.m[j]/100);
+    nctx.fillStyle=rp[ri(sc)]; nctx.fill();
+    nctx.lineWidth=r>18?0.8:0.5; nctx.strokeStyle=rp[ri(sc)]; nctx.stroke();   // seals anti-alias hairlines between cells
   }
+  nctx.globalAlpha=1;
+}
+// grid resolution by zoom: H3 res 3 (~4,800 sq mi) → 4 (~680) → 5 (~98) → 6 (~14 sq mi, the scored grid)
+function netRes(z){ return z<4.6?3:(z<6.0?4:(z<7.4?5:6)); }
+var RES_SQMI={3:'~4,800 sq mi',4:'~680 sq mi',5:'~98 sq mi',6:'~14 sq mi'};
+// roll the scored res-6 cells up to a coarser grid: strength = average weighted by how many doctors/hospitals
+// sit in each cell (so empty land never outvotes a city); counts add up; market size = the busiest child.
+function netLevel(L,res){
+  L.lv=L.lv||{}; if(L.lv[res]) return L.lv[res];
+  var idx={}, V={h:[],sw:[],w:[],m:[],nc:[],ac:[],nh:[],ah:[]};
+  for(var i=0;i<L.n;i++){
+    var k=res<6?h3.cellToParent(L.h[i],res):L.h[i], t=idx[k];
+    if(t==null){ t=idx[k]=V.h.length; V.h.push(k); V.sw.push(0); V.w.push(0); V.m.push(0); V.nc.push(0); V.ac.push(0); V.nh.push(0); V.ah.push(0); }
+    var w=(+L.ac[i]||0)+20*(+L.ah[i]||0)+1;
+    V.sw[t]+=w*L.s[i]; V.w[t]+=w; if(L.m[i]>V.m[t]) V.m[t]=+L.m[i];
+    V.nc[t]+=+L.nc[i]||0; V.ac[t]+=+L.ac[i]||0; V.nh[t]+=+L.nh[i]||0; V.ah[t]+=+L.ah[i]||0;
+  }
+  var n=V.h.length; V.n=n; V.s=new Array(n); V.mx=new Float64Array(n); V.my=new Float64Array(n); V.cz=new Float32Array(n); V.poly={}; V.idx=idx;
+  var edge={3:0.0041,4:0.00156,5:0.00059,6:0.000223}[res];
+  for(var j=0;j<n;j++){
+    V.s[j]=Math.round(V.sw[j]/V.w[j]);
+    var c=h3.cellToLatLng(V.h[j]); V.mx[j]=mercX(c[1]); V.my[j]=mercY(c[0]); V.cz[j]=edge/Math.cos(c[0]*Math.PI/180);
+  }
+  return L.lv[res]=V;
 }
 function drawPins(P,rp,W,H,z,scale,cx,cy,net){
   var ps=typeof pinScale==='function'?pinScale(z):1;
@@ -2379,6 +2385,7 @@ function legend(){
       '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div>'+
       '<div class="lgscale"><span>Thin</span><span>Moderate</span><span>Solid</span><span>Strong</span></div>'+
       '<div class="netmut">Carrier data as of '+fmtDate(n.data_as_of)+' · registry '+fmtDate(n.registry_as_of)+'</div>';
+    if(N.frame) html+='<div class="netmut">Cell size at this zoom: '+RES_SQMI[netRes(N.frame.z)]+' (zoom in for finer cells)</div>';
     if(N.loading['h'+n.network_key]||N.loading['p'+n.network_key]) html+='<div class="netmut">loading…</div>';
   });
   html+='<div class="netmut" style="margin-top:4px">Deeper colour = larger share of the area\'s registered doctors &amp; hospitals in network (Strong = 55%+, Solid 45–54%, Moderate 35–44%, Thin under 35%).</div>';
@@ -2394,16 +2401,17 @@ function hoverAt(mx,my){
       return '<b>ZIP '+P.lb[i]+'</b> · '+(P.city[i]||'')+', '+(P.st[i]||'')+'<br>'+(P.nc[i]||0).toLocaleString()+' in-network clinicians'+(P.nh[i]?' · '+P.nh[i]+' hospital'+(P.nh[i]>1?'s':''):'')+(P.s[i]!=null?' · area '+P.s[i]+'% signed ('+BAND_NAMES[bandOf(P.s[i])]+')':'');
     } }
   if(N.view==='pins') return null;
-  var best=null,bd=1e9;
-  N.cat.networks.forEach(function(n){ var L=N.layers[n.network_key]; if(!netVisible(n)||!L) return;
-    var r=Math.max(6,L.cz[0]*f.scale);
-    for(var i=0;i<L.n;i++){ var x=(L.mx[i]-f.cx)*f.scale+f.W/2; if(Math.abs(x-mx)>r) continue; var y=(L.my[i]-f.cy)*f.scale+f.H/2; if(Math.abs(y-my)>r) continue;
-      var d=(x-mx)*(x-mx)+(y-my)*(y-my); if(d<bd){ bd=d; best={L:L,i:i,n:n}; } } });
-  if(!best) return null;
-  var L2=best.L,j=best.i;
-  return '<b>'+best.n.network_name+'</b> · '+L2.s[j]+'% of area doctors/hospitals signed ('+BAND_NAMES[bandOf(L2.s[j])]+')'+
-    (L2.ac[j]?'<br>This cell: '+L2.nc[j].toLocaleString()+' of '+L2.ac[j].toLocaleString()+' clinicians in network':'')+
-    (L2.ah[j]?' · '+L2.nh[j]+' of '+L2.ah[j]+' hospitals':'');
+  // exact cell under the cursor, at the grid resolution currently drawn
+  var wx=f.cx+(mx-f.W/2)/f.scale, wy=f.cy+(my-f.H/2)/f.scale;
+  var lng=wx*360-180, lat=Math.atan(Math.sinh(Math.PI*(1-2*wy)))*180/Math.PI;
+  if(!(lat>-85&&lat<85)) return null;
+  var res=netRes(f.z), out=null;
+  N.cat.networks.forEach(function(n){ var L=N.layers[n.network_key]; if(out||!netVisible(n)||!L) return;
+    var V=netLevel(L,res), j=V.idx[h3.latLngToCell(lat,lng,res)]; if(j==null) return;
+    out='<b>'+n.network_name+'</b> · '+V.s[j]+'% of area doctors/hospitals signed ('+BAND_NAMES[bandOf(V.s[j])]+')'+
+      (V.ac[j]?'<br>This '+RES_SQMI[res]+' cell: '+V.nc[j].toLocaleString()+' of '+V.ac[j].toLocaleString()+' clinicians in network':'')+
+      (V.ah[j]?' · '+V.nh[j]+' of '+V.ah[j]+' hospitals':''); });
+  return out;
 }
 
 // ---------- wiring ----------
