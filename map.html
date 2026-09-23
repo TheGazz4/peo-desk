@@ -403,7 +403,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.53 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.54 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2178,7 +2178,7 @@ var NET_EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-net';
 var CARRIER_HEX={aetna:'#9b4fd0',unitedhealthcare:'#2f7fe0',uhc:'#2f7fe0',oxford:'#2f7fe0',cigna:'#e0b43a',anthem:'#2fb36b',elevance:'#2fb36b',kaiser:'#16a3c9',bcbs:'#e05a7a',bluecross:'#e05a7a',blueshield:'#e05a7a',healthcareservice:'#e05a7a',hmsa:'#e05a7a',humana:'#7cb342',point32:'#8d6e63',harvardpilgrim:'#8d6e63'};   // v3.47: one distinct hue per carrier
 var BAND_NAMES=['Thin','Moderate','Solid','Strong'];
 var BAND_RANGE=['under 35%','35–44%','45–54%','55%+'];
-var N={method:((location.search.match(/[?&]netmethod=(v2|dens)\b/)||[])[1]||'now'),cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
+var N={method:((location.search.match(/[?&]netmethod=(v2|dens)\b/)||[])[1]||'now'),cms:/[?&]netcms=1\b/.test(location.search),cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
        layers:{},pts:{},loading:{},carriersOff:{},hover:null,peo:null,sel:null};
 window.NETSTATE=N;
 var $n=function(id){return document.getElementById(id)};
@@ -2224,6 +2224,7 @@ function buildSection(){
    '<div id="netbody" style="display:none">'+
      '<div class="netsub"><span class="nettipq" tabindex="0" data-tip-t="Heat method" data-tip="How the heat layer is calculated. Current is today&#39;s approved view; Share and Density are previews waiting on your OK.">Heat method <i>?</i></span></div>'+
      '<div class="seg" id="netmethod"><button data-m="now" data-tip-t="Current" data-tip="Share of the area&#39;s doctors and hospitals in network, blended over about 12 miles.">Current</button><button data-m="v2" data-tip-pv="1" data-tip-t="Share" data-tip="Share of the area&#39;s clinicians in network, weighted by where they practise.">Share</button><button data-m="dens" data-tip-pv="1" data-tip-t="Density" data-tip="Where the network&#39;s in-network clinicians actually practise, placed by ZIP.">Density</button></div>'+
+     '<label class="netcms" id="netcmsrow" data-tip-pv="1" data-tip-t="Medicare distance" data-tip="Blends over Medicare&#39;s primary-care distance for each county type: 5 mi in big cities, 10 in metros, 20 in small towns, 30 rural, 60 frontier. Works with Share and Density."><input type="checkbox" id="netcms"> Medicare distance</label>'+
      '<div class="netsub">Carrier</div><div id="netcarriers" class="netchips"></div>'+
      '<div class="netsub" title="Pick a PEO, then one of its networks. A carrier can run several networks and PEOs on the same carrier can ride different ones, so the heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
      '<div class="netsub">Plan reach</div><div class="netchips" id="nettiers">'+
@@ -2245,7 +2246,9 @@ function buildSection(){
         '#nettip.on{opacity:1;transform:none}#nettip b{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink,#fff);margin-bottom:3px}'+
         '#nettip .pv{padding:1px 7px;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(155,79,208,.22);color:#d9b8f5}'+
         '.nettipq{cursor:help}.nettipq i{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;margin-left:4px;border-radius:50%;'+
-        'font-style:normal;font-size:9px;font-weight:700;border:1px solid var(--muted,#8a90a0);color:var(--muted,#8a90a0);vertical-align:1px}';
+        'font-style:normal;font-size:9px;font-weight:700;border:1px solid var(--muted,#8a90a0);color:var(--muted,#8a90a0);vertical-align:1px}'+
+        '.netcms{display:flex;align-items:center;gap:7px;margin:7px 0 2px;font-size:12px;color:var(--ink2,#cfd3de);cursor:pointer;user-select:none}'+
+        '.netcms input{accent-color:#9b4fd0;margin:0;cursor:pointer}.netcms.off{opacity:.42;cursor:default}.netcms.off input{cursor:default}';
       document.head.appendChild(st); }
     var tip=document.getElementById('nettip'); if(!tip){ tip=document.createElement('div'); tip.id='nettip'; tip.setAttribute('role','tooltip'); document.body.appendChild(tip); }
     var tmr=null;
@@ -2266,7 +2269,11 @@ function buildSection(){
     });
     var pn=$n('panel'); if(pn) pn.addEventListener('scroll',hide,{passive:true});
   })();
-  nm.addEventListener('click',function(e){ var m=e.target&&e.target.dataset.m; if(!m) return; N.method=m; [].forEach.call(nm.children,function(bn){ bn.classList.toggle('on',bn.dataset.m===m); }); ensureData(); redraw(); });
+  // v3.54 PREVIEW (owner 2026-09-23): Medicare distance - only applies to Share and Density; Current stays the approved view
+  var cmsBox=$n('netcms'), cmsRow=$n('netcmsrow');
+  function syncCms(){ cmsBox.checked=N.cms; cmsBox.disabled=N.method==='now'; cmsRow.classList.toggle('off',N.method==='now'); }
+  syncCms(); cmsBox.addEventListener('change',function(){ N.cms=cmsBox.checked; ensureData(); redraw(); });
+  nm.addEventListener('click',function(e){ var m=e.target&&e.target.dataset.m; if(!m) return; N.method=m; [].forEach.call(nm.children,function(bn){ bn.classList.toggle('on',bn.dataset.m===m); }); syncCms(); ensureData(); redraw(); });
   $n('nettiers').addEventListener('click',function(e){ var t=e.target.dataset&&e.target.dataset.t; if(!t) return; N.tiers[t]=!N.tiers[t]; e.target.classList.toggle('on',N.tiers[t]); renderList(); redraw(); });
   bands.addEventListener('click',function(e){ var b=e.target.dataset&&e.target.dataset.b; if(b==null) return; b=+b; N.bands[b]=!N.bands[b]; e.target.classList.toggle('on',N.bands[b]); redraw(); });
   var cv=document.createElement('canvas'); cv.id='netcanvas'; $n('mapwrap').insertBefore(cv,$n('pincanvas'));
@@ -2354,7 +2361,7 @@ function ensureData(){
     var k=n.network_key;
     if((N.view==='heat'||N.view==='both')&&!N.layers[k]&&!N.loading['h'+k]){ N.loading['h'+k]=1;
       netFetch({mode:'layer',network_key:k}).then(function(L){ prepLayer(L); N.layers[k]=L; renderList(); redraw(); }).catch(function(){}).then(function(){ delete N.loading['h'+k]; }); }
-    if((N.view==='pins'||N.view==='both'||(N.method==='dens'&&N.view==='heat'))&&!N.pts[k]&&!N.loading['p'+k]){ N.loading['p'+k]=1;
+    if((N.view==='pins'||N.view==='both'||((N.method==='dens'||cmsOn())&&N.view==='heat'))&&!N.pts[k]&&!N.loading['p'+k]){ N.loading['p'+k]=1;
       netFetch({mode:'points',network_key:k}).then(function(P){ prepPts(P); N.pts[k]=P; redraw(); }).catch(function(){}).then(function(){ delete N.loading['p'+k]; }); }
   });
 }
@@ -2380,7 +2387,7 @@ function drawNet(){
   var wrap=$n('mapwrap'), W=wrap.clientWidth, H=wrap.clientHeight, dpr=Math.min(window.devicePixelRatio||1,2);
   if(ncv.width!==Math.round(W*dpr)||ncv.height!==Math.round(H*dpr)){ ncv.width=Math.round(W*dpr); ncv.height=Math.round(H*dpr); ncv.style.width=W+'px'; ncv.style.height=H+'px'; }
   nctx.setTransform(dpr,0,0,dpr,0,0); nctx.clearRect(0,0,W,H);
-  N.hitsP=[]; N.frame=null;
+  N.hitsP=[]; N.frame=null; N.cmsF=null;
   if(!S.map||!N.cat||N.view==='off'){ legend(); return; }
   var z=S.map.getZoom(), scale=256*Math.pow(2,z), ctr=S.map.getCenter(), cx=mercX(ctr.lng()), cy=mercY(ctr.lat());
   N.frame={W:W,H:H,z:z,scale:scale,cx:cx,cy:cy};
@@ -2388,7 +2395,8 @@ function drawNet(){
   N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     var col=carrierHex(n.carrier), rp=ramp(col);
-    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]) drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy); }
+    if(heat&&cmsOn()){ drawCms(N.layers[n.network_key],N.pts[n.network_key],rp,W,H,z,scale,cx,cy); }
+    else if(heat&&N.method==='dens'){ if(N.pts[n.network_key]) drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy); }
     else if(heat&&N.layers[n.network_key]) drawHeat(N.layers[n.network_key],rp,W,H,z,scale,cx,cy,col);
   });
   if(pins) N.cat.networks.forEach(function(n){
@@ -2438,6 +2446,90 @@ function drawDensity(P,rp,W,H,z,scale,cx,cy){
   nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality='high';
   nctx.drawImage(off,0,0,ow,oh,0,0,ow*G,oh*G);
   nctx.restore();
+}
+// v3.54 PREVIEW 'Medicare distance' (owner 2026-09-23: "is 12 miles the universal standard?" -> "yes, preview first").
+// Not yet approved; Current is untouched. Instead of one blend radius everywhere, every spot on the map uses Medicare
+// Advantage's primary-care distance standard for its county type (42 CFR 422.116): Large Metro 5 mi, Metro 10,
+// Micro 20, Rural 30, CEAC/frontier 60. County type = CMS MA network-adequacy Table 3-1 rules on Census population and
+// density (migration 6025, refreshed monthly), carried on every ZIP in the points payload ('ct').
+// Each spot leans to the county types of the ZIPs around it (weights blurred over ~10 mi) so type borders fade instead of
+// stepping; a spot with no ZIP nearby fades to frontier. Kernel per type = Gaussian with the same area as a
+// circle of that distance (sigma = R / sqrt 2), so a value reads as "clinicians within the Medicare distance".
+//   Share:   colour = in-network share of the clinicians within that distance; opacity = how many clinicians are within it.
+//   Density: colour = how many in-network clinicians are within that distance.
+//   Blank = no in-network clinician within Medicare's distance (the CMS test fails there).
+var CMS_MI=[0,5,10,20,30,60], CMS_NAME=['','Large metro','Metro','Small town','Rural','Frontier'];
+function cmsOn(){ return N.cms&&(N.method==='v2'||N.method==='dens'); }
+function drawCms(L,P,rp,W,H,z,scale,cx,cy){
+  var share=N.method==='v2';
+  if(!P||!P.ct||!P.mx||(share&&!(L&&L.ac&&L.nc&&L.mx))) return;
+  var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy))), pxKm=scale/(40075.017*Math.cos(lat));
+  // kernel per county type in screen px (never under 1.5 px, so a 5-mile city still shows at national zoom)
+  var sp=[0]; for(var t=1;t<=5;t++) sp[t]=Math.max(1.5,CMS_MI[t]*1.609344/Math.SQRT2*pxKm);
+  var G=Math.max(2,Math.min(96,Math.round(sp[1]/2))), pad,ow,oh,gw,gh,n;
+  for(;;){ pad=Math.ceil(3*sp[5]/G)+2; ow=Math.ceil(W/G); oh=Math.ceil(H/G); gw=ow+2*pad; gh=oh+2*pad; n=gw*gh; if(n<=1.2e6||G>=256) break; G=Math.ceil(G*1.5); }
+  var no=ow*oh;
+  if(!HB.A||HB.A.length<n){ HB.A=new Float32Array(n); HB.B=new Float32Array(n); HB.T=new Float32Array(n); }
+  if(!HB.X||HB.X.length<n){ HB.X=new Float32Array(n); HB.Y=new Float32Array(n); HB.I=new Float32Array(5*n); }
+  if(!HB.OA||HB.OA.length<no){ HB.OA=new Float32Array(no); HB.OB=new Float32Array(no); HB.OT=new Uint8Array(no); HB.WT=new Float32Array(5*no); HB.WS=new Float32Array(no); }
+  var A=HB.A, Bv=HB.B, X=HB.X, Y=HB.Y, I=HB.I, OA=HB.OA, OB=HB.OB, OT=HB.OT, WT=HB.WT, WS=HB.WS, Bd=N.bands, sg=scale/G;
+  A.fill(0,0,n); Bv.fill(0,0,n); I.fill(0,0,5*n); OA.fill(0,0,no); OB.fill(0,0,no); WS.fill(0,0,no);
+  function dep(arr,off0,mx,my,w){
+    var gx=(mx-cx)*sg+ow/2+pad, gy=(my-cy)*sg+oh/2+pad;
+    if(gx<0||gy<0||gx>=gw-1||gy>=gh-1) return;
+    var x0=gx|0, y0=gy|0, fx=gx-x0, fy=gy-y0, i=off0+y0*gw+x0;
+    arr[i]+=w*(1-fx)*(1-fy); arr[i+1]+=w*fx*(1-fy); arr[i+gw]+=w*(1-fx)*fy; arr[i+gw+1]+=w*fx*fy;
+  }
+  // 1. county-type weights: every typed ZIP votes for its type; votes blurred over ~10 mi
+  var cnt=[0,0,0,0,0,0];
+  for(var k=0;k<P.n;k++){ if(P.k[k]===1) continue; var ct=+P.ct[k]; if(!(ct>=1&&ct<=5)) continue; dep(I,(ct-1)*n,P.mx[k],P.my[k],1); cnt[ct]++; }
+  var have=[0,0,0,0,0,0], sI=sp[2]/G;
+  for(t=1;t<=5;t++){ if(!cnt[t]) continue; var It=I.subarray((t-1)*n,t*n); gaussBlur(It,HB.T,gw,gh,sI);
+    for(var y=0;y<oh;y++){ var row=(t-1)*n+(y+pad)*gw+pad; for(var x=0;x<ow;x++){ var o=y*ow+x, w=I[row+x]; WT[(t-1)*no+o]=w; WS[o]+=w; } } }
+  var eps=0.03/(2*Math.PI*sI*sI);   // small standing vote for frontier (3% of one ZIP's peak): far from any ZIP the spot fades to frontier smoothly
+  for(var o1=0;o1<no;o1++){ var s=WS[o1]+eps, bt=5, bw=0; WT[4*no+o1]+=eps;
+    for(t=1;t<=5;t++){ var wv=(WT[(t-1)*no+o1]/=s); if(wv>bw){ bw=wv; bt=t; } }
+    OT[o1]=bt; for(t=1;t<=5;t++) if(WT[(t-1)*no+o1]>0.02) have[t]=1; }
+  // 2. drop the clinicians: Share = each scored cell's all-clinician (A) and in-network (Bv) counts; Density = in-network per ZIP
+  if(share){ for(var j=0;j<L.n;j++){ var ac=+L.ac[j]; if(!(ac>0)) continue; var nc=+L.nc[j]||0;
+      if(!Bd[bandOf(Math.round(100*nc/ac))]) continue; dep(A,0,L.mx[j],L.my[j],ac); if(nc) dep(Bv,0,L.mx[j],L.my[j],nc); } }
+  else { for(k=0;k<P.n;k++){ if(P.k[k]===1) continue; var c=+P.nc[k]; if(c>0) dep(A,0,P.mx[k],P.my[k],c); } }
+  // 3. blur once per county type on screen; each spot blends the results by its type weights -> clinicians within its distance
+  for(t=1;t<=5;t++){ if(!have[t]) continue;
+    var sgm=sp[t]/G, area=2*Math.PI*sgm*sgm, wo=(t-1)*no;
+    X.set(A.subarray(0,n)); gaussBlur(X,HB.T,gw,gh,sgm);
+    if(share){ Y.set(Bv.subarray(0,n)); gaussBlur(Y,HB.T,gw,gh,sgm); }
+    for(var y2=0;y2<oh;y2++){ var r2=(y2+pad)*gw+pad; for(var x2=0;x2<ow;x2++){ var o2=y2*ow+x2, w2=WT[wo+o2]; if(!(w2>0)) continue;
+      OA[o2]+=w2*X[r2+x2]*area; if(share) OB[o2]+=w2*Y[r2+x2]*area; } }
+  }
+  N.cmsF={G:G,ow:ow,oh:oh,OA:OA,OB:OB,OT:OT,share:share,have:have};
+  // 4. paint
+  if(!off||off.width!==ow||off.height!==oh){ off=off||document.createElement('canvas'); off.width=ow; off.height=oh; octx=off.getContext('2d'); HB.img=null; }
+  if(!HB.img) HB.img=octx.createImageData(ow,oh);
+  var d=HB.img.data, pal=heatPalette(rp);
+  for(var p2=0,o3=0;o3<no;o3++,p2+=4){
+    var inN=share?OB[o3]:OA[o3];
+    if(!(inN>=0.5)){ d[p2+3]=0; continue; }          // no in-network clinician within Medicare's distance
+    var ci, cov;
+    if(share){ var all=OA[o3]; ci=Math.round(ri(100*OB[o3]/all)*2.55)*4;
+      var c3=Math.min(1,Math.max(0,(Math.log(all)/Math.LN10+0.3)/1.8)); cov=c3*c3*(3-2*c3); }
+    else { var L10=Math.log(inN)/Math.LN10; ci=Math.round(Math.max(0,Math.min(100,5+24*L10))*2.55)*4;   // 1 -> faint, 10 -> 29, 100 -> 53, 1,000 -> 77, 10,000 -> deepest
+      var c4=Math.min(1,Math.max(0,(inN-0.5)/2.5)); cov=c4*c4*(3-2*c4); }
+    d[p2]=pal[ci]; d[p2+1]=pal[ci+1]; d[p2+2]=pal[ci+2]; d[p2+3]=Math.round(pal[ci+3]*cov);
+  }
+  octx.putImageData(HB.img,0,0);
+  nctx.save();
+  if(heatClip(W,H,cx,cy,scale)) nctx.clip('evenodd');
+  nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality='high';
+  nctx.drawImage(off,0,0,ow,oh,0,0,ow*G,oh*G);
+  nctx.restore();
+}
+function cmsHover(mx,my){
+  var F=N.cmsF; if(!F) return '';
+  var x=(mx/F.G)|0, y=(my/F.G)|0; if(x<0||y<0||x>=F.ow||y>=F.oh) return '';
+  var o=y*F.ow+x, t=F.OT[o], nIn=Math.round(F.share?F.OB[o]:F.OA[o]);
+  return '<br><b>Medicare distance here:</b> '+CMS_MI[t]+' mi ('+CMS_NAME[t]+') · '+nIn.toLocaleString()+' in-network clinician'+(nIn===1?'':'s')+' within it'+
+    (F.share&&F.OA[o]>=0.5?' of '+Math.round(F.OA[o]).toLocaleString()+' ('+Math.round(100*F.OB[o]/F.OA[o])+'%)':'');
 }
 function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
   // v3.46 (owner 2026-09-23: "research how REAL heat maps are drawn ... this is just a series of dots").
@@ -2593,7 +2685,8 @@ function legend(){
   if(!N.cat||N.view==='off'){ lg.style.display='none'; return; }
   var vis=(N.cat.networks||[]).filter(netVisible);
   if(!vis.length){ lg.style.display='none'; return; }
-  var html=N.method==='v2'?'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 Share</b><br>Colour = share of the area\'s clinicians in network, weighted by where the clinicians are. Faint = few clinicians nearby. Not yet approved; nothing in the data has changed.</div>':
+  var html=cmsOn()?(N.method==='v2'?'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 Share \u00b7 Medicare distance</b><br>Colour = share of the clinicians within Medicare\'s primary-care distance who are in network (5 mi big cities, 10 metros, 20 small towns, 30 rural, 60 frontier). Blank = no in-network clinician within that distance. Not yet approved; nothing in the data has changed.</div>':'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 Density \u00b7 Medicare distance</b><br>Colour = how many in-network clinicians are within Medicare\'s primary-care distance of each spot (5 mi big cities, 10 metros, 20 small towns, 30 rural, 60 frontier). Blank = none within that distance. Not yet approved; nothing in the data has changed.</div>'):
+    N.method==='v2'?'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 Share</b><br>Colour = share of the area\'s clinicians in network, weighted by where the clinicians are. Faint = few clinicians nearby. Not yet approved; nothing in the data has changed.</div>':
     N.method==='dens'?'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 Density</b><br>Where this network\'s in-network clinicians practise, placed by ZIP (same way as client pins without a street address), per sq mi. Deeper = more in-network doctors nearby; the scale bar below reads Few \u2192 Many. Not yet approved; nothing in the data has changed.</div>':'';
   var pp=peoOf(N.peo); if(pp) html+='<div class="netmut" style="margin-bottom:3px">'+esc(pp.peo)+'\'s plan rides:</div>';
   vis.forEach(function(n){
@@ -2602,7 +2695,8 @@ function legend(){
       '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div>'+
       '<div class="lgscale"><span>Thin</span><span>Moderate</span><span>Solid</span><span>Strong</span></div>'+
       '<div class="netmut" title="Carrier network file '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(n.data_as_of,n.registry_as_of)+' · updates monthly</div>';
-    if(N.frame&&N.view!=='pins') html+='<div class="netmut">Heat blends the ~'+Math.max(1,Math.round(heatSpan(N.frame.z,N.frame.cy,N.frame.scale).km*2*0.621))+' mi around each spot at this zoom (zoom in for street-level detail)</div>';
+    if(N.frame&&N.view!=='pins'&&cmsOn()){ var hv=N.cmsF?N.cmsF.have:[0,0,0,0,0,0], on=[]; for(var t=1;t<=5;t++) if(hv[t]) on.push(CMS_MI[t]+' mi '+CMS_NAME[t].toLowerCase()); html+='<div class="netmut">Medicare distance on screen: '+(on.join(' \u00b7 ')||'loading\u2026')+'</div>'; }
+    else if(N.frame&&N.view!=='pins') html+='<div class="netmut">Heat blends the ~'+Math.max(1,Math.round(heatSpan(N.frame.z,N.frame.cy,N.frame.scale).km*2*0.621))+' mi around each spot at this zoom (zoom in for street-level detail)</div>';
     if(N.loading['h'+n.network_key]||N.loading['p'+n.network_key]) html+='<div class="netmut">loading…</div>';
   });
   html+='<div class="netmut" style="margin-top:4px">Deeper colour = larger share of the area\'s registered doctors &amp; hospitals in network (Strong = 55%+, Solid 45–54%, Moderate 35–44%, Thin under 35%).</div>';
@@ -2628,6 +2722,7 @@ function hoverAt(mx,my){
     out='<b>'+n.network_name+'</b> · '+V.s[j]+'% of area doctors/hospitals signed ('+BAND_NAMES[bandOf(V.s[j])]+')'+
       (V.ac[j]?'<br>This '+RES_SQMI[res]+' cell: '+V.nc[j].toLocaleString()+' of '+V.ac[j].toLocaleString()+' clinicians in network':'')+
       (V.ah[j]?' · '+V.nh[j]+' of '+V.ah[j]+' hospitals':''); });
+  if(cmsOn()&&N.cmsF){ var cmh=cmsHover(mx,my); if(cmh) out=(out||'<b>'+(N.method==='v2'?'Share':'Density')+' preview</b>')+cmh; }
   return out;
 }
 
