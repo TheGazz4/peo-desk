@@ -345,18 +345,21 @@
   function render(j) {
     var co = j.company || {}, st = j.status || {}, story = j.story || {}, conc = j.concurrency || {}, colors = j.peo_colors || {};
     var rels = conc.relationships || [];
+    var hold = !!j.hold;   /* story_fact_agreement_law: story and facts disagree -> show neither */
+    ["tl", "moments"].forEach(function (k) { var s = $(k) && $(k).closest("section"); if (s) s.classList.toggle("hidden", hold); });
     $("empty").classList.add("hidden"); $("rec").classList.remove("hidden");
     document.title = "PEO Engine — " + (co.name || "Client Lifecycle");
 
-    var active = (st.active_now || []);
+    var active = hold ? [] : (st.active_now || []);
     var dates = j.dates || {};
     var chips = [];
-    if (active.length) chips.push('<span class="chip good"><span class="dot" style="background:var(--good)"></span><b>' +
+    if (hold) chips.push('<span class="chip warn"><span class="dot" style="background:var(--warning)"></span><b>Under review</b></span>');
+    else if (active.length) chips.push('<span class="chip good"><span class="dot" style="background:var(--good)"></span><b>' +
         (active.length > 1 ? active.length + " PEOs today" : "Current PEO client") + '</b></span>');
     else chips.push('<span class="chip warn"><span class="dot" style="background:var(--warning)"></span><b>No running PEO term on record</b></span>');
     active.forEach(function (p) { chips.push('<span class="chip"><span class="dot" style="background:' + esc(colors[p] || "#8a8a85") + '"></span><b>' + esc(peoName(rels, p)) + '</b></span>'); });
     if (st.confidence) chips.push('<span class="chip">Confidence <b>' + esc(st.confidence) + '</b></span>');
-    var loc = [co.city && co.state ? co.city + ", " + co.state : co.state, co.address, co.website].filter(Boolean).map(esc).join(" · ");
+    var loc = [co.city && co.state ? co.city + ", " + co.state : co.state, co.website].filter(Boolean).map(esc).join(" · ");
     $("id").innerHTML = '<h2>' + esc(co.name) + '</h2><div class="loc">' + loc + '</div><div class="chips">' + chips.join("") + '</div>' +
       '<div class="dates">' + (dates.as_of_display ? '<span>As of <b>' + esc(dates.as_of_display) + '</b></span>' : '') +
       (dates.checked_display ? '<span>Checked <b>' + esc(dates.checked_display) + '</b></span>' : '') +
@@ -364,7 +367,7 @@
 
     /* the story — first and most important */
     var sh = '<div class="eyebrow">The story</div>';
-    if (story.withheld) sh += '<p class="withheld">The story for this company is withheld: it stated a PEO count that does not match the calculation. See the record check below.</p>';
+    if (story.withheld) sh += '<p class="withheld">' + esc(story.withheld_text || "The story for this company is held back until its record agrees with itself. See the record check below.") + '</p>';
     else {
       sh += '<h3>' + esc(story.headline) + '</h3><div class="prose">' + (story.paragraphs || []).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("") + '</div>';
     }
