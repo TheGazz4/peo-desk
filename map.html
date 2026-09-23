@@ -392,7 +392,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.43 · 2026-09-22</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.43.1 · 2026-09-22</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2253,12 +2253,12 @@ function renderList(){
   N.cat.networks.forEach(function(n){
     var dim=N.tiers[n.tier]===false||N.carriersOff[n.carrier];
     var plans=(n.plans||[]).map(function(p){ return '<div class="netplan">'+p.peo+(/inferred/i.test(p.label||'')?' <span class="netlbl">Inferred</span>':'')+
-      (p.plan_year_from?' <span class="netmut">plan yr '+fmtDate(p.plan_year_from)+' – '+fmtDate(p.plan_year_to)+'</span>':'')+'</div>'; }).join('');
+      (p.filed_on?'<div class="netmut" title="Carrier comes from the plan\'s newest federal filing (plan year '+fmtDate(p.plan_year_from)+' – '+fmtDate(p.plan_year_to)+'). These filings arrive after a plan year closes, so this is the most current filed record.">Carrier per latest federal filing · filed '+fmtDate(p.filed_on)+'</div>':'')+'</div>'; }).join('');
     var row=document.createElement('label'); row.className='netrow'+(dim?' dim':'');
     row.innerHTML='<input type="checkbox" '+(N.nets[n.network_key]?'checked':'')+'>'+
       '<div class="netmeta"><div><i class="netsw" style="background:'+carrierHex(n.carrier)+'"></i><b>'+n.network_name+'</b> <span class="nettier">'+n.tier+'</span></div>'+plans+
       '<div class="netmut">'+(n.clinicians||0).toLocaleString()+' clinicians · '+(n.hospitals||0).toLocaleString()+' hospitals · '+n.states_covered+' states covered</div>'+
-      '<div class="netmut">Carrier data as of '+fmtDate(n.data_as_of)+' · registry '+fmtDate(n.registry_as_of)+'</div></div>';
+      '<div class="netmut">Network data as of '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'</div></div>';
     row.querySelector('input').onchange=function(e){ N.nets[n.network_key]=e.target.checked; ensureData(); redraw(); };
     box.appendChild(row);
   });
@@ -2384,7 +2384,7 @@ function legend(){
     html+='<div class="lgrow"><b>'+n.network_name+'</b> <span class="nettier">'+n.tier+'</span></div>'+
       '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div>'+
       '<div class="lgscale"><span>Thin</span><span>Moderate</span><span>Solid</span><span>Strong</span></div>'+
-      '<div class="netmut">Carrier data as of '+fmtDate(n.data_as_of)+' · registry '+fmtDate(n.registry_as_of)+'</div>';
+      '<div class="netmut">Network data as of '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'</div>';
     if(N.frame) html+='<div class="netmut">Cell size at this zoom: '+RES_SQMI[netRes(N.frame.z)]+' (zoom in for finer cells)</div>';
     if(N.loading['h'+n.network_key]||N.loading['p'+n.network_key]) html+='<div class="netmut">loading…</div>';
   });
