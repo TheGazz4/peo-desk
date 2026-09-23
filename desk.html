@@ -127,6 +127,13 @@
   .sc-grid h3 { font-size: 11px; margin: 0 0 6px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
   .sc-grid td { white-space: normal; }
   .sc-grid td.nw { white-space: nowrap; }
+  /* PEO health networks (netstrength 6013) */
+  #tblPeoNet td { white-space: normal; }
+  #tblPeoNet td.peo { font-weight: 600; color: var(--ink-1); }
+  #tblPeoNet tr.grp td { border-top: 1px solid var(--baseline); }
+  #tblPeoNet .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  #tblPeoNet .mut { color: var(--ink-muted); font-size: 12px; }
+  .pn-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; font-size: 12px; color: var(--ink-2); }
   .delta-up { color: var(--good); font-weight: 650; }
   .delta-dn { color: var(--serious); }
   .delta-0  { color: var(--ink-muted); }
@@ -243,6 +250,14 @@
     </div>
   </section>
 
+  <section class="wide" id="peoNet">
+    <h2>PEO health networks <small>— which PEO uses which carrier, and which network</small></h2>
+    <p class="blurb">Each PEO's carriers come from its newest federal health filing (Form 5500 Schedule A, 2024 or later). The network is named by the PEO's or carrier's own plan documents (benefits guides, SBCs), saved in the evidence vault and checked against the carrier's monthly federal network file. <b>Likely</b> = named in a current document; <b>Inferred</b> = older, third-party or a two-step match. Rows with a live strength map can be turned on in the Coverage Map under Network strength.</p>
+    <div class="sc-tiles" id="pnTiles"></div>
+    <div class="pn-bar"><label><input type="checkbox" id="pnOnlyNet"> only rows with a network</label><span id="pnCount"></span><a href="map.html" style="margin-left:auto">Open the Coverage Map →</a></div>
+    <table id="tblPeoNet"><thead><tr><th>PEO</th><th>carrier</th><th class="num">people on plan</th><th>network</th><th>label</th><th>plan year · source</th><th>strength map</th></tr></thead><tbody></tbody></table>
+  </section>
+
   <section>
     <h2>Decision desk <small>— what the platform decided without you</small></h2>
     <p class="blurb">Every question the platform raises lands here. The <b>judge</b> researches it against project history and rules tiers 1 and 2; the <b>executor</b> then fixes, audits and re-tests it, and nothing is marked applied without a live-passing acceptance test. Tier 3 — sends, deletes, spend caps, security, or two of your own laws in conflict — is always yours, with an opinion attached.</p>
@@ -352,7 +367,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -906,9 +921,44 @@ function renderCarrierSupervisor(d) {
     `<tr><td class="num">${esc(String(h.run_id))}</td><td>${h.finished_at ? ageSpan(h.finished_at, 90000) : "—"}</td><td><span class="chip ${({ verified: "ok", unverified: "warn", red: "critical", error: "critical" })[h.status] || ""}">${esc(h.status || "")}</span></td><td class="num">${fmtN(h.inserted)}</td><td class="num">${fmtN(h.reversions)}</td><td class="num">${fmtN(h.current)}</td></tr>`).join("");
 }
 
+const PN_HEX = { aetna: "#9b4fd0", uhc: "#2f7fe0", elevance: "#2fb36b", kaiser: "#16a3c9", cigna: "#e0b43a", bcbs_other: "#e05a7a", bcbsm: "#e05a7a", hcsc: "#e05a7a", hmsa: "#e05a7a", point32: "#8d6e63", medica: "#7cb342" };
+let pnOnly = localStorage.getItem("desk_pn_only") === "1";
+document.addEventListener("change", (e) => { if (e.target && e.target.id === "pnOnlyNet") { pnOnly = e.target.checked; localStorage.setItem("desk_pn_only", pnOnly ? "1" : "0"); if (latest) renderPeoNetworks(latest); } });
+function renderPeoNetworks(d) {
+  const rows = d.desk_peo_networks?.rows || [];
+  const cb = $("#pnOnlyNet"); if (cb) cb.checked = pnOnly;
+  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
+  const pairs = new Map();
+  rows.forEach((r) => { const k = r.family_slug + "|" + r.carrier_family; const p = pairs.get(k) || { lives: 0, net: false, likely: false, heat: false }; p.lives = Math.max(p.lives, Number(r.schedule_a_lives) || 0); if (r.network_printed) p.net = true; if (r.label === "Likely Network") p.likely = true; if (r.heat_live) p.heat = true; pairs.set(k, p); });
+  let lv = 0, lvNet = 0, nNet = 0, nLikely = 0; const peos = new Set(), peosNet = new Set(), heatNets = new Set();
+  pairs.forEach((p, k) => { lv += p.lives; peos.add(k.split("|")[0]); if (p.net) { lvNet += p.lives; nNet++; peosNet.add(k.split("|")[0]); } if (p.likely) nLikely++; });
+  rows.forEach((r) => { if (r.heat_live && r.scored_network) heatNets.add(r.scored_network); });
+  const pct = lv ? Math.round((100 * lvNet) / lv) : 0;
+  const tiles = [
+    ["PEOs on the table", fmtN(peos.size), `${fmtN(peosNet.size)} with at least one network named`, null],
+    ["PEO × carrier pairs", fmtN(pairs.size), `${fmtN(nNet)} with the network named (${fmtN(nLikely)} Likely)`, null],
+    ["people covered by a named network", pct + "%", `${fmtN(lvNet)} of ${fmtN(lv)} people on these filings`, pct >= 80 ? "good" : null],
+    ["networks with a live strength map", fmtN(heatNets.size), [...heatNets].join(", ") || "building", heatNets.size ? "good" : null],
+  ];
+  $("#pnTiles").innerHTML = tiles.map(([k, v, dd, tone]) => `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="d">${esc(dd)}</div></div>`).join("");
+  const show = rows.filter((r) => !pnOnly || r.network_printed);
+  $("#pnCount").textContent = `${show.length} rows`;
+  let lastPeo = null, lastCar = null;
+  $("#tblPeoNet tbody").innerHTML = show.map((r) => {
+    const newPeo = r.family_slug !== lastPeo, newCar = newPeo || r.carrier_family !== lastCar; lastPeo = r.family_slug; lastCar = r.carrier_family;
+    const sw = `<span class="sw" style="background:${PN_HEX[r.carrier_family] || "#e0913a"}"></span>`;
+    const lab = r.label ? `<span class="chip ${r.label === "Likely Network" ? "ok" : "warn"}">${r.label === "Likely Network" ? "Likely" : "Inferred"}</span>${r.stale ? ' <span class="mut">(pre-2024 document)</span>' : ""}` : "";
+    const net = r.network_printed ? `${esc(r.network_printed)}${r.region && !/^national$/i.test(r.region) ? ` <span class="mut">(${esc(r.region)})</span>` : ""}${r.scored_network && r.scored_network !== r.network_printed ? `<div class="mut">carrier file: ${esc(r.scored_network)}${r.network_tier ? " · " + esc(r.network_tier) : ""}</div>` : ""}` : '<span class="mut">not identified yet — research queued</span>';
+    const src = r.source_url ? `${esc(r.plan_year_text || "")} · <a href="${esc(r.source_url)}" target="_blank" rel="noopener">${esc(String(r.evidence_type || "").replace(/_/g, " "))}</a>${r.vault_path ? ' <span class="mut">· vaulted</span>' : ""}` : "";
+    const st = r.heat_live ? '<span class="chip ok">live</span>' : r.scored_network ? '<span class="chip warn">building</span>' : r.network_printed ? '<span class="mut">carrier file not in pipeline yet</span>' : "";
+    return `<tr class="${newPeo ? "grp" : ""}"><td class="peo">${newPeo ? esc(r.peo) : ""}</td><td>${newCar ? sw + esc(r.carrier) : ""}</td><td class="num">${newCar ? fmtN(r.schedule_a_lives) + (r.share_pct != null ? ` <span class="mut">${r.share_pct}%</span>` : "") : ""}</td><td>${net}</td><td>${lab}</td><td>${src}</td><td>${st}</td></tr>`;
+  }).join("") || `<tr><td colspan="7">no rows yet</td></tr>`;
+}
+
 function renderAll(d) {
   renderScorecard(d);
   renderCarrierSupervisor(d);
+  renderPeoNetworks(d);
   renderDecisions(d);
   renderStrip(d);
   renderPlays(d);
