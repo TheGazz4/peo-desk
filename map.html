@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.61 (2026-09-23, owner: "the state outlines but the quick card isn't appearing"): full screen now enlarges the whole
+            page (Google's button enlarged only the tiles, hiding pins + Quick Card); the card is committed before the outline.
      v3.59 (2026-09-23, owner): click open map inside a state (not a pin) -> the Quick Card shows that state's PEO stats
             (same math/filters as This view, live) and the state gets a thin outline. Click again / water / x / Esc clears.
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
@@ -419,7 +421,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.60 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.61 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -842,6 +844,7 @@ window.initMap=function(){
   mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
   mapDiv.addEventListener('click',onClick);
   initStateClick();   // v3.59 state Quick Card
+  try{ initFullscreen(); }catch(_){}   // v3.61 full screen keeps pins + Quick Card
   mapDiv.addEventListener('mousedown',onDrawDown,true);
   mapDiv.addEventListener('mouseup',onDrawUp,true);
   window.addEventListener('resize',scheduleDraw);
@@ -1887,11 +1890,38 @@ function initStateClick(){
       stLoadGeo().then(function(){
         var f=stAt(lng,lat);
         if(!f||(STG.sel&&STG.sel.st===f.st)){ if(STG.sel) stClear(); return; }
-        STG.sel=f; stOutline(f); stRender();
+        STG.sel=f;
+        try{ stRender(); }catch(e){ try{ console.error('[stcard]',e); }catch(_){} stFallback(f); }   // v3.61: never an outline without its card
+        stOutline(f);
       }).catch(function(){});
     },280);
   });
   S.map.addListener('dblclick',function(){ if(STG.t){ clearTimeout(STG.t); STG.t=null; } });
+}
+function stFallback(f){
+  var c=$('card'), nm=STATE_NAMES[f.st]||f.st; c.dataset.kind='state';
+  c.innerHTML='<div class="hd"><span class="stsw"></span><div><b>'+esc(nm)+'</b><div style="font-size:11.5px;color:var(--muted)">State view</div></div>'+
+    '<button class="x" id="stcard-x">×</button></div><div class="bd"><div class="note" style="margin-top:0">The totals for '+esc(nm)+' could not be counted just now. Refresh the map and click the state again.</div></div>';
+  c.style.display='block'; $('stcard-x').onclick=function(){ stClear(); };
+}
+// v3.61 FULL SCREEN FIX: Google's own full-screen button enlarges ONLY the map tiles (#map), so the pin
+// layer, HQ logos, filters and the Quick Card all vanish while the state outline (drawn inside the map)
+// stays - exactly "the state outlines but the Quick Card isn't appearing". Our button full-screens the
+// whole page instead, so everything comes along. Browsers without the Fullscreen API keep Google's button.
+function initFullscreen(){
+  var root=document.documentElement;
+  if(!(document.fullscreenEnabled||document.webkitFullscreenEnabled)) return;
+  S.map.setOptions({fullscreenControl:false});
+  var b=document.createElement('button'); b.id='fs-btn'; b.type='button';
+  b.style.cssText='width:40px;height:40px;margin:10px;border:0;border-radius:2px;background:#fff;box-shadow:rgba(0,0,0,.3) 0 1px 4px -1px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';
+  function isFs(){ return !!(document.fullscreenElement||document.webkitFullscreenElement); }
+  function paint(){ var on=isFs(); b.title=on?'Exit full screen':'Full screen (keeps pins, filters and the Quick Card)';
+    b.innerHTML=on?'<svg width="18" height="18" viewBox="0 0 18 18"><path d="M6 1v5H1M12 1v5h5M6 17v-5H1M12 17v-5h5" fill="none" stroke="#666" stroke-width="2"/></svg>'
+                  :'<svg width="18" height="18" viewBox="0 0 18 18"><path d="M1 6V1h5M17 6V1h-5M1 12v5h5M17 12v5h-5" fill="none" stroke="#666" stroke-width="2"/></svg>'; }
+  b.onclick=function(){ try{ if(isFs()) (document.exitFullscreen||document.webkitExitFullscreen).call(document);
+    else (root.requestFullscreen||root.webkitRequestFullscreen).call(root); }catch(_){} };
+  ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev){ document.addEventListener(ev,function(){ paint(); try{ kickMap(); }catch(_){} scheduleDraw(); }); });
+  paint(); S.map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(b);
 }
 function stClear(keepCard){
   var had=!!STG.sel; STG.sel=null; stOutline(null);
