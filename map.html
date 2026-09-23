@@ -379,6 +379,9 @@ body.panel-drag{cursor:col-resize;user-select:none}
 #netcanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
 #netsec .netsub{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:9px 0 5px}
 .netchips{display:flex;flex-wrap:wrap;gap:5px}
+.svcn{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.svcpv{margin-left:4px;padding:1px 7px;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.04em;background:rgba(155,79,208,.22);color:#d9b8f5;vertical-align:1px}
+.svctipq{cursor:help}.svctipq i{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;margin-left:4px;border-radius:50%;font-style:normal;font-size:9px;font-weight:700;border:1px solid var(--muted,#8a90a0);color:var(--muted,#8a90a0);vertical-align:1px;text-transform:none}
 .netchip{font-size:11.5px;padding:3px 8px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:5px}
 .netchip.on{border-color:var(--accent);color:var(--ink);background:rgba(99,144,238,.14)}
 .netchip i,.netsw{display:inline-block;width:9px;height:9px;border-radius:2px}
@@ -409,7 +412,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.57 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.58 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -431,6 +434,8 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <h2 style="margin-top:10px" title="How confident we are in the PEO shown on each pin. Cross-verified = independently confirmed.">Confidence</h2>
         <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
+        <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Relationship" data-tip="What kind of service each client gets from the company on its pin.&#10;&#10;Click a chip to hide or show it. All on shows every pin.">Relationship <i>?</i></span> <span class="svcpv">Preview</span></h2>
+        <div class="netchips" id="svc-chips"></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
           <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO user departures">Both</button><button id="hist-2" title="Former PEO user departures only — current pins hidden">Former only</button></div>
@@ -506,7 +511,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'brand', placement:'address', msOnly:false, minSrc:0, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
+  grain:'brand', placement:'address', msOnly:false, minSrc:0, svcOff:{}, panelOpen:true, hqLogos:true, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -714,7 +719,8 @@ function commitDetail(st,r){
   d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
             hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null,
             osc:fOk?r.osc:null, os:fOk?r.os:null, z5:zOk?r.z5:null,
-            hg:gOk?r.hg:null, ws:sOk?r.ws:null, ld:(r.ld&&r.ld.length===n)?r.ld:null, ec:(r.ec&&r.ec.length===n)?r.ec:null};
+            hg:gOk?r.hg:null, ws:sOk?r.ws:null, ld:(r.ld&&r.ld.length===n)?r.ld:null, ec:(r.ec&&r.ec.length===n)?r.ec:null, sv:(r.sv&&r.sv.length===n)?r.sv:null};
+  try{ renderSvcChips(); }catch(_){}
   d.lat0=null; d.lng0=null;
 }
 function loadDetail(st,retried){
@@ -959,6 +965,7 @@ function draw(){
       if(!vis2[IDX2[i2]]) continue;
       if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
       if(S.minSrc && d2.detail && d2.detail.cs && d2.detail.cs[i2]<S.minSrc) continue;
+      if(!svcOk(d2.detail,i2)) continue;
       if(!heatOk(d2,i2)) continue;
       if(!brandOk(d2,i2)) continue;
       var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
@@ -1213,6 +1220,7 @@ function terrResults(){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
+      if(!svcOk(d.detail,i)) continue;
       if(!heatOk(d,i)) continue;
       if(!brandOk(d,i)) continue;
       if(t.area){ if(!inArea(t.area, st, d, i)) continue; }
@@ -1265,6 +1273,7 @@ function resetAll(){
   S.heat=[true,true,true,true];
   S.lens='peo'; try{ syncLensButtons(); renderLensLegend(); }catch(_){}
   S.minSrc=0; try{ syncSrcButtons(); }catch(_){}
+  S.svcOff={}; try{ renderSvcChips(); }catch(_){}
   S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
   S.placement='address'; try{ syncPlacementButtons(); }catch(_){}
   setHistMode(0);
@@ -1307,6 +1316,7 @@ function onMove(e){
               renLine+='WC renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+ww+')</span><br>'; }
       else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
       renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
+      if(d.detail.sv){ var svq=d.detail.sv[h.i]; renLine+='Relationship: '+(svq?'<b>'+SVC[svq].name+'</b>':'<span class="mut">unconfirmed</span>')+' <span class="mut">('+SVC[svq].card+')</span><br>'; }   // v3.58
       if(d.detail.ld&&d.detail.ld[h.i]){ renLine+='<span style="color:#ff7b72">! address disputed — a public listing puts this exact company name in another state</span><br>'; }   // v3.39
       if(d.detail.ec){ var EC=['not testable — no roster covers this company yet','UNCONFIRMED — not on any PEO roster that covers this name','likely — a name variant is on a public PEO roster','confirmed on a public PEO roster','confirmed by a second source'];
         var ecc=['#71808b','#d03b3b','#fab219','#43a566','#43a566'][d.detail.ec[h.i]]||'#71808b';
@@ -1528,6 +1538,39 @@ function setMinSrc(v){
   bump(); scheduleDraw(); updateStats(); writeUrl();
 }
 $('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ setMinSrc(1) }; $('src-2').onclick=function(){ setMinSrc(2) };
+// v3.58 PREVIEW Relationship filter (owner 2026-09-23: "a toggle that said PEO or HRO/ASO", plus HR Only and Payroll Only).
+// Each pin carries sv (1266 client_service_bucket): what service THIS client gets from the company on its pin.
+// Vendor = public.vendor_service_model (falls back to entity_class). A vendor selling both PEO and ASO counts the client as
+// PEO only on filing-grade co-employment evidence; otherwise Unconfirmed. All chips on = the map exactly as before.
+var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares the employer role with the client and runs payroll, benefits and HR under its own plans.'},
+  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer.'},
+  3:{name:'HR Only',card:'HR help, no payroll',tip:'HR help without payroll: HR consulting, benefits administration or a PEO/benefits broker.'},
+  4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software.'},
+  5:{name:'Staffing / other',card:'not an HR vendor for this client',tip:'Not an HR vendor for this client: staffing agencies, insurers and employer-of-record payrolling.'},
+  0:{name:'Unconfirmed',card:'company sells PEO and HR outsourcing; not yet confirmed which',tip:'The company sells both PEO and HR outsourcing (or is not classified yet), and we have not confirmed which one this client uses.'}};
+var SVC_ORDER=['1','2','3','4','5','0'];
+function svcOk(dd,i){ if(!dd||!dd.sv) return true; return !S.svcOff[dd.sv[i]]; }
+function renderSvcChips(){
+  var box=$('svc-chips'); if(!box) return;
+  var cnt={0:0,1:0,2:0,3:0,4:0,5:0}, have=false;
+  Object.keys(S.pinData||{}).forEach(function(st){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.sv) return; have=true; for(var i=0;i<dd.sv.length;i++) cnt[dd.sv[i]]=(cnt[dd.sv[i]]||0)+1; });
+  box.innerHTML=SVC_ORDER.map(function(k){ return '<span class="netchip'+(S.svcOff[k]?'':' on')+'" data-sv="'+k+'" data-tip-t="'+SVC[k].name+'" data-tip="'+SVC[k].tip+'">'+SVC[k].name+(have?' <span class="svcn">'+cnt[k].toLocaleString()+'</span>':'')+'</span>'; }).join('');
+  svcTipBind(box);
+}
+$('svc-chips').addEventListener('click',function(e){ var el=e.target.closest?e.target.closest('[data-sv]'):null; if(!el) return; var k=el.dataset.sv; S.svcOff[k]=!S.svcOff[k]; if(!S.svcOff[k]) delete S.svcOff[k];
+  renderSvcChips(); bump(); scheduleDraw(); updateStats(); writeUrl(); });
+// same sleek hover as the network panel (#nettip), for the Relationship chips and its ? mark
+function svcTipBind(root){
+  var tip=document.getElementById('nettip'); if(!tip){ tip=document.createElement('div'); tip.id='nettip'; tip.setAttribute('role','tooltip'); document.body.appendChild(tip); }
+  [].forEach.call(root.querySelectorAll('[data-tip]'),function(el){ if(el._svt) return; el._svt=1;
+    function show(){ tip.innerHTML='<b>'+esc(el.dataset.tipT||'')+'<span class="pv">Preview</span></b>'+esc(el.dataset.tip||''); tip.classList.add('on');
+      var r=el.getBoundingClientRect(), tw=tip.offsetWidth, th=tip.offsetHeight, x=Math.max(8,Math.min(innerWidth-tw-8,r.left+r.width/2-tw/2)), y=r.bottom+8; if(y+th>innerHeight-8) y=r.top-th-8; tip.style.left=x+'px'; tip.style.top=y+'px'; }
+    function hide(){ tip.classList.remove('on'); }
+    el.addEventListener('mouseenter',show); el.addEventListener('mouseleave',hide); el.addEventListener('focus',show); el.addEventListener('blur',hide);
+    el.addEventListener('touchstart',function(){ show(); setTimeout(hide,2800); },{passive:true}); });
+}
+(function(){ var h=document.querySelector('.svctipq'); if(h&&h.parentNode) svcTipBind(h.parentNode); })();
+renderSvcChips();
 // ---- panel collapse (desktop hide / mobile drawer) ----
 function isMobile(){ return window.matchMedia('(max-width:760px)').matches; }
 function applyPanel(){
@@ -1674,6 +1717,7 @@ function buildUrl(){
     if(!S.hqLogos) p.set('hl','0');
     if(S.msOnly) p.set('ms','1');
     if(S.minSrc) p.set('src',String(S.minSrc));
+    var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }); if(svo.length) p.set('svoff',svo.join(','));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.hist) p.set('hist', S.histOnly?'2':'1');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
@@ -1692,6 +1736,7 @@ function readUrl(){
     if(p.get('hl')==='0'){ S.hqLogos=false; $('hqlogo-on').checked=false; }
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
+    if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-5]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
     if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
@@ -1725,6 +1770,7 @@ function computeViewLegend(){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
+      if(!svcOk(d.detail,i)) continue;
       if(!heatOk(d,i)) continue;
       if(!brandOk(d,i)) continue;
       if(MX[i]<x1||MX[i]>x2||MY[i]<y1||MY[i]>y2) continue;
@@ -1915,6 +1961,7 @@ function tblSelect(){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && dd && !dd.ms[i]) continue;
       if(S.minSrc && dd && dd.cs && dd.cs[i]<S.minSrc) continue;
+      if(!svcOk(dd,i)) continue;
       if(!heatOk(d,i)) continue;
       if(!brandOk(d,i)) continue;
       if(S.terr&&S.terr.area){ if(!inArea(S.terr.area, st, d, i)) continue; }
@@ -2084,6 +2131,7 @@ function tblPaintInner(){
   if(S.terr) bits.push(S.terr.area?('in '+S.terr.area.label):'inside the circle');
   if(renLens()) bits.push('renewal heat on');
   if(S.minSrc) bits.push(S.minSrc>=2?'cross-verified only':'verified only');
+  var svh=SVC_ORDER.filter(function(k){ return S.svcOff[k]; }); if(svh.length) bits.push('hiding '+svh.map(function(k){ return SVC[k].name; }).join(', '));
   if(S.msOnly) bits.push('multi-state only');
   if(S.hist) bits.push('current users only (former records are on the map, not here)');
   $('tbl-what').textContent='· '+bits.join(' · ')+' · ignores pan and zoom';
