@@ -133,6 +133,9 @@
   #tblPeoNet tr.grp td { border-top: 1px solid var(--baseline); }
   #tblPeoNet .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
   #tblPeoNet .mut { color: var(--ink-muted); font-size: 12px; }
+  #tblPeoHealth .mut, #tblDataCal .mut { color: var(--ink-muted); font-size: 12px; }
+  #tblDataCal tr.grp td { border-top: 1px solid var(--baseline); padding-top: 10px; }
+  .pn-bar select { font: inherit; font-size: 12px; }
   .pn-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; font-size: 12px; color: var(--ink-2); }
   .delta-up { color: var(--good); font-weight: 650; }
   .delta-dn { color: var(--serious); }
@@ -257,11 +260,23 @@
   </section>
 
   <section class="wide" id="peoNet">
-    <h2>PEO health networks <small>— which PEO uses which carrier, and which network</small></h2>
-    <p class="blurb">Each PEO's carriers come from its newest federal health filing (Form 5500 Schedule A, 2024 or later). The network is named by the PEO's or carrier's own plan documents (benefits guides, SBCs), saved in the evidence vault and checked against the carrier's monthly federal network file. <b>Likely</b> = named in a current document; <b>Inferred</b> = older, third-party or a two-step match. Rows with a live strength map can be turned on in the Coverage Map under Network strength.</p>
+    <h2>PEO health networks <small>— every PEO, every carrier, every network, sorted National / Regional / Local</small></h2>
+    <p class="blurb">Each PEO's carriers come from its newest federal health filing (Form 5500 Schedule A, 2024 or later). The network is named by the PEO's or carrier's own plan documents (benefits guides, SBCs), saved in the evidence vault and checked against the carrier's monthly federal network file. <b>Likely</b> = named in a current document; <b>Inferred</b> = older, third-party, plan type only, or a two-step match. <b>Tier</b>: National = 40+ states, Regional = 3–39, Local = 1–2 (Blue plans count as Local in their home state and reach other states through BlueCard). A tier marked <i>measured</i> comes from the carrier's own network file; otherwise it is documented, and <i>re-cite</i> means the source page was general and needs a service-area page. Research repeats by itself 60 days before each PEO's renewal, and at once when a new filing lands.</p>
     <div class="sc-tiles" id="pnTiles"></div>
-    <div class="pn-bar"><label><input type="checkbox" id="pnOnlyNet"> only rows with a network</label><span id="pnCount"></span><a href="map.html" style="margin-left:auto">Open the Coverage Map →</a></div>
-    <table id="tblPeoNet"><thead><tr><th>PEO</th><th>carrier</th><th class="num">people on plan</th><th>network</th><th>label</th><th>plan year · source</th><th>strength map</th></tr></thead><tbody></tbody></table>
+    <h3 style="margin:14px 0 6px;font-size:13px">Every PEO profile</h3>
+    <table id="tblPeoHealth"><thead><tr><th>status</th><th class="num">PEOs</th><th class="num">all carriers named</th><th class="num">some named</th><th class="num">people on plans</th><th class="num">people on a named network</th><th>largest</th></tr></thead><tbody></tbody></table>
+    <div class="pn-bar" style="margin-top:12px"><label><input type="checkbox" id="pnOnlyNet"> only rows with a network</label>
+      <label>status <select id="pnStatus"><option value="">all</option><option>network named</option><option>plan type only</option><option>older or third-party source only</option><option>researched - not public</option><option>not researched yet</option><option>not a medical carrier</option></select></label>
+      <label>tier <select id="pnTier"><option value="">all</option><option>National</option><option>Regional</option><option>Local</option></select></label>
+      <span id="pnCount"></span><a href="map.html" style="margin-left:auto">Open the Coverage Map →</a></div>
+    <table id="tblPeoNet"><thead><tr><th>PEO</th><th>carrier</th><th class="num">people on plan</th><th>network</th><th>tier</th><th>label</th><th>pair status</th><th>plan year · source</th><th>next check</th><th>strength map</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="wide" id="dataCal">
+    <h2>Health data calendar <small>— when each PEO's new data is due, and when it arrived</small></h2>
+    <p class="blurb">Checked every hour. <b>Form 5500</b> (carriers and people covered) is due the last day of the 7th month after the plan year ends, or the 15th day of the 10th month with an extension (<a href="https://www.irs.gov/retirement-plans/form-5500-corner" target="_blank" rel="noopener">IRS</a>); every DOL dataset file is under an hourly change check, so a new filing is picked up the hour DOL publishes it. <b>SBCs</b> must go out at least 30 days before an auto-renewing plan year (<a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-147/section-147.200" target="_blank" rel="noopener">45 CFR 147.200</a>), so network research runs 60 days before renewal. <b>Carrier network files</b> refresh monthly and are checked daily. <b>Form M-1</b> (MEWAs) is due March 1 (<a href="https://www.askebsa.dol.gov/mewa/" target="_blank" rel="noopener">DOL</a>) — dated here, not yet loaded.</p>
+    <div class="sc-tiles" id="dcTiles"></div>
+    <table id="tblDataCal"><thead><tr><th>when</th><th>PEO</th><th>what</th><th>detail</th><th class="num">people</th><th>renewal</th><th>5500 due</th><th>extended due</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section>
@@ -373,7 +388,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -929,36 +944,73 @@ function renderCarrierSupervisor(d) {
 
 const PN_HEX = { aetna: "#9b4fd0", uhc: "#2f7fe0", elevance: "#2fb36b", kaiser: "#16a3c9", cigna: "#e0b43a", bcbs_other: "#e05a7a", bcbsm: "#e05a7a", hcsc: "#e05a7a", hmsa: "#e05a7a", point32: "#8d6e63", medica: "#7cb342" };
 let pnOnly = localStorage.getItem("desk_pn_only") === "1";
-document.addEventListener("change", (e) => { if (e.target && e.target.id === "pnOnlyNet") { pnOnly = e.target.checked; localStorage.setItem("desk_pn_only", pnOnly ? "1" : "0"); if (latest) renderPeoNetworks(latest); } });
+let pnStatus = "", pnTier = "";
+document.addEventListener("change", (e) => {
+  if (!e.target) return;
+  if (e.target.id === "pnOnlyNet") { pnOnly = e.target.checked; localStorage.setItem("desk_pn_only", pnOnly ? "1" : "0"); }
+  else if (e.target.id === "pnStatus") pnStatus = e.target.value;
+  else if (e.target.id === "pnTier") pnTier = e.target.value;
+  else return;
+  if (latest) renderPeoNetworks(latest);
+});
 function renderPeoNetworks(d) {
   const rows = d.desk_peo_networks?.rows || [];
   const cb = $("#pnOnlyNet"); if (cb) cb.checked = pnOnly;
   const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
   const pairs = new Map();
-  rows.forEach((r) => { const k = r.family_slug + "|" + r.carrier_family; const p = pairs.get(k) || { lives: 0, net: false, likely: false, heat: false }; p.lives = Math.max(p.lives, Number(r.schedule_a_lives) || 0); if (r.network_printed) p.net = true; if (r.label === "Likely Network") p.likely = true; if (r.heat_live) p.heat = true; pairs.set(k, p); });
-  let lv = 0, lvNet = 0, nNet = 0, nLikely = 0; const peos = new Set(), peosNet = new Set(), heatNets = new Set();
-  pairs.forEach((p, k) => { lv += p.lives; peos.add(k.split("|")[0]); if (p.net) { lvNet += p.lives; nNet++; peosNet.add(k.split("|")[0]); } if (p.likely) nLikely++; });
-  rows.forEach((r) => { if (r.heat_live && r.scored_network) heatNets.add(r.scored_network); });
+  rows.forEach((r) => { const k = r.family_slug + "|" + r.carrier_family; const p = pairs.get(k) || { lives: 0, status: r.pair_status, heat: false }; p.lives = Math.max(p.lives, Number(r.schedule_a_lives) || 0); if (r.heat_live) p.heat = true; pairs.set(k, p); });
+  let lv = 0, lvNet = 0, nNamed = 0; const peos = new Set(), heatNets = new Set(), tierN = { National: 0, Regional: 0, Local: 0 };
+  pairs.forEach((p, k) => { lv += p.lives; peos.add(k.split("|")[0]); if (p.status === "network named") { lvNet += p.lives; nNamed++; } });
+  rows.forEach((r) => { if (r.heat_live && r.scored_network) heatNets.add(r.scored_network); if (r.network_printed && tierN[r.network_tier] != null) tierN[r.network_tier]++; });
   const pct = lv ? Math.round((100 * lvNet) / lv) : 0;
+  const due = rows.map((r) => r.refresh_due_on).filter(Boolean).sort();
+  const nextDue = due.find((x) => x > new Date().toISOString().slice(0, 10)) || due[0];
   const tiles = [
-    ["PEOs on the table", fmtN(peos.size), `${fmtN(peosNet.size)} with at least one network named`, null],
-    ["PEO × carrier pairs", fmtN(pairs.size), `${fmtN(nNet)} with the network named (${fmtN(nLikely)} Likely)`, null],
-    ["people covered by a named network", pct + "%", `${fmtN(lvNet)} of ${fmtN(lv)} people on these filings`, pct >= 80 ? "good" : null],
+    ["PEO × carrier pairs", fmtN(pairs.size), `${fmtN(peos.size)} PEOs · ${fmtN(nNamed)} with the network named`, null],
+    ["people on a named network", pct + "%", `${fmtN(lvNet)} of ${fmtN(lv)} people on these filings`, pct >= 80 ? "good" : null],
+    ["networks by tier", `${tierN.National} · ${tierN.Regional} · ${tierN.Local}`, "National · Regional · Local rows", null],
+    ["next research refresh", nextDue || "—", "60 days before that PEO's renewal", null],
     ["networks with a live strength map", fmtN(heatNets.size), [...heatNets].join(", ") || "building", heatNets.size ? "good" : null],
   ];
   $("#pnTiles").innerHTML = tiles.map(([k, v, dd, tone]) => `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="d">${esc(dd)}</div></div>`).join("");
-  const show = rows.filter((r) => !pnOnly || r.network_printed);
+  const hs = d.desk_peo_health_status?.rows || [];
+  const tb = $("#tblPeoHealth tbody");
+  if (tb) tb.innerHTML = hs.map((h) => `<tr><td>${esc(h.health_status)}</td><td class="num">${fmtN(h.peos)}</td><td class="num">${fmtN(h.all_named)}</td><td class="num">${fmtN(h.some_named)}</td><td class="num">${fmtN(h.lives)}</td><td class="num">${fmtN(h.lives_named)}</td><td class="mut">${esc((h.examples || []).join(", "))}</td></tr>`).join("") || `<tr><td colspan="7">no rows yet</td></tr>`;
+  const show = rows.filter((r) => (!pnOnly || r.network_printed) && (!pnStatus || r.pair_status === pnStatus) && (!pnTier || r.network_tier === pnTier));
   $("#pnCount").textContent = `${show.length} rows`;
   let lastPeo = null, lastCar = null;
+  const stChip = (s) => s === "network named" ? "ok" : (s === "plan type only" || s === "older or third-party source only") ? "warn" : "";
   $("#tblPeoNet tbody").innerHTML = show.map((r) => {
     const newPeo = r.family_slug !== lastPeo, newCar = newPeo || r.carrier_family !== lastCar; lastPeo = r.family_slug; lastCar = r.carrier_family;
     const sw = `<span class="sw" style="background:${PN_HEX[r.carrier_family] || "#e0913a"}"></span>`;
-    const lab = r.label ? `<span class="chip ${r.label === "Likely Network" ? "ok" : "warn"}">${r.label === "Likely Network" ? "Likely" : "Inferred"}</span>${r.stale ? ' <span class="mut">(pre-2024 document)</span>' : ""}` : "";
-    const net = r.network_printed ? `${esc(r.network_printed)}${r.region && !/^national$/i.test(r.region) ? ` <span class="mut">(${esc(r.region)})</span>` : ""}${r.scored_network && r.scored_network !== r.network_printed ? `<div class="mut">carrier file: ${esc(r.scored_network)}${r.network_tier ? " · " + esc(r.network_tier) : ""}</div>` : ""}` : '<span class="mut">not identified yet — research queued</span>';
+    const lab = r.label ? `<span class="chip ${r.label === "Likely Network" ? "ok" : "warn"}">${r.label === "Likely Network" ? "Likely" : "Inferred"}</span>${r.stale ? ' <span class="mut">(pre-2024 document)</span>' : ""}${r.name_basis === "plan_type_only" ? ' <span class="mut">(plan type only)</span>' : ""}` : "";
+    const net = r.network_printed ? `${esc(r.network_printed)}${r.region && !/^national$/i.test(r.region) ? ` <span class="mut">(${esc(r.region)})</span>` : ""}${r.scored_network && r.scored_network !== r.network_printed ? `<div class="mut">carrier file: ${esc(r.scored_network)}</div>` : ""}` : `<span class="mut">${esc(r.research_notes ? r.research_notes.slice(0, 140) : "not identified yet — research queued")}</span>`;
+    const tier = r.network_tier ? `<b>${esc(r.network_tier)}</b>${r.tier_source === "measured" ? ' <span class="mut">measured</span>' : r.tier_source === "general_page" ? ' <span class="mut" title="source page is general; needs a service-area citation">re-cite</span>' : ""}${r.tier_basis ? `<div class="mut" title="${esc(r.tier_basis)}">${esc(r.tier_basis.slice(0, 90))}${r.tier_basis.length > 90 ? "…" : ""}</div>` : ""}` : "";
     const src = r.source_url ? `${esc(r.plan_year_text || "")} · <a href="${esc(r.source_url)}" target="_blank" rel="noopener">${esc(String(r.evidence_type || "").replace(/_/g, " "))}</a>${r.vault_path ? ' <span class="mut">· vaulted</span>' : ""}` : "";
+    const nxt = `${r.refresh_due_on ? esc(r.refresh_due_on) : "—"}${r.next_renewal_on ? `<div class="mut">renews ${esc(r.next_renewal_on)}</div>` : ""}`;
     const st = r.heat_live ? '<span class="chip ok">live</span>' : r.scored_network ? '<span class="chip warn">building</span>' : r.network_printed ? '<span class="mut">carrier file not in pipeline yet</span>' : "";
-    return `<tr class="${newPeo ? "grp" : ""}"><td class="peo">${newPeo ? esc(r.peo) : ""}</td><td>${newCar ? sw + esc(r.carrier) : ""}</td><td class="num">${newCar ? fmtN(r.schedule_a_lives) + (r.share_pct != null ? ` <span class="mut">${r.share_pct}%</span>` : "") : ""}</td><td>${net}</td><td>${lab}</td><td>${src}</td><td>${st}</td></tr>`;
-  }).join("") || `<tr><td colspan="7">no rows yet</td></tr>`;
+    const flag = newPeo && r.peo_flag ? `<div class="mut" title="${esc(r.peo_flag)}">⚑ ${esc(r.peo_flag.split(":")[0])}</div>` : "";
+    return `<tr class="${newPeo ? "grp" : ""}"><td class="peo">${newPeo ? esc(r.peo) + flag : ""}</td><td>${newCar ? sw + esc(r.carrier) : ""}</td><td class="num">${newCar ? fmtN(r.schedule_a_lives) + (r.share_pct != null ? ` <span class="mut">${r.share_pct}%</span>` : "") : ""}</td><td>${net}</td><td>${tier}</td><td>${lab}</td><td>${newCar ? `<span class="chip ${stChip(r.pair_status)}">${esc(r.pair_status || "")}</span>` : ""}</td><td>${src}</td><td>${newCar ? nxt : ""}</td><td>${st}</td></tr>`;
+  }).join("") || `<tr><td colspan="10">no rows yet</td></tr>`;
+  renderDataCalendar(d);
+}
+function renderDataCalendar(d) {
+  const rows = d.desk_data_calendar?.rows || [];
+  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
+  const n = (b) => rows.filter((r) => r.bucket === b).length;
+  const in30 = rows.filter((r) => r.bucket === "upcoming" && r.on_date && (new Date(r.on_date) - new Date()) / 864e5 <= 30).length;
+  const tiles = [
+    ["arrived in the last 14 days", fmtN(n("arrived")), "new filings, dataset refreshes, window changes", n("arrived") ? "good" : null],
+    ["due or expected in 30 days", fmtN(in30), `${fmtN(n("upcoming"))} in the next 45 days`, null],
+    ["past extended due date, not in our data", fmtN(n("past due, not in our data")), "watched hourly until DOL publishes it", n("past due, not in our data") ? "warn" : "good"],
+  ];
+  const t = $("#dcTiles"); if (t) t.innerHTML = tiles.map(([k, v, dd, tone]) => `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="d">${esc(dd)}</div></div>`).join("");
+  const tb = $("#tblDataCal tbody"); if (!tb) return;
+  let last = null;
+  tb.innerHTML = rows.map((r) => {
+    const head = r.bucket !== last ? `<tr class="grp"><td colspan="8"><b>${esc(r.bucket)}</b></td></tr>` : ""; last = r.bucket;
+    return head + `<tr><td>${esc(r.on_date || "")}</td><td>${esc(r.peo || "")}</td><td>${esc(r.event || "")}</td><td class="mut">${esc(String(r.detail || "").slice(0, 120))}</td><td class="num">${fmtN(r.lives)}</td><td>${esc(r.next_renewal_on || "")}</td><td>${esc(r.f5500_due_on || "")}</td><td>${esc(r.f5500_ext_due_on || "")}</td></tr>`;
+  }).join("") || `<tr><td colspan="8">nothing due in the next 45 days</td></tr>`;
 }
 
 function renderAll(d) {
