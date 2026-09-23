@@ -403,7 +403,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.50 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.51 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2178,7 +2178,7 @@ var NET_EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-net';
 var CARRIER_HEX={aetna:'#9b4fd0',unitedhealthcare:'#2f7fe0',uhc:'#2f7fe0',oxford:'#2f7fe0',cigna:'#e0b43a',anthem:'#2fb36b',elevance:'#2fb36b',kaiser:'#16a3c9',bcbs:'#e05a7a',bluecross:'#e05a7a',blueshield:'#e05a7a',healthcareservice:'#e05a7a',hmsa:'#e05a7a',humana:'#7cb342',point32:'#8d6e63',harvardpilgrim:'#8d6e63'};   // v3.47: one distinct hue per carrier
 var BAND_NAMES=['Thin','Moderate','Solid','Strong'];
 var BAND_RANGE=['under 35%','35–44%','45–54%','55%+'];
-var N={method:(/[?&]netmethod=v2\b/.test(location.search)?'v2':'now'),cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
+var N={method:((location.search.match(/[?&]netmethod=(v2|dens)\b/)||[])[1]||'now'),cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
        layers:{},pts:{},loading:{},carriersOff:{},hover:null,peo:null,sel:null};
 window.NETSTATE=N;
 var $n=function(id){return document.getElementById(id)};
@@ -2223,7 +2223,7 @@ function buildSection(){
    '<div class="seg" id="netview"><button data-v="off" class="on">Off</button><button data-v="heat">Heat</button><button data-v="pins">Pins</button><button data-v="both">Both</button></div>'+
    '<div id="netbody" style="display:none">'+
      '<div class="netsub" title="PREVIEW ONLY (owner review 2026-09-23). Proposed: colour = share of the area\'s clinicians in network, weighted by where clinicians are; opacity = how many clinicians are nearby. Nothing in the data has changed.">Heat method</div>'+
-     '<div class="seg" id="netmethod"><button data-m="now">Current</button><button data-m="v2">Proposed (preview)</button></div>'+
+     '<div class="seg" id="netmethod"><button data-m="now">Current</button><button data-m="v2" title="Preview: colour = share of the area\'s clinicians in network, weighted by where they practise">Share</button><button data-m="dens" title="Preview: where the network\'s in-network clinicians practise, drawn from each ZIP (not 14 sq mi cells), so it lines up with client pins">Density</button></div>'+
      '<div class="netsub">Carrier</div><div id="netcarriers" class="netchips"></div>'+
      '<div class="netsub" title="Pick a PEO, then one of its networks. A carrier can run several networks and PEOs on the same carrier can ride different ones, so the heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
      '<div class="netsub">Plan reach</div><div class="netchips" id="nettiers">'+
@@ -2236,7 +2236,7 @@ function buildSection(){
   for(var b=3;b>=0;b--){ var sp=document.createElement('span'); sp.className='netchip on'; sp.dataset.b=b; sp.title=BAND_RANGE[b]+' of local doctors/hospitals signed (weighted)'; sp.textContent=BAND_NAMES[b]; bands.appendChild(sp); }
   $n('netview').addEventListener('click',function(e){ var v=e.target&&e.target.dataset.v; if(!v) return; setView(v); });
   var nm=$n('netmethod'); [].forEach.call(nm.children,function(bn){ bn.classList.toggle('on',bn.dataset.m===N.method); });
-  nm.addEventListener('click',function(e){ var m=e.target&&e.target.dataset.m; if(!m) return; N.method=m; [].forEach.call(nm.children,function(bn){ bn.classList.toggle('on',bn.dataset.m===m); }); redraw(); });
+  nm.addEventListener('click',function(e){ var m=e.target&&e.target.dataset.m; if(!m) return; N.method=m; [].forEach.call(nm.children,function(bn){ bn.classList.toggle('on',bn.dataset.m===m); }); ensureData(); redraw(); });
   $n('nettiers').addEventListener('click',function(e){ var t=e.target.dataset&&e.target.dataset.t; if(!t) return; N.tiers[t]=!N.tiers[t]; e.target.classList.toggle('on',N.tiers[t]); renderList(); redraw(); });
   bands.addEventListener('click',function(e){ var b=e.target.dataset&&e.target.dataset.b; if(b==null) return; b=+b; N.bands[b]=!N.bands[b]; e.target.classList.toggle('on',N.bands[b]); redraw(); });
   var cv=document.createElement('canvas'); cv.id='netcanvas'; $n('mapwrap').insertBefore(cv,$n('pincanvas'));
@@ -2324,7 +2324,7 @@ function ensureData(){
     var k=n.network_key;
     if((N.view==='heat'||N.view==='both')&&!N.layers[k]&&!N.loading['h'+k]){ N.loading['h'+k]=1;
       netFetch({mode:'layer',network_key:k}).then(function(L){ prepLayer(L); N.layers[k]=L; renderList(); redraw(); }).catch(function(){}).then(function(){ delete N.loading['h'+k]; }); }
-    if((N.view==='pins'||N.view==='both')&&!N.pts[k]&&!N.loading['p'+k]){ N.loading['p'+k]=1;
+    if((N.view==='pins'||N.view==='both'||(N.method==='dens'&&N.view==='heat'))&&!N.pts[k]&&!N.loading['p'+k]){ N.loading['p'+k]=1;
       netFetch({mode:'points',network_key:k}).then(function(P){ prepPts(P); N.pts[k]=P; redraw(); }).catch(function(){}).then(function(){ delete N.loading['p'+k]; }); }
   });
 }
@@ -2358,13 +2358,56 @@ function drawNet(){
   N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     var col=carrierHex(n.carrier), rp=ramp(col);
-    if(heat&&N.layers[n.network_key]) drawHeat(N.layers[n.network_key],rp,W,H,z,scale,cx,cy,col);
+    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]) drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy); }
+    else if(heat&&N.layers[n.network_key]) drawHeat(N.layers[n.network_key],rp,W,H,z,scale,cx,cy,col);
   });
   if(pins) N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     if(N.pts[n.network_key]) drawPins(N.pts[n.network_key],ramp(carrierHex(n.carrier)),W,H,z,scale,cx,cy,n);
   });
   legend();
+}
+// PREVIEW 'dens' (owner review 2026-09-23, not yet approved): network DENSITY drawn at client-pin precision.
+// Every ZIP's in-network clinician count is dropped at that ZIP's centre (no 14 sq mi cells, no 12-mile catchment), then a
+// kernel that tightens with zoom (~50 mi nationally, ~2-3 km at street zoom) turns it into clinicians per sq km.
+// Colour and opacity both follow log10(in-network clinicians per sq km): 0.003 -> invisible, 30+ -> deepest.
+function drawDensity(P,rp,W,H,z,scale,cx,cy){
+  if(!P||!P.mx) return;
+  var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy))), pxKm=scale/(40075.017*Math.cos(lat));
+  var spx=Math.max(8*Math.pow(2,0.45*(z-4.6)),1.2*pxKm);
+  var G=Math.max(3,Math.min(16,Math.round(spx/5))), sig=spx/G;
+  var pad=Math.ceil(3*sig)+2, ow=Math.ceil(W/G), oh=Math.ceil(H/G), gw=ow+2*pad, gh=oh+2*pad, n=gw*gh;
+  if(!HB.A||HB.A.length<n){ HB.A=new Float32Array(n); HB.B=new Float32Array(n); HB.T=new Float32Array(n); }
+  var A=HB.A; A.fill(0,0,n);
+  var sg=scale/G;
+  for(var j=0;j<P.n;j++){
+    if(P.k[j]===1) continue;
+    var c=+P.nc[j]; if(!(c>0)) continue;
+    var gx=(P.mx[j]-cx)*sg+ow/2+pad, gy=(P.my[j]-cy)*sg+oh/2+pad;
+    if(gx<0||gy<0||gx>=gw-1||gy>=gh-1) continue;
+    var x0=gx|0, y0=gy|0, fx=gx-x0, fy=gy-y0, i=y0*gw+x0;
+    A[i]+=c*(1-fx)*(1-fy); A[i+1]+=c*fx*(1-fy); A[i+gw]+=c*(1-fx)*fy; A[i+gw+1]+=c*fx*fy;
+  }
+  gaussBlur(A,HB.T,gw,gh,sig);
+  if(!off||off.width!==ow||off.height!==oh){ off=off||document.createElement('canvas'); off.width=ow; off.height=oh; octx=off.getContext('2d'); HB.img=null; }
+  if(!HB.img) HB.img=octx.createImageData(ow,oh);
+  var d=HB.img.data, pal=heatPalette(rp), k2=(pxKm/G)*(pxKm/G);   // grid px^2 per km^2
+  for(var y=0;y<oh;y++){
+    var row=(y+pad)*gw+pad, p=y*ow*4;
+    for(var x=0;x<ow;x++,p+=4){
+      var dens=A[row+x]*k2; if(dens<0.003){ d[p+3]=0; continue; }
+      var L10=Math.log(dens)/Math.LN10;
+      var I=Math.round(Math.max(0,Math.min(100,(L10+1.5)*100/3))*2.55)*4;
+      var c2=Math.min(1,Math.max(0,(L10+2.5)/2)), cov=c2*c2*(3-2*c2);
+      d[p]=pal[I]; d[p+1]=pal[I+1]; d[p+2]=pal[I+2]; d[p+3]=Math.round(pal[I+3]*cov);
+    }
+  }
+  octx.putImageData(HB.img,0,0);
+  nctx.save();
+  if(heatClip(W,H,cx,cy,scale)) nctx.clip('evenodd');
+  nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality='high';
+  nctx.drawImage(off,0,0,ow,oh,0,0,ow*G,oh*G);
+  nctx.restore();
 }
 function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
   // v3.46 (owner 2026-09-23: "research how REAL heat maps are drawn ... this is just a series of dots").
@@ -2520,7 +2563,8 @@ function legend(){
   if(!N.cat||N.view==='off'){ lg.style.display='none'; return; }
   var vis=(N.cat.networks||[]).filter(netVisible);
   if(!vis.length){ lg.style.display='none'; return; }
-  var html=N.method==='v2'?'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 proposed method</b><br>Colour = share of the area\'s clinicians in network, weighted by where the clinicians are. Faint = few clinicians nearby. Not yet approved; nothing in the data has changed.</div>':'';
+  var html=N.method==='v2'?'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 Share</b><br>Colour = share of the area\'s clinicians in network, weighted by where the clinicians are. Faint = few clinicians nearby. Not yet approved; nothing in the data has changed.</div>':
+    N.method==='dens'?'<div class="lghover" style="margin-bottom:4px"><b>PREVIEW \u2014 Density</b><br>Where this network\'s in-network clinicians practise, placed by ZIP (same way as client pins without a street address), per sq mi. Deeper = more in-network doctors nearby; the scale bar below reads Few \u2192 Many. Not yet approved; nothing in the data has changed.</div>':'';
   var pp=peoOf(N.peo); if(pp) html+='<div class="netmut" style="margin-bottom:3px">'+esc(pp.peo)+'\'s plan rides:</div>';
   vis.forEach(function(n){
     var rp=ramp(carrierHex(n.carrier));
