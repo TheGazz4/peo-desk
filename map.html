@@ -403,7 +403,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.51 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.52 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2222,8 +2222,8 @@ function buildSection(){
    '<h2 title="Where the carrier network behind each PEO\'s pooled (MEP) health plan is strong. Strength = share of the area\'s doctors and hospitals the network has signed.">Network strength · PEO health plans</h2>'+
    '<div class="seg" id="netview"><button data-v="off" class="on">Off</button><button data-v="heat">Heat</button><button data-v="pins">Pins</button><button data-v="both">Both</button></div>'+
    '<div id="netbody" style="display:none">'+
-     '<div class="netsub" title="PREVIEW ONLY (owner review 2026-09-23). Proposed: colour = share of the area\'s clinicians in network, weighted by where clinicians are; opacity = how many clinicians are nearby. Nothing in the data has changed.">Heat method</div>'+
-     '<div class="seg" id="netmethod"><button data-m="now">Current</button><button data-m="v2" title="Preview: colour = share of the area\'s clinicians in network, weighted by where they practise">Share</button><button data-m="dens" title="Preview: where the network\'s in-network clinicians practise, drawn from each ZIP (not 14 sq mi cells), so it lines up with client pins">Density</button></div>'+
+     '<div class="netsub"><span class="nettipq" tabindex="0" data-tip-t="Heat method" data-tip="How the heat layer is calculated. Current is today&#39;s approved view; Share and Density are previews waiting on your OK.">Heat method <i>?</i></span></div>'+
+     '<div class="seg" id="netmethod"><button data-m="now" data-tip-t="Current" data-tip="Share of the area&#39;s doctors and hospitals in network, blended over about 12 miles. Today&#39;s approved view.">Current</button><button data-m="v2" data-tip-pv="1" data-tip-t="Share" data-tip="Share of the area&#39;s clinicians in network, weighted by where they practise. Cities read true; empty land fades out.">Share</button><button data-m="dens" data-tip-pv="1" data-tip-t="Density" data-tip="Where the network&#39;s in-network clinicians actually practise, placed by ZIP so it lines up with your client pins. Deeper = more doctors nearby.">Density</button></div>'+
      '<div class="netsub">Carrier</div><div id="netcarriers" class="netchips"></div>'+
      '<div class="netsub" title="Pick a PEO, then one of its networks. A carrier can run several networks and PEOs on the same carrier can ride different ones, so the heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
      '<div class="netsub">Plan reach</div><div class="netchips" id="nettiers">'+
@@ -2236,6 +2236,36 @@ function buildSection(){
   for(var b=3;b>=0;b--){ var sp=document.createElement('span'); sp.className='netchip on'; sp.dataset.b=b; sp.title=BAND_RANGE[b]+' of local doctors/hospitals signed (weighted)'; sp.textContent=BAND_NAMES[b]; bands.appendChild(sp); }
   $n('netview').addEventListener('click',function(e){ var v=e.target&&e.target.dataset.v; if(!v) return; setView(v); });
   var nm=$n('netmethod'); [].forEach.call(nm.children,function(bn){ bn.classList.toggle('on',bn.dataset.m===N.method); });
+  // v3.52 (owner 2026-09-23): sleek hover explanations on the Heat method choices (replaces the plain browser title tooltips)
+  (function(){
+    if(!document.getElementById('nettipcss')){ var st=document.createElement('style'); st.id='nettipcss';
+      st.textContent='#nettip{position:fixed;z-index:9999;max-width:250px;padding:9px 12px 10px;border-radius:10px;background:var(--surface,#161923);'+
+        'border:1px solid rgba(155,79,208,.5);box-shadow:0 12px 30px rgba(0,0,0,.5);color:var(--ink2,#cfd3de);font-size:12px;line-height:1.45;'+
+        'pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .14s ease,transform .14s ease}'+
+        '#nettip.on{opacity:1;transform:none}#nettip b{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink,#fff);margin-bottom:3px}'+
+        '#nettip .pv{padding:1px 7px;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(155,79,208,.22);color:#d9b8f5}'+
+        '.nettipq{cursor:help}.nettipq i{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;margin-left:4px;border-radius:50%;'+
+        'font-style:normal;font-size:9px;font-weight:700;border:1px solid var(--muted,#8a90a0);color:var(--muted,#8a90a0);vertical-align:1px}';
+      document.head.appendChild(st); }
+    var tip=document.getElementById('nettip'); if(!tip){ tip=document.createElement('div'); tip.id='nettip'; tip.setAttribute('role','tooltip'); document.body.appendChild(tip); }
+    var tmr=null;
+    function show(el){
+      clearTimeout(tmr);
+      tip.innerHTML='<b>'+esc(el.dataset.tipT||'')+(el.dataset.tipPv?'<span class="pv">Preview</span>':'')+'</b>'+esc(el.dataset.tip||'');
+      tip.classList.add('on');
+      var r=el.getBoundingClientRect(), tw=tip.offsetWidth, th=tip.offsetHeight;
+      var x=Math.max(8,Math.min(window.innerWidth-tw-8,r.left+r.width/2-tw/2)), y=r.bottom+8;
+      if(y+th>window.innerHeight-8) y=r.top-th-8;
+      tip.style.left=x+'px'; tip.style.top=y+'px';
+    }
+    function hide(){ clearTimeout(tmr); tip.classList.remove('on'); }
+    [].forEach.call(sec.querySelectorAll('[data-tip]'),function(el){
+      el.addEventListener('mouseenter',function(){ show(el); }); el.addEventListener('mouseleave',hide);
+      el.addEventListener('focus',function(){ show(el); }); el.addEventListener('blur',hide);
+      el.addEventListener('touchstart',function(){ show(el); tmr=setTimeout(hide,2800); },{passive:true});
+    });
+    var pn=$n('panel'); if(pn) pn.addEventListener('scroll',hide,{passive:true});
+  })();
   nm.addEventListener('click',function(e){ var m=e.target&&e.target.dataset.m; if(!m) return; N.method=m; [].forEach.call(nm.children,function(bn){ bn.classList.toggle('on',bn.dataset.m===m); }); ensureData(); redraw(); });
   $n('nettiers').addEventListener('click',function(e){ var t=e.target.dataset&&e.target.dataset.t; if(!t) return; N.tiers[t]=!N.tiers[t]; e.target.classList.toggle('on',N.tiers[t]); renderList(); redraw(); });
   bands.addEventListener('click',function(e){ var b=e.target.dataset&&e.target.dataset.b; if(b==null) return; b=+b; N.bands[b]=!N.bands[b]; e.target.classList.toggle('on',N.bands[b]); redraw(); });
