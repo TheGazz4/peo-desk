@@ -1565,7 +1565,7 @@ var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares t
   3:{name:'HR Only',card:'HR help, no payroll',tip:'HR help without payroll: HR consulting, benefits administration or a PEO/benefits broker.'},
   4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software.'},
   5:{name:'Staffing / other',card:'not an HR vendor for this client',tip:'Not an HR vendor for this client: staffing agencies, insurers and employer-of-record payrolling.'},
-  0:{name:'Unconfirmed',card:'company sells PEO and HR outsourcing; not yet confirmed which',tip:'The company sells both PEO and HR outsourcing (or is not classified yet), and we have not confirmed which one this client uses.'}};
+  0:{name:'Unconfirmed',card:'only a CRM record links it; company also sells payroll or isn\'t classified yet',tip:'Only our CRM record links this client, and the company mainly sells payroll or HR outsourcing (Paychex, CertiPay, Rippling) or is not classified yet, so we cannot tell which service the client uses.'}};
 var SVC_ORDER=['1','2','3','4','5','0'];
 function svcOk(dd,i){ if(!dd||!dd.sv) return true; return !S.svcOff[dd.sv[i]]; }
 function renderSvcChips(){
