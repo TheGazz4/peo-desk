@@ -200,7 +200,10 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .spacer{flex:1}
 #stats{font-size:12px;color:var(--ink2);white-space:nowrap}
 #main{display:flex;flex:1;min-height:0}
-#panel{width:280px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+#panel{width:280px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
+#panel>.sec{flex-shrink:0}  /* v3.49: panel scrolls; sections keep their height so every filter is reachable */
+#panel>.sec:last-child{flex:1 0 auto!important;min-height:300px!important}
+#panel #peo-list{max-height:60vh}
 #panel .sec{padding:10px 12px;border-bottom:1px solid var(--grid)}
 #panel h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px}
 .seg{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
@@ -400,7 +403,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.48 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.49 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
