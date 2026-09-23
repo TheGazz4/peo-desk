@@ -385,6 +385,14 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #netlegend{position:absolute;left:12px;bottom:26px;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 11px;max-width:300px;font-size:12px;color:var(--ink2);display:none;box-shadow:0 6px 24px rgba(0,0,0,.4)}
 #netlegend .lgbar{height:9px;border-radius:5px;margin:5px 0 2px}
 #netlegend .lgscale{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+/* v3.47 PEO-first network picker */
+.netpeo{border-bottom:1px solid var(--grid);padding:2px 0}
+.netpeo.open{padding-bottom:6px}
+.netcar{font-size:12px;color:var(--ink2);margin:6px 0 2px 22px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.netcar b{color:var(--ink);font-weight:600}
+.netind{margin-left:34px}
+.netrow.netind{padding:2px 0}
+.netpend{font-size:11px;color:var(--muted);margin:1px 0 1px 36px}
 #netlegend .lghover{margin-top:6px;padding-top:6px;border-top:1px solid var(--grid);color:var(--ink)}
 </style>
 </head>
@@ -392,7 +400,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.46 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.47 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2164,11 +2172,11 @@ if(!deskKey()){ showGate(false); } else { boot(); }
 (function(){
 'use strict';
 var NET_EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-net';
-var CARRIER_HEX={aetna:'#9b4fd0',unitedhealthcare:'#2f7fe0',cigna:'#16a3c9',anthem:'#2f6fd6',elevance:'#2f6fd6',kaiser:'#3aa0a0',bcbs:'#3b82f6',humana:'#4caf50'};
+var CARRIER_HEX={aetna:'#9b4fd0',unitedhealthcare:'#2f7fe0',uhc:'#2f7fe0',oxford:'#2f7fe0',cigna:'#e0b43a',anthem:'#2fb36b',elevance:'#2fb36b',kaiser:'#16a3c9',bcbs:'#e05a7a',bluecross:'#e05a7a',blueshield:'#e05a7a',healthcareservice:'#e05a7a',hmsa:'#e05a7a',humana:'#7cb342',point32:'#8d6e63',harvardpilgrim:'#8d6e63'};   // v3.47: one distinct hue per carrier
 var BAND_NAMES=['Thin','Moderate','Solid','Strong'];
 var BAND_RANGE=['under 35%','35–44%','45–54%','55%+'];
 var N={cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
-       layers:{},pts:{},loading:{},carriersOff:{},hover:null};
+       layers:{},pts:{},loading:{},carriersOff:{},hover:null,peo:null,sel:null};
 window.NETSTATE=N;
 var $n=function(id){return document.getElementById(id)};
 
@@ -2212,7 +2220,7 @@ function buildSection(){
    '<div class="seg" id="netview"><button data-v="off" class="on">Off</button><button data-v="heat">Heat</button><button data-v="pins">Pins</button><button data-v="both">Both</button></div>'+
    '<div id="netbody" style="display:none">'+
      '<div class="netsub">Carrier</div><div id="netcarriers" class="netchips"></div>'+
-     '<div class="netsub">Network · PEO plan</div><div id="netlist"></div>'+
+     '<div class="netsub" title="Pick a PEO, then one of its networks. A carrier can run several networks and PEOs on the same carrier can ride different ones, so the heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
      '<div class="netsub">Plan reach</div><div class="netchips" id="nettiers">'+
        '<span class="netchip on" data-t="national">National</span><span class="netchip on" data-t="regional">Regional</span><span class="netchip on" data-t="local">Local</span></div>'+
      '<div class="netsub">Strength</div><div class="netchips" id="netbands"></div>'+
@@ -2236,36 +2244,69 @@ function setView(v){
 }
 function loadCatalog(){
   netFetch({mode:'catalog'}).then(function(c){
-    N.cat=c; (c.networks||[]).forEach(function(n,i){ if(N.nets[n.network_key]==null) N.nets[n.network_key]=(i===0); });
+    N.cat=c;
+    if(!N.peo){ var first=(c.peos||[]).filter(function(p){ return firstMapped(p.family_slug,c); })[0]; if(first){ N.peo=first.family_slug; N.sel=firstMapped(first.family_slug,c); } }
     renderCarriers(); renderList(); ensureData();
   }).catch(function(e){ if(e.message!=='auth') $n('netlist').innerHTML='<div class="netmut">Network layer unavailable.</div>'; });
 }
+function shortCarrier(c){ return String(c||'').replace(' (other plan)','').replace('Elevance / Anthem','Anthem').replace(/^Blue Cross Blue Shield of /,'BCBS ').replace(/^Blue Cross Blue Shield/,'Blue plans').replace(/^Point32Health.*/,'Harvard Pilgrim').replace(/^HMSA.*/,'HMSA').replace(/^Health Care Service Corp.*/,'BCBS TX/IL/OK/NM/MT'); }
 function renderCarriers(){
   var seen={},box=$n('netcarriers'); box.innerHTML='';
-  (N.cat.networks||[]).forEach(function(n){ if(seen[n.carrier]) return; seen[n.carrier]=1;
-    var sp=document.createElement('span'); sp.className='netchip'+(N.carriersOff[n.carrier]?'':' on');
-    sp.innerHTML='<i style="background:'+carrierHex(n.carrier)+'"></i>'+n.carrier;
-    sp.onclick=function(){ N.carriersOff[n.carrier]=!N.carriersOff[n.carrier]; sp.classList.toggle('on',!N.carriersOff[n.carrier]); renderList(); redraw(); };
-    box.appendChild(sp); });
+  (N.cat.peos||[]).forEach(function(p){ (p.carriers||[]).forEach(function(c){
+    if(!(c.networks||[]).length||seen[c.carrier]) return; seen[c.carrier]=1;
+    var sp=document.createElement('span'); sp.className='netchip'+(N.carriersOff[c.carrier]?'':' on');
+    sp.innerHTML='<i style="background:'+carrierHex(c.carrier)+'"></i>'+esc(shortCarrier(c.carrier));
+    sp.onclick=function(){ N.carriersOff[c.carrier]=!N.carriersOff[c.carrier]; sp.classList.toggle('on',!N.carriersOff[c.carrier]);
+      if(N.peo&&!firstMapped(N.peo)) N.sel=null; else if(N.peo&&N.sel&&!selAllowed()) N.sel=firstMapped(N.peo);
+      renderList(); ensureData(); redraw(); };
+    box.appendChild(sp); }); });
 }
 function fmtDate(d){ if(!d) return '—'; var p=String(d).slice(0,10).split('-'); return MONTHS[+p[1]].slice(0,3)+' '+(+p[2])+', '+p[0]; }
 // one current stamp for the whole network layer: the month of its newest monthly source
 function fmtMonth(){ var m=[].slice.call(arguments).filter(Boolean).map(String).sort().pop(); if(!m) return '—'; var p=m.slice(0,10).split('-'); return MONTHS[+p[1]]+' '+p[0]; }
-function netVisible(n){ return !!N.nets[n.network_key] && N.tiers[n.tier]!==false && !N.carriersOff[n.carrier]; }
+// v3.47 (owner 2026-09-23): PEO-first. A carrier runs several networks and two PEOs on the same carrier can ride
+// different ones, so heat is switched on by picking a PEO and then ONE of its networks (never stacked heat layers).
+function netMeta(k){ return ((N.cat&&N.cat.networks)||[]).filter(function(n){ return n.network_key===k; })[0]||null; }
+function peoOf(slug,cat){ return (((cat||N.cat)||{}).peos||[]).filter(function(p){ return p.family_slug===slug; })[0]||null; }
+function firstMapped(slug,cat){ var p=peoOf(slug,cat); if(!p) return null;
+  for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if(N.carriersOff[c.carrier]) continue;
+    for(var j=0;j<(c.networks||[]).length;j++){ var x=c.networks[j]; if(x.mapped&&x.network_key) return x.network_key; } }
+  return null; }
+function selAllowed(){ var p=peoOf(N.peo); if(!p) return false; return (p.carriers||[]).some(function(c){ return !N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return x.network_key===N.sel&&x.mapped; }); }); }
+function netVisible(n){ return !!N.sel && n.network_key===N.sel && N.tiers[n.tier]!==false; }
 function renderList(){
   var box=$n('netlist'); box.innerHTML='';
-  if(!N.cat||!(N.cat.networks||[]).length){ box.innerHTML='<div class="netmut">No MEP networks scored yet.</div>'; return; }
-  N.cat.networks.forEach(function(n){
-    var dim=N.tiers[n.tier]===false||N.carriersOff[n.carrier];
-    // v3.44.1 (owner): the network surface is the CARRIER's, independent of any PEO — the PEO line only says
-    // which MEPs ride it; the filing that proves it lives in the hover, not in the network's dates.
-    var plans=(n.plans||[]).map(function(p){ return '<div class="netplan" title="Rides this network per its latest federal filing'+(p.filed_on?' (filed '+fmtDate(p.filed_on)+')':'')+'">'+p.peo+(/inferred/i.test(p.label||'')?' <span class="netlbl">Inferred</span>':'')+'</div>'; }).join('');
-    var row=document.createElement('label'); row.className='netrow'+(dim?' dim':'');
-    row.innerHTML='<input type="checkbox" '+(N.nets[n.network_key]?'checked':'')+'>'+
-      '<div class="netmeta"><div><i class="netsw" style="background:'+carrierHex(n.carrier)+'"></i><b>'+n.network_name+'</b> <span class="nettier">'+n.tier+'</span></div>'+plans+
-      '<div class="netmut">'+(n.clinicians||0).toLocaleString()+' clinicians · '+(n.hospitals||0).toLocaleString()+' hospitals · '+n.states_covered+' states covered</div>'+
-      '<div class="netmut" title="Carrier network file '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(n.data_as_of,n.registry_as_of)+' · updates monthly</div>'+'</div>';
-    row.querySelector('input').onchange=function(e){ N.nets[n.network_key]=e.target.checked; ensureData(); redraw(); };
+  var peos=(N.cat&&N.cat.peos)||[];
+  if(!peos.length){ box.innerHTML='<div class="netmut">No PEO plan networks identified yet.</div>'; return; }
+  peos.forEach(function(p){
+    var cars=(p.carriers||[]).filter(function(c){ return !N.carriersOff[c.carrier] && ((c.networks||[]).length || (c.lives||0)>=1000); });
+    if(!cars.some(function(c){ return (c.networks||[]).length; })) return;
+    var open=N.peo===p.family_slug, ready=0;
+    cars.forEach(function(c){ (c.networks||[]).forEach(function(x){ if(x.mapped) ready++; }); });
+    var row=document.createElement('div'); row.className='netpeo'+(open?' open':'');
+    var html='<label class="netrow"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b></div>'+
+      '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+'</div></div></label>';
+    if(open) cars.forEach(function(c){
+      html+='<div class="netcar"><i class="netsw" style="background:'+carrierHex(c.carrier)+'"></i><b>'+esc(shortCarrier(c.carrier))+'</b>'+
+        '<span class="netmut">'+(c.lives||0).toLocaleString()+' people'+(c.share_pct!=null?' · '+c.share_pct+'% of the plan':'')+'</span></div>';
+      if(!(c.networks||[]).length){ html+='<div class="netpend">Network not identified yet (research queued)</div>'; return; }
+      (c.networks||[]).forEach(function(x){
+        var tag=/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':'';
+        var where=x.region&&!/^national$/i.test(x.region)?' <span class="netmut">('+esc(x.region)+')</span>':'';
+        var m=x.mapped?netMeta(x.network_key):null;
+        if(m){ var sel=N.sel===x.network_key, dim=N.tiers[m.tier]===false;
+          html+='<label class="netrow netind'+(dim?' dim':'')+'" title="Named in '+esc(p.peo)+'\'s '+esc(x.plan_year||'')+' plan documents"><input type="radio" name="netsel" value="'+esc(x.network_key)+'" '+(sel?'checked':'')+'>'+
+            '<div class="netmeta"><div>'+esc(m.network_name)+' <span class="nettier">'+esc(m.tier)+'</span>'+tag+where+'</div>'+
+            (sel?'<div class="netmut">'+(m.clinicians||0).toLocaleString()+' clinicians · '+(m.hospitals||0).toLocaleString()+' hospitals · '+m.states_covered+' states covered</div>'+
+              '<div class="netmut" title="Carrier network file '+fmtDate(m.data_as_of)+' · provider registry '+fmtDate(m.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(m.data_as_of,m.registry_as_of)+' · updates monthly</div>'+
+              (N.layers[x.network_key]&&!N.layers[x.network_key].n?'<div class="netmut">Map is being built from the carrier\'s file, check back shortly</div>':''):'')+
+            '</div></label>';
+        } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.network)+tag+where+' · map not built yet</div>';
+      });
+    });
+    row.innerHTML=html;
+    row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.sel=firstMapped(p.family_slug); renderList(); ensureData(); redraw(); };
+    [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){ N.sel=r.value; renderList(); ensureData(); redraw(); }; });
     box.appendChild(row);
   });
 }
@@ -2275,7 +2316,7 @@ function ensureData(){
     if(!netVisible(n)) return;
     var k=n.network_key;
     if((N.view==='heat'||N.view==='both')&&!N.layers[k]&&!N.loading['h'+k]){ N.loading['h'+k]=1;
-      netFetch({mode:'layer',network_key:k}).then(function(L){ prepLayer(L); N.layers[k]=L; redraw(); }).catch(function(){}).then(function(){ delete N.loading['h'+k]; }); }
+      netFetch({mode:'layer',network_key:k}).then(function(L){ prepLayer(L); N.layers[k]=L; renderList(); redraw(); }).catch(function(){}).then(function(){ delete N.loading['h'+k]; }); }
     if((N.view==='pins'||N.view==='both')&&!N.pts[k]&&!N.loading['p'+k]){ N.loading['p'+k]=1;
       netFetch({mode:'points',network_key:k}).then(function(P){ prepPts(P); N.pts[k]=P; redraw(); }).catch(function(){}).then(function(){ delete N.loading['p'+k]; }); }
   });
@@ -2468,6 +2509,7 @@ function legend(){
   var vis=(N.cat.networks||[]).filter(netVisible);
   if(!vis.length){ lg.style.display='none'; return; }
   var html='';
+  var pp=peoOf(N.peo); if(pp) html+='<div class="netmut" style="margin-bottom:3px">'+esc(pp.peo)+'\'s plan rides:</div>';
   vis.forEach(function(n){
     var rp=ramp(carrierHex(n.carrier));
     html+='<div class="lgrow"><b>'+n.network_name+'</b> <span class="nettier">'+n.tier+'</span></div>'+
