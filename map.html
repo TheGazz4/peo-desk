@@ -392,7 +392,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.45 · 2026-09-22</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.46 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2281,11 +2281,11 @@ function ensureData(){
   });
 }
 function prepLayer(L){
-  var n=L.n||0; L.mx=new Float64Array(n); L.my=new Float64Array(n); L.cz=new Float32Array(n);
+  var n=L.n||0; L.mx=new Float64Array(n); L.my=new Float64Array(n); L.cz=new Float32Array(n); L.c2=new Float32Array(n);
   for(var i=0;i<n;i++){
     var la,ln;
     if(L.lat){ la=+L.lat[i]; ln=+L.lng[i]; } else { var c=h3.cellToLatLng(L.h[i]); la=c[0]; ln=c[1]; }
-    L.mx[i]=mercX(ln); L.my[i]=mercY(la); L.cz[i]=0.000185/Math.cos(la*Math.PI/180);
+    L.mx[i]=mercX(ln); L.my[i]=mercY(la); L.cz[i]=0.000185/Math.cos(la*Math.PI/180); var cl=Math.cos(la*Math.PI/180); L.c2[i]=1/(cl*cl);
   }
   L.poly={};
 }
@@ -2319,43 +2319,94 @@ function drawNet(){
   legend();
 }
 function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
-  // v3.44 (owner 2026-09-22: "a real heat map" — one smooth glowing surface, one colour, strongest = deepest).
-  // Kernel-smoothed surface: every cell spreads its strength over a soft round footprint; each screen pixel shows
-  // the WEIGHTED AVERAGE of the cells around it (smooth, no bubbles, no hexagons) and fades out where there is
-  // no network data. The footprint follows the grid, so the surface sharpens as you zoom in.
-  if(typeof h3==='undefined'||!h3.cellToLatLng) return;
-  var res=netRes(z), V=netLevel(L,res), B=N.bands, k=2;
-  var hw=Math.ceil(W/k), hh=Math.ceil(H/k), n=hw*hh;
-  if(!HB.num||HB.num.length!==n){ HB.num=new Float32Array(n); HB.den=new Float32Array(n); } else { HB.num.fill(0); HB.den.fill(0); }
-  var num=HB.num, den=HB.den;
-  for(var j=0;j<V.n;j++){
-    var sc=V.s[j]; if(!B[bandOf(sc)]) continue;
-    var R=Math.max(1.6,Math.min(120,V.cz[j]*scale*1.73/k*1.2)), R2=R*R;   // v3.45: footprint = the cell itself (+20% to close seams) - glow stays where the providers are
-    var x=((V.mx[j]-cx)*scale+W/2)/k, y=((V.my[j]-cy)*scale+H/2)/k;
-    if(x<-R||x>hw+R||y<-R||y>hh+R) continue;
-    var v=ri(sc)/100, wm=0.25+0.75*(V.m[j]/100);
-    var x0=Math.max(0,Math.floor(x-R)), x1=Math.min(hw-1,Math.ceil(x+R)), y0=Math.max(0,Math.floor(y-R)), y1=Math.min(hh-1,Math.ceil(y+R));
-    for(var py=y0;py<=y1;py++){
-      var dy=py-y, row=py*hw;
-      for(var px=x0;px<=x1;px++){
-        var dx=px-x, q=1-(dx*dx+dy*dy)/R2; if(q<=0) continue;
-        var w=q*q*wm; num[row+px]+=w*v; den[row+px]+=w;
-      }
+  // v3.46 (owner 2026-09-23: "research how REAL heat maps are drawn ... this is just a series of dots").
+  // Kernel density estimation - the method behind Mapbox GL, deck.gl, Google Maps and heatmap.js heat maps:
+  //  1. every scored ~14 sq mi cell drops its land area (and area x strength) into an off-screen grid (1/4 screen res or coarser);
+  //  2. the grid is blurred with a Gaussian kernel (3 box passes = Gaussian). The kernel is wider than the gap between
+  //     cells and towns, so they MERGE into one continuous surface. (v3.45's kernel was the cell itself -> each town
+  //     showed as its own dot.) Radius: ~5.5 km on the ground at street zoom, ~11 screen px (~70 mi) at national zoom;
+  //  3. colour = kernel-weighted average strength (deeper purple = more of the area's doctors & hospitals signed);
+  //     opacity = how much of the surrounding land the network serves, so the glow fades out softly at its edges;
+  //  4. the grid is upscaled smoothly and clipped to the US outline: nothing spills into Canada, Mexico or the sea.
+  if(!L.c2) return;
+  var sp=heatSpan(z,cy,scale), G=Math.max(4,Math.min(16,Math.round(sp.px/5))), sig=sp.px/G;   // grid coarsens as the kernel widens (surface is smooth anyway)
+  var pad=Math.ceil(3*sig)+2, ow=Math.ceil(W/G), oh=Math.ceil(H/G), gw=ow+2*pad, gh=oh+2*pad, n=gw*gh;
+  if(!HB.A||HB.A.length<n){ HB.A=new Float32Array(n); HB.B=new Float32Array(n); HB.T=new Float32Array(n); }
+  var A=HB.A, Bv=HB.B, Bd=N.bands; A.fill(0,0,n); Bv.fill(0,0,n);
+  var sg=scale/G, cellG=36.13/(40075.017*40075.017)*sg*sg;   // one res-6 cell's area in grid px (at the equator)
+  for(var j=0;j<L.n;j++){
+    var sc=L.s[j]; if(!Bd[bandOf(sc)]) continue;
+    var gx=(L.mx[j]-cx)*sg+ow/2+pad, gy=(L.my[j]-cy)*sg+oh/2+pad;
+    if(gx<0||gy<0||gx>=gw-1||gy>=gh-1) continue;
+    var w=cellG*L.c2[j], v=w*sc/100, x0=gx|0, y0=gy|0, fx=gx-x0, fy=gy-y0, i=y0*gw+x0;
+    var w00=(1-fx)*(1-fy), w10=fx*(1-fy), w01=(1-fx)*fy, w11=fx*fy;          // bilinear: no pixel snapping
+    A[i]+=w*w00; A[i+1]+=w*w10; A[i+gw]+=w*w01; A[i+gw+1]+=w*w11;
+    Bv[i]+=v*w00; Bv[i+1]+=v*w10; Bv[i+gw]+=v*w01; Bv[i+gw+1]+=v*w11;
+  }
+  gaussBlur(A,HB.T,gw,gh,sig); gaussBlur(Bv,HB.T,gw,gh,sig);
+  if(!off||off.width!==ow||off.height!==oh){ off=off||document.createElement('canvas'); off.width=ow; off.height=oh; octx=off.getContext('2d'); HB.img=null; }
+  if(!HB.img) HB.img=octx.createImageData(ow,oh);
+  var d=HB.img.data, pal=heatPalette(rp);
+  for(var y=0;y<oh;y++){
+    var row=(y+pad)*gw+pad, p=y*ow*4;
+    for(var x=0;x<ow;x++,p+=4){
+      var a=A[row+x]; if(a<0.004){ d[p+3]=0; continue; }
+      var I=Math.round(ri(Bv[row+x]/a*100)*2.55)*4, c=Math.min(1,Math.max(0,(a-0.01)/0.4)), cov=c*c*(3-2*c);
+      d[p]=pal[I]; d[p+1]=pal[I+1]; d[p+2]=pal[I+2]; d[p+3]=Math.round(pal[I+3]*cov);
     }
   }
-  if(!off){ off=document.createElement('canvas'); octx=off.getContext('2d'); }
-  if(off.width!==hw||off.height!==hh){ off.width=hw; off.height=hh; HB.img=null; }
-  if(!HB.img) HB.img=octx.createImageData(hw,hh);
-  var d=HB.img.data, pal=heatPalette(rp);
-  for(var i=0,p=0;i<n;i++,p+=4){
-    var dn=den[i]; if(dn<=0.004){ d[p+3]=0; continue; }
-    var I=Math.min(255,Math.round(num[i]/dn*255))*4, cov=1-Math.exp(-dn*2.2);   // edges fade where data runs out
-    d[p]=pal[I]; d[p+1]=pal[I+1]; d[p+2]=pal[I+2]; d[p+3]=Math.round(pal[I+3]*cov);
-  }
   octx.putImageData(HB.img,0,0);
-  nctx.save(); nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality='high';
-  try{ nctx.filter='blur('+(z<7?0.6:1)+'px)'; }catch(_){}
-  nctx.drawImage(off,0,0,hw,hh,0,0,hw*k,hh*k); nctx.restore();
+  nctx.save();
+  if(heatClip(W,H,cx,cy,scale)) nctx.clip('evenodd');
+  nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality='high';
+  nctx.drawImage(off,0,0,ow,oh,0,0,ow*G,oh*G);
+  nctx.restore();
+}
+// kernel radius for this zoom: never under 5.5 km on the ground (~0.85x the 6.4 km gap between scored cells, so the
+// surface never breaks into dots); at wide zooms it grows in screen px more slowly than the map (Mapbox-style zoom ramp)
+var HEAT_KM=5.5, HEAT_MIN_PX=11;
+function heatSpan(z,cy,scale){
+  var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy))), pxKm=scale/(40075.017*Math.cos(lat));
+  var px=Math.max(HEAT_MIN_PX*Math.pow(2,0.45*(z-4.6)),HEAT_KM*pxKm); return {px:px,km:px/pxKm};
+}
+// Gaussian blur as three box blurs (Kovesi 2010 widths) - separable, cost does not grow with the radius
+function gaussBlur(a,t,w,h,sig){
+  if(sig<0.35) return;
+  var wI=Math.sqrt(12*sig*sig/3+1), wl=Math.floor(wI); if(wl%2===0) wl--; var wu=wl+2;
+  var m=Math.round((12*sig*sig-3*wl*wl-12*wl-9)/(-4*wl-4));
+  for(var k=0;k<3;k++){ var r=((k<m?wl:wu)-1)/2; if(r<1) continue; boxH(a,t,w,h,r); boxV(t,a,w,h,r); }
+}
+var HPS=new Float64Array(1);
+function boxH(s,o,w,h,r){
+  if(HPS.length<w+1) HPS=new Float64Array(Math.max(w,h)+1); var P=HPS, iv=1/(2*r+1);
+  for(var y=0;y<h;y++){ var b=y*w; P[0]=0; for(var x=0;x<w;x++) P[x+1]=P[x]+s[b+x];
+    for(x=0;x<w;x++){ var lo=x-r<0?0:x-r, hi=x+r+1>w?w:x+r+1; o[b+x]=(P[hi]-P[lo])*iv; } }
+}
+function boxV(s,o,w,h,r){
+  if(HPS.length<h+1) HPS=new Float64Array(Math.max(w,h)+1); var P=HPS, iv=1/(2*r+1);
+  for(var x=0;x<w;x++){ P[0]=0; for(var y=0;y<h;y++) P[y+1]=P[y]+s[y*w+x];
+    for(y=0;y<h;y++){ var lo=y-r<0?0:y-r, hi=y+r+1>h?h:y+r+1; o[y*w+x]=(P[hi]-P[lo])*iv; } }
+}
+// US outline (Census cartographic boundary via the us-atlas package) - the heat is clipped to it
+var HM={rings:null,loading:false};
+var NET_MASK={topo:'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js',
+              nation:'https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/nation-10m.json'};
+function heatMask(){
+  if(HM.rings||HM.loading||HM.fail>1) return; HM.loading=true;
+  var p=(typeof topojson==='undefined')?new Promise(function(ok,no){ var s=document.createElement('script'); s.src=NET_MASK.topo; s.onload=ok; s.onerror=no; document.head.appendChild(s); }):Promise.resolve();
+  p.then(function(){ return fetch(NET_MASK.nation).then(function(r){ return r.json(); }); }).then(function(t){
+    var f=topojson.feature(t,t.objects.nation), g=f.features?f.features[0].geometry:f.geometry;
+    var polys=g.type==='Polygon'?[g.coordinates]:g.coordinates, rings=[];
+    polys.forEach(function(poly){ poly.forEach(function(ring){
+      var a=new Float64Array(ring.length*2); for(var i=0;i<ring.length;i++){ a[2*i]=mercX(ring[i][0]); a[2*i+1]=mercY(ring[i][1]); } rings.push(a); }); });
+    HM.rings=rings; redraw();
+  }).catch(function(){ HM.loading=false; HM.fail=(HM.fail||0)+1; });   // no outline: surface still drawn, unclipped
+}
+function heatClip(W,H,cx,cy,scale){
+  if(!HM.rings){ heatMask(); return false; }
+  nctx.beginPath();
+  HM.rings.forEach(function(a){ for(var i=0;i<a.length;i+=2){ var X=(a[i]-cx)*scale+W/2, Y=(a[i+1]-cy)*scale+H/2; if(i) nctx.lineTo(X,Y); else nctx.moveTo(X,Y); } nctx.closePath(); });
+  return true;
 }
 var HB={};
 // strength 0..255 → carrier colour ramp with alpha: thin = barely there, strong = deep, saturated carrier colour
@@ -2423,7 +2474,7 @@ function legend(){
       '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div>'+
       '<div class="lgscale"><span>Thin</span><span>Moderate</span><span>Solid</span><span>Strong</span></div>'+
       '<div class="netmut" title="Carrier network file '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(n.data_as_of,n.registry_as_of)+' · updates monthly</div>';
-    if(N.frame) html+='<div class="netmut">Cell size at this zoom: '+RES_SQMI[netRes(N.frame.z)]+' (zoom in for finer cells)</div>';
+    if(N.frame&&N.view!=='pins') html+='<div class="netmut">Heat blends the ~'+Math.max(1,Math.round(heatSpan(N.frame.z,N.frame.cy,N.frame.scale).km*2*0.621))+' mi around each spot at this zoom (zoom in for street-level detail)</div>';
     if(N.loading['h'+n.network_key]||N.loading['p'+n.network_key]) html+='<div class="netmut">loading…</div>';
   });
   html+='<div class="netmut" style="margin-top:4px">Deeper colour = larger share of the area\'s registered doctors &amp; hospitals in network (Strong = 55%+, Solid 45–54%, Moderate 35–44%, Thin under 35%).</div>';
