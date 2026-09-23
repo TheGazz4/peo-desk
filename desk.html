@@ -228,6 +228,12 @@
     </div>
   </section>
 
+  <section class="wide" id="lineagePanel">
+    <h2>Latest appended records <small>— owner only · newest new information on the book · <a href="lineage.html" id="lnAll">open all 100 →</a></small></h2>
+    <p class="blurb">Records that just received <b>new</b> information (a re-statement of something already on file does not count). Click a name for where it came from and every append since. Refreshes every 5 minutes.</p>
+    <table id="tblLineage"><thead><tr><th>when (AZ)</th><th>record</th><th class="num">new</th><th>what was added</th><th>from</th></tr></thead><tbody><tr><td colspan="5" class="age cold">loading…</td></tr></tbody></table>
+  </section>
+
   <section class="wide" id="carrierSup">
     <h2>Health-carrier supervisor <small>— who carried each client, for exactly which dates</small></h2>
     <p class="blurb">Nightly agent (04:53 UTC, after the carrier layer rebuilds). A client carrier fact is written only for the overlap of the client's dated PEO window and that PEO's dated Schedule A policy term — never guessed, never open-ended. Unmapped carrier names are held back and researched by the AI lane; judgment calls go to the decision desk.</p>
@@ -1111,6 +1117,46 @@ if (DEMO) { poll(); }
 else if (!deskKey) { showOverlay(); }
 else { poll(); }
 setInterval(poll, POLL_MS);
+</script>
+<script>
+/* Latest appended records panel (record lineage, instanceA 2026-09-23). Owner only: dash-ai admits only the desk key or
+   the owner login. Reads record_lineage_recent() on its own 5-minute clock so the 5-second desk poll stays light. */
+(function () {
+  "use strict";
+  var FN = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/dash-ai";
+  var ANONK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+  var tb = document.querySelector("#tblLineage tbody");
+  function e(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function when(ts) { return new Date(ts).toLocaleString("en-US", { timeZone: "America/Phoenix", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+  function go(hash) { try { if (window.parent !== window) { window.parent.location.hash = hash; return true; } } catch (x) {} return false; }
+  document.getElementById("lnAll").addEventListener("click", function (ev) { if (go("#/lineage")) ev.preventDefault(); });
+  tb.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest("a[data-id]"); if (!a) return;
+    if (go("#/lineage?id=" + a.dataset.id)) ev.preventDefault();
+  });
+  function load() {
+    var k = null; try { k = localStorage.getItem("desk_key") || localStorage.getItem("peo_dash_key"); } catch (x) {}
+    if (!k || document.hidden) return;
+    fetch(FN, { method: "POST", headers: { "Content-Type": "application/json", "apikey": ANONK, "Authorization": "Bearer " + ANONK, "x-desk-key": k },
+      body: JSON.stringify({ mode: "sql", sql: "select record_lineage_recent(10, false) as j", label: "desk lineage panel", quiet: true }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        var j = res && res.rows && res.rows[0] && res.rows[0].j;
+        if (!j) throw new Error((res && (res.detail || res.error)) || "no reply");
+        tb.innerHTML = (j.rows || []).map(function (r) {
+          var f = r.fields || [];
+          return "<tr><td>" + e(when(r.last_append_at)) + "</td><td><a href=\"lineage.html#id=" + e(r.company_id) + "\" data-id=\"" + e(r.company_id) + "\">" + e(r.name) + "</a>" +
+            " <span class=\"age cold\">" + e([r.city, r.state].filter(Boolean).join(", ")) + "</span></td><td class=\"num\">" + e(r.new_facts_last) + "</td><td>" +
+            e(f.slice(0, 4).join(", ") + (f.length > 4 ? " +" + (f.length - 4) : "")) + "</td><td>" +
+            e((r.hubs || []).map(function (h) { return h.label.replace(/ data hub$| hub$/i, ""); }).join(", ")) + "</td></tr>";
+        }).join("") || "<tr><td colspan=\"5\" class=\"age cold\">nothing appended yet</td></tr>";
+      })
+      .catch(function (err) { tb.innerHTML = "<tr><td colspan=\"5\" class=\"age cold\">could not load: " + e(err.message) + "</td></tr>"; });
+  }
+  load();
+  setInterval(load, 5 * 60 * 1000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+})();
 </script>
 </body>
 </html>
