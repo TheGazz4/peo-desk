@@ -2192,7 +2192,7 @@ function ramp(hex){
   if(rampCache[hex]) return rampCache[hex];
   var hsl=hexToHsl(hex), out=[];
   for(var s=0;s<=100;s++){
-    var t=s/100, sat=18+72*t, lig=DARK?(46+18*t):(78-40*t), a=0.10+0.80*Math.pow(t,1.25);
+    var t=s/100, sat=15+80*t, lig=DARK?(38+32*t):(82-46*t), a=0.05+0.90*Math.pow(t,1.4);
     out.push('hsla('+hsl[0].toFixed(0)+','+sat.toFixed(0)+'%,'+lig.toFixed(0)+'%,'+a.toFixed(3)+')');
   }
   return rampCache[hex]=out;
