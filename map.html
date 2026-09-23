@@ -409,7 +409,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.55 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.56 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2229,7 +2229,7 @@ function buildSection(){
    '<h2 title="Where the carrier network behind each PEO\'s pooled (MEP) health plan is strong. Strength = share of the area\'s doctors and hospitals the network has signed.">Network strength · PEO health plans</h2>'+
    '<div class="seg" id="netview"><button data-v="off" class="on">Off</button><button data-v="heat">Heat</button><button data-v="pins">Pins</button><button data-v="both">Both</button></div>'+
    '<div id="netbody" style="display:none">'+
-     '<div class="netsub"><span class="nettipq" tabindex="0" data-tip-t="Heat method" data-tip="How the heat layer is calculated. Current is today&#39;s approved view; Share and Density are previews waiting on your OK.">Heat method <i>?</i></span></div>'+
+     '<div class="netsub"><span class="nettipq" tabindex="0" data-tip-t="Heat method" data-tip="Choose how the heat layer is drawn.&#10;&#10;Current: the approved view.&#10;Share: preview, the % of local clinicians in network.&#10;Density: preview, where in-network clinicians practise.&#10;Medicare distance: preview, blends by Medicare&#39;s miles for each county type.&#10;&#10;Previews change nothing until you approve them.">Heat method <i>?</i></span></div>'+
      '<div class="seg" id="netmethod"><button data-m="now" data-tip-t="Current" data-tip="Share of the area&#39;s doctors and hospitals in network, blended over about 12 miles.">Current</button><button data-m="v2" data-tip-pv="1" data-tip-t="Share" data-tip="Share of the area&#39;s clinicians in network, weighted by where they practise.">Share</button><button data-m="dens" data-tip-pv="1" data-tip-t="Density" data-tip="Where the network&#39;s in-network clinicians actually practise, placed by ZIP.">Density</button></div>'+
      '<label class="netcms" id="netcmsrow" data-tip-pv="1" data-tip-t="Medicare distance" data-tip="Blends over Medicare&#39;s primary-care distance for each county type: 5 mi in big cities, 10 in metros, 20 in small towns, 30 rural, 60 frontier. Works with Share and Density."><input type="checkbox" id="netcms"> Medicare distance</label>'+
      '<div class="netsub">Carrier</div><div id="netcarriers" class="netchips"></div>'+
@@ -2247,7 +2247,7 @@ function buildSection(){
   // v3.52 (owner 2026-09-23): sleek hover explanations on the Heat method choices (replaces the plain browser title tooltips)
   (function(){
     if(!document.getElementById('nettipcss')){ var st=document.createElement('style'); st.id='nettipcss';
-      st.textContent='#nettip{position:fixed;z-index:9999;max-width:250px;padding:9px 12px 10px;border-radius:10px;background:var(--surface,#161923);'+
+      st.textContent='#nettip{position:fixed;z-index:9999;max-width:270px;white-space:pre-line;padding:9px 12px 10px;border-radius:10px;background:var(--surface,#161923);'+
         'border:1px solid rgba(155,79,208,.5);box-shadow:0 12px 30px rgba(0,0,0,.5);color:var(--ink2,#cfd3de);font-size:12px;line-height:1.45;'+
         'pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .14s ease,transform .14s ease}'+
         '#nettip.on{opacity:1;transform:none}#nettip b{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink,#fff);margin-bottom:3px}'+
