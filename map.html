@@ -1563,18 +1563,21 @@ $('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ se
 // Each pin carries sv (1266 client_service_bucket): what service THIS client gets from the company on its pin.
 // Vendor = public.vendor_service_model (falls back to entity_class). A vendor selling both PEO and ASO counts the client as
 // PEO only on filing-grade co-employment evidence; otherwise Unconfirmed. All chips on = the map exactly as before.
-var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares the employer role with the client and runs payroll, benefits and HR under its own plans.'},
-  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer.'},
+var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares the employer role with the client and runs payroll, benefits and HR under its own plans. Also shows clients of companies that offer both PEO and ASO.'},
+  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer. Also shows clients of companies that offer both PEO and ASO.'},
+  6:{name:'PEO & ASO',card:'company offers both PEO and ASO',tip:'Clients of companies confirmed to offer both PEO and ASO/HRO (TriNet, Insperity, Justworks, Vensure and others). They also show under PEO and under HRO/ASO.'},
   3:{name:'HR Only',card:'HR help, no payroll',tip:'HR help without payroll: HR consulting, benefits administration or a PEO/benefits broker.'},
   4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software.'},
   5:{name:'Staffing / other',card:'not an HR vendor for this client',tip:'Not an HR vendor for this client: staffing agencies, insurers and employer-of-record payrolling.'},
   0:{name:'Unconfirmed',card:'only a CRM record links it; company also sells payroll or isn\'t classified yet',tip:'Only our CRM record links this client, and the company mainly sells payroll or HR outsourcing (Paychex, CertiPay, Rippling) or is not classified yet, so we cannot tell which service the client uses.'}};
-var SVC_ORDER=['1','2','3','4','5','0'];
-function svcOk(dd,i){ if(!dd||!dd.sv) return true; return !S.svcOff[dd.sv[i]]; }
+var SVC_ORDER=['1','2','6','3','4','5','0'];
+// 1269: a PEO & ASO pin (6) shows when PEO, HRO/ASO or PEO & ASO is on
+function svcOk(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) return !(S.svcOff[6]&&S.svcOff[1]&&S.svcOff[2]); return !S.svcOff[v]; }
 function renderSvcChips(){
   var box=$('svc-chips'); if(!box) return;
-  var cnt={0:0,1:0,2:0,3:0,4:0,5:0}, have=false;
+  var cnt={0:0,1:0,2:0,3:0,4:0,5:0,6:0}, have=false;
   Object.keys(S.pinData||{}).forEach(function(st){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.sv) return; have=true; for(var i=0;i<dd.sv.length;i++) cnt[dd.sv[i]]=(cnt[dd.sv[i]]||0)+1; });
+  cnt[1]+=cnt[6]; cnt[2]+=cnt[6];   // PEO and HRO/ASO counts include the PEO & ASO pins they also show
   box.innerHTML=SVC_ORDER.map(function(k){ return '<span class="netchip'+(S.svcOff[k]?'':' on')+'" data-sv="'+k+'" data-tip-t="'+SVC[k].name+'" data-tip="'+SVC[k].tip+'">'+SVC[k].name+(have?' <span class="svcn">'+cnt[k].toLocaleString()+'</span>':'')+'</span>'; }).join('');
   svcTipBind(box);
 }
@@ -1757,7 +1760,7 @@ function readUrl(){
     if(p.get('hl')==='0'){ S.hqLogos=false; $('hqlogo-on').checked=false; }
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
-    if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-5]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
+    if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
     if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
