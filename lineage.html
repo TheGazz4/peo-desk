@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEO Engine — Record Lineage</title>
+<!--
+  RECORD LINEAGE surface v1.0 (Instance A, 2026-09-23). OWNER ONLY. Mounted by the platform shell (index.html) as
+  route #/lineage (deep link: #/lineage?id=<company uuid>).
+  Owner request (Gazz 2026-09-23): drill into any record and see where it originated, how and where it was appended,
+  by which sources, and how it evolved to what we call "current" today; plus the 100 most recently appended records.
+  Brain: the Mesh (brain_knowledge mesh/record_lineage_law).
+  Data: dash-ai mode 'sql' (read-only; admits only the desk key or the owner login) calling
+    record_lineage_recent(int, boolean) — latest appended records
+    record_lineage(uuid)                — one record: origin, story, field evolution, timeline, sources, live writes, held back
+    client_lifecycle_search(text, int)  — finder (search term travels base64 so no word in a name trips the SQL guard)
+  Sources ARE named here by owner design. This page must never be linked from a customer surface.
+  Publish door: desk_assets('lineage.html') -> desk_asset_commit('lineage.html', ...)
+-->
+<style>
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19; --surface-2: #232321;
+    --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --accent: #3987e5; --accent-soft: rgba(57,135,229,0.14);
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    --new: #3987e5; --changed: #fab219; --confirmed: #898781;
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --page: #f9f9f7; --surface-1: #fcfcfb; --surface-2: #f1f0ec;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #75746f;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --accent-soft: rgba(42,120,214,0.10);
+    --new: #2a78d6; --changed: #b7800b; --confirmed: #75746f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--page); color: var(--ink-1); font: 14px/1.55 var(--sans); }
+  a { color: var(--accent); }
+  .hidden { display: none !important; }
+  button { font: inherit; }
+
+  header { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--border);
+    padding: 10px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  header h1 { font-size: 13px; margin: 0; letter-spacing: .08em; white-space: nowrap; color: var(--ink-2); }
+  .owner { font: 500 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--warning);
+    border: 1px solid var(--warning); border-radius: 3px; padding: 3px 5px; }
+  .finder { position: relative; flex: 1 1 260px; max-width: 520px; }
+  .finder input { width: 100%; font: inherit; font-size: 13px; color: var(--ink-1); background: var(--surface-1);
+    border: 1px solid var(--baseline); border-radius: 8px; padding: 7px 10px; }
+  #results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface-1);
+    border: 1px solid var(--baseline); border-radius: 8px; max-height: 360px; overflow: auto; z-index: 8; }
+  #results button { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--grid);
+    color: var(--ink-1); padding: 8px 10px; font-size: 13px; cursor: pointer; }
+  #results button:hover, #results button:focus-visible { background: var(--accent-soft); outline: none; }
+  #results .sub { color: var(--ink-muted); font-size: 12px; }
+  #status { font-size: 12px; color: var(--ink-muted); }
+  #status.err { color: var(--critical); }
+
+  main { max-width: 1120px; margin: 0 auto; padding: 8px 16px 60px; }
+  .empty { color: var(--ink-muted); padding: 60px 0; text-align: center; }
+  .eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-muted); }
+
+  /* ---------- list view ---------- */
+  .lhead { padding: 20px 0 12px; display: grid; gap: 6px; }
+  .lhead h2 { font: 700 clamp(22px, 3.4vw, 30px)/1.15 var(--serif); margin: 0; }
+  .lhead p { margin: 0; color: var(--ink-2); max-width: 78ch; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 6px 0 12px; font-size: 13px; color: var(--ink-2); }
+  .bar input[type=search] { font: inherit; font-size: 13px; color: var(--ink-1); background: var(--surface-1); border: 1px solid var(--baseline);
+    border-radius: 8px; padding: 6px 10px; flex: 1 1 200px; max-width: 320px; }
+  .btn { background: var(--surface-1); color: var(--ink-1); border: 1px solid var(--baseline); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  .btn:hover { background: var(--surface-2); }
+  .chipsel { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chipsel button { background: var(--surface-1); color: var(--ink-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+  .chipsel button[aria-pressed=true] { background: var(--accent-soft); color: var(--ink-1); border-color: var(--accent); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 4px 0 16px; }
+  .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
+  .kpi .v { font: 600 22px/1.1 var(--sans); font-variant-numeric: tabular-nums; }
+  .kpi .k { font-size: 12px; color: var(--ink-muted); }
+  ol.recs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .rec { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; width: 100%; text-align: left; cursor: pointer;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; color: var(--ink-1); }
+  .rec:hover, .rec:focus-visible { border-color: var(--accent); outline: none; background: var(--accent-soft); }
+  .rec .nm { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .rec .loc { color: var(--ink-muted); font-weight: 400; font-size: 13px; }
+  .rec .when { text-align: right; font: 12px var(--mono); color: var(--ink-2); white-space: nowrap; }
+  .rec .when small { display: block; color: var(--ink-muted); }
+  .rec .what { grid-column: 1 / -1; font-size: 13px; color: var(--ink-2); }
+  .rec .what b { color: var(--new); font-weight: 600; }
+  .rec .how { grid-column: 1 / -1; font-size: 12px; color: var(--ink-muted); }
+  .newdot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+  .peo { font: 500 11px/1 var(--sans); padding: 3px 7px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border); }
+  .kindtag { font: 500 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 3px 5px; border-radius: 3px; border: 1px solid var(--border); color: var(--ink-muted); }
+  @media (max-width: 560px) { .rec { grid-template-columns: 1fr; } .rec .when { text-align: left; } }
+
+  /* ---------- record view ---------- */
+  .back { display: inline-block; margin: 14px 0 0; font-size: 13px; color: var(--ink-2); text-decoration: none; cursor: pointer; background: none; border: 0; padding: 0; }
+  .back:hover { color: var(--ink-1); }
+  .id { padding: 12px 0 14px; display: grid; gap: 8px; }
+  .id h2 { font: 700 clamp(24px, 4vw, 36px)/1.1 var(--serif); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .idline { color: var(--ink-2); font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+  .mono { font-family: var(--mono); font-size: 12px; color: var(--ink-muted); }
+  .story { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: clamp(16px, 3vw, 26px); display: grid; gap: 10px; }
+  .story p { margin: 0; font: 17px/1.6 var(--serif); max-width: 74ch; }
+  .origin { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 12px; }
+  .ocard { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; font-size: 13px; }
+  .ocard .k { font-size: 12px; color: var(--ink-muted); }
+  .ocard .v { font-weight: 500; }
+
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin: 22px 0 14px; }
+  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--ink-2); padding: 7px 10px; cursor: pointer; font-size: 13px; }
+  .tabs button[aria-selected=true] { color: var(--ink-1); border-bottom-color: var(--accent); font-weight: 600; }
+  .tabs .n { font: 11px var(--mono); color: var(--ink-muted); margin-left: 4px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink-muted); margin: 0 0 12px; }
+  .k-first, .k-changed, .k-confirmed { font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 3px 5px; border-radius: 3px; }
+  .k-first { color: var(--new); background: color-mix(in srgb, var(--new) 16%, transparent); }
+  .k-changed { color: var(--changed); background: color-mix(in srgb, var(--changed) 16%, transparent); }
+  .k-confirmed { color: var(--confirmed); background: color-mix(in srgb, var(--confirmed) 14%, transparent); }
+
+  .grp { margin: 18px 0 6px; font: 600 12px var(--sans); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }
+  .fld { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+  .fhead { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .fhead .fl { font-weight: 600; }
+  .fhead .cur { font-size: 13px; color: var(--ink-2); }
+  .fhead .cur b { color: var(--ink-1); font-weight: 600; word-break: break-word; }
+  .fhead .basis { font-size: 12px; color: var(--ink-muted); width: 100%; }
+  ol.chain { list-style: none; margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--grid); display: grid; gap: 8px; }
+  ol.chain li { position: relative; font-size: 13px; }
+  ol.chain li::before { content: ""; position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--new); border: 2px solid var(--surface-1); }
+  ol.chain li.changed::before { background: var(--changed); }
+  ol.chain li .val { font-weight: 600; word-break: break-word; }
+  ol.chain li .meta { color: var(--ink-muted); font-size: 12px; }
+  .iscur { font: 600 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--good); border: 1px solid var(--good); border-radius: 3px; padding: 2px 4px; margin-left: 6px; }
+  details.ev { font-size: 12px; color: var(--ink-muted); }
+  details.ev summary { cursor: pointer; }
+  details.ev code { font: 11px var(--mono); word-break: break-all; }
+
+  .batch { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+  .batch.onlyconf { opacity: .72; }
+  .bhead { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .bhead .t { font: 13px var(--mono); color: var(--ink-2); }
+  .bhead .h { font-weight: 600; }
+  .bhead .p { font-size: 12px; color: var(--ink-muted); width: 100%; }
+  ul.items { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  ul.items li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  ul.items .f { color: var(--ink-2); }
+  ul.items .v { font-weight: 500; word-break: break-word; }
+  ul.items .a { font: 11px var(--mono); color: var(--ink-muted); }
+
+  .srcs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+  .src { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; }
+  .src h4 { margin: 0; font-size: 15px; }
+  .src .nums { display: flex; gap: 14px; font-size: 13px; color: var(--ink-2); }
+  .src .nums b { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+  .src .sub { font-size: 12px; color: var(--ink-muted); }
+
+  .tblwrap { overflow-x: auto; }
+  table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .t th { text-align: left; font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); padding: 0 10px 8px 0; border-bottom: 1px solid var(--baseline); white-space: nowrap; }
+  .t td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  .t td.d { font: 12px var(--mono); color: var(--ink-2); white-space: nowrap; }
+  .gap { color: var(--warning); font-style: italic; }
+  .more { margin: 10px 0; }
+  .note { font-size: 12px; color: var(--ink-muted); margin: 0 0 12px; max-width: 80ch; }
+
+  #overlay { position: fixed; inset: 0; background: var(--page); display: flex; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
+  #overlay .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; width: 360px; max-width: 100%; }
+  #overlay h2 { margin: 0 0 6px; font-size: 15px; }
+  #overlay p { color: var(--ink-2); font-size: 13px; }
+  #overlay input { width: 100%; font: inherit; color: var(--ink-1); background: var(--page); border: 1px solid var(--baseline); border-radius: 8px; padding: 7px 10px; }
+  #overlay button { margin-top: 12px; width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px; font-weight: 600; cursor: pointer; }
+  #overlay .err { color: var(--critical); font-size: 12px; min-height: 16px; margin-top: 8px; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div id="overlay" class="hidden">
+  <div class="card">
+    <h2>Record Lineage</h2>
+    <p>Owner only. Enter your desk access key. It is stored only in this browser and unlocks every desk surface.</p>
+    <input id="keyInput" type="password" placeholder="desk key" autocomplete="off">
+    <div class="err" id="keyErr"></div>
+    <button id="keyGo" type="button">Open</button>
+  </div>
+</div>
+
+<header>
+  <h1>RECORD LINEAGE</h1>
+  <span class="owner" title="Sources are named on this page. Never shown to customers.">owner only</span>
+  <div class="finder">
+    <input id="q" type="search" placeholder="Open any record by name…" autocomplete="off" aria-label="Find a company">
+    <div id="results" class="hidden" role="listbox"></div>
+  </div>
+  <span id="status"></span>
+</header>
+
+<main>
+  <!-- ================= LIST ================= -->
+  <div id="listView">
+    <div class="lhead">
+      <div class="eyebrow">Check-in list</div>
+      <h2>Latest 100 appended records</h2>
+      <p>Records that received <b>new information</b> most recently. A re-statement of something already on file does not count. Tap a record to see where it came from and every append since.</p>
+    </div>
+    <div class="kpis" id="lkpis"></div>
+    <div class="bar">
+      <input id="lfilter" type="search" placeholder="Filter by name, state, field or source…" aria-label="Filter the list">
+      <button class="btn" id="lrefresh" type="button">Refresh</button>
+      <label><input type="checkbox" id="lnew"> include brand-new records</label>
+      <span id="lmeta" class="mono"></span>
+    </div>
+    <div class="chipsel" id="lhubs" aria-label="Filter by source"></div>
+    <ol class="recs" id="lrows" style="margin-top:12px"></ol>
+    <div class="empty hidden" id="lempty">Nothing matches.</div>
+  </div>
+
+  <!-- ================= RECORD ================= -->
+  <div id="recView" class="hidden">
+    <button class="back" id="backBtn" type="button">← Latest appended records</button>
+    <div class="id" id="rid"></div>
+    <article class="story">
+      <div class="eyebrow">How this record got to today</div>
+      <p id="rstory"></p>
+      <div class="origin" id="rorigin"></div>
+    </article>
+    <div class="kpis" id="rkpis" style="margin-top:14px"></div>
+
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="evo" aria-selected="true">Field evolution<span class="n" id="n-evo"></span></button>
+      <button role="tab" data-tab="tl">Append timeline<span class="n" id="n-tl"></span></button>
+      <button role="tab" data-tab="src">Sources<span class="n" id="n-src"></span></button>
+      <button role="tab" data-tab="app">Writes to the live record<span class="n" id="n-app"></span></button>
+      <button role="tab" data-tab="grd">Held back<span class="n" id="n-grd"></span></button>
+    </div>
+
+    <section id="tab-evo">
+      <div class="legend">
+        <span><span class="k-first">first</span> first time the field landed</span>
+        <span><span class="k-changed">changed</span> a source brought a value never seen before</span>
+        <span><span class="k-confirmed">confirmed</span> a source re-stated a value already on file</span>
+        <span><span class="iscur" style="margin:0">current</span> what the record says today</span>
+      </div>
+      <div class="bar">
+        <input id="ffilter" type="search" placeholder="Filter fields…" aria-label="Filter fields">
+        <label><input type="checkbox" id="fchanged"> only fields whose value changed</label>
+      </div>
+      <div id="evo"></div>
+    </section>
+
+    <section id="tab-tl" class="hidden">
+      <p class="note">Every delivery to this record, newest first. One card = one source landing facts at one time.</p>
+      <div class="bar"><label><input type="checkbox" id="tlhide" checked> hide deliveries that only re-confirmed facts</label></div>
+      <div id="tl"></div>
+      <button class="btn more hidden" id="tlmore" type="button">Show more</button>
+    </section>
+
+    <section id="tab-src" class="hidden">
+      <p class="note">Every source that has touched this record, most helpful first. New facts = first-time or changed values; the rest were re-confirmations.</p>
+      <div class="srcs" id="srcs"></div>
+    </section>
+
+    <section id="tab-app" class="hidden">
+      <p class="note">When a fact wins, it is written onto the live record. This is that write log, newest first. “Winner” = the value showing today.</p>
+      <div class="tblwrap"><table class="t" id="app"></table></div>
+    </section>
+
+    <section id="tab-grd" class="hidden">
+      <p class="note">Facts the platform refused or held back from this record, and why (identity guards, healer decisions, federal sources that disagreed).</p>
+      <div class="tblwrap"><table class="t" id="grd"></table></div>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var SB = "https://lzasgflrxxrssjntrfmt.supabase.co";
+  var FN = SB + "/functions/v1/dash-ai";
+  var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+  var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  var AUTO_MS = 5 * 60 * 1000;
+
+  var mem = {};
+  function sget(k) { try { return localStorage.getItem(k); } catch (e) { return mem[k] || null; } }
+  function sset(k, v) { try { localStorage.setItem(k, v); } catch (e) { mem[k] = v; } }
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function norm(s) { return String(s == null ? "" : s).replace(/[^A-Za-z0-9]/g, "").toUpperCase(); }
+
+  var saved = sget("desk_theme");
+  if (saved) document.documentElement.dataset.theme = saved;
+  window.addEventListener("storage", function (e) { if (e.key === "desk_theme" && e.newValue) document.documentElement.dataset.theme = e.newValue; });
+
+  var KEY = sget("desk_key") || sget("peo_dash_key") || "";
+  function setStatus(msg, err) { var s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
+
+  function sql(q, label, ms) {
+    var h = { "Content-Type": "application/json", "apikey": ANON, "Authorization": "Bearer " + ANON };
+    if (KEY) h["x-desk-key"] = KEY;
+    var opts = { method: "POST", headers: h, body: JSON.stringify({ mode: "sql", sql: q, label: label, quiet: true }) };
+    if (window.AbortSignal && AbortSignal.timeout) opts.signal = AbortSignal.timeout(ms || 45000);
+    return fetch(FN, opts).then(function (r) {
+      return r.json().then(function (j) {
+        if (r.status === 401 || r.status === 403) { askKey("That key was not accepted."); throw new Error("unauthorized"); }
+        if (!r.ok || j.error) throw new Error((j && (j.detail || j.error)) || ("HTTP " + r.status));
+        return j;
+      });
+    });
+  }
+  function askKey(msg) { $("overlay").classList.remove("hidden"); $("keyErr").textContent = msg || ""; $("keyInput").focus(); }
+  $("keyGo").onclick = function () {
+    var k = $("keyInput").value.trim();
+    if (!k) { $("keyErr").textContent = "Enter the key."; return; }
+    KEY = k; sset("desk_key", k); sset("peo_dash_key", k);
+    $("overlay").classList.add("hidden");
+    route(true);
+  };
+  $("keyInput").addEventListener("keydown", function (e) { if (e.key === "Enter") $("keyGo").click(); });
+
+  /* ---------- time: Arizona (the owner's clock) ---------- */
+  var AZ = { timeZone: "America/Phoenix" };
+  function fmtWhen(ts) {
+    if (!ts) return "";
+    var d = new Date(ts);
+    return d.toLocaleString("en-US", { timeZone: AZ.timeZone, month: "short", day: "numeric", year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined, hour: "numeric", minute: "2-digit" });
+  }
+  function fmtDay(ts) { if (!ts) return ""; return new Date(ts).toLocaleDateString("en-US", { timeZone: AZ.timeZone, month: "short", day: "numeric", year: "numeric" }); }
+  function fmtAsOf(s) { if (!s) return ""; var a = String(s).split("-"); return new Date(Date.UTC(+a[0], +a[1] - 1, +a[2])).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }); }
+  function ago(ts) {
+    if (!ts) return "";
+    var s = (Date.now() - new Date(ts).getTime()) / 1000;
+    if (s < 90) return "just now";
+    if (s < 5400) return Math.round(s / 60) + " min ago";
+    if (s < 172800) return Math.round(s / 3600) + " hr ago";
+    return Math.round(s / 86400) + " days ago";
+  }
+  function plural(n, w) { return n + " " + w + (n === 1 ? "" : "s"); }
+
+  /* ---------- finder ---------- */
+  var qTimer = null;
+  function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
+  $("q").addEventListener("input", function () {
+    clearTimeout(qTimer);
+    var v = this.value.trim();
+    if (v.length < 3) { $("results").classList.add("hidden"); return; }
+    qTimer = setTimeout(function () { search(v); }, 280);
+  });
+  $("q").addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { var b = $("results").querySelector("button"); if (b) { e.preventDefault(); b.focus(); } }
+    if (e.key === "Escape") $("results").classList.add("hidden");
+  });
+  $("results").addEventListener("keydown", function (e) {
+    var t = e.target; if (t.tagName !== "BUTTON") return;
+    if (e.key === "ArrowDown" && t.nextElementSibling) { e.preventDefault(); t.nextElementSibling.focus(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); (t.previousElementSibling || $("q")).focus(); }
+  });
+  function search(v) {
+    setStatus("Searching…");
+    sql("select * from client_lifecycle_search(convert_from(decode('" + b64(v) + "','base64'),'UTF8'), 20)", "lineage search", 20000)
+      .then(function (j) {
+        var rows = j.rows || [];
+        $("results").innerHTML = rows.length ? rows.map(function (r) {
+          return '<button type="button" role="option" data-id="' + esc(r.company_id) + '">' + esc(r.name) +
+            '<span class="sub"> · ' + esc([r.city, r.state].filter(Boolean).join(", ")) + (r.current_peo ? " · " + esc(r.current_peo) : "") + '</span></button>';
+        }).join("") : '<button type="button" disabled>No match</button>';
+        $("results").classList.remove("hidden");
+        setStatus("");
+      })
+      .catch(function (e) { setStatus("Search failed: " + e.message, true); });
+  }
+  $("results").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-id]"); if (!b) return;
+    $("results").classList.add("hidden"); $("q").value = "";
+    openRecord(b.dataset.id);
+  });
+  document.addEventListener("click", function (e) { if (!e.target.closest(".finder")) $("results").classList.add("hidden"); });
+
+  /* ---------- routing: #id=<uuid> here; #/lineage?id=<uuid> in the shell ---------- */
+  function idFromUrl() {
+    var m = (location.hash || "").match(/id=([0-9a-f-]{36})/i) || (location.search || "").match(/id=([0-9a-f-]{36})/i);
+    return m && UUID.test(m[1]) ? m[1] : null;
+  }
+  function tellShell(id) {
+    try { if (window.parent !== window) window.parent.location.hash = id ? "#/lineage?id=" + id : "#/lineage"; } catch (e) {}
+  }
+  function openRecord(id) {
+    if (!UUID.test(id)) return;
+    tellShell(id);
+    if (idFromUrl() !== id) location.hash = "id=" + id; else loadRecord(id);
+  }
+  function openList() {
+    tellShell(null);
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+    showList();
+  }
+  var currentId = null;
+  function route(force) {
+    var id = idFromUrl();
+    if (id) { if (force || id !== currentId) loadRecord(id); }
+    else showList(force);
+  }
+  window.addEventListener("hashchange", function () { route(false); });
+  $("backBtn").onclick = openList;
+
+  /* ================= LIST ================= */
+  var list = null, listAt = 0, hubFilter = null, listLoading = false;
+  var LAST_SEEN_KEY = "lineage_last_seen";
+  var lastSeen = Number(sget(LAST_SEEN_KEY) || 0);
+
+  function showList(force) {
+    currentId = null;
+    $("recView").classList.add("hidden"); $("listView").classList.remove("hidden");
+    document.title = "PEO Engine — Record Lineage";
+    if (!list || force || Date.now() - listAt > AUTO_MS) loadList(); else renderList();
+  }
+  function loadList() {
+    if (listLoading) return;
+    listLoading = true;
+    setStatus("Loading latest appends…");
+    var inc = $("lnew").checked ? "true" : "false";
+    sql("select record_lineage_recent(100, " + inc + ") as j", "lineage recent", 45000)
+      .then(function (res) {
+        var j = res.rows && res.rows[0] && res.rows[0].j;
+        if (!j) throw new Error("empty reply");
+        var prevSeen = lastSeen;
+        list = j; listAt = Date.now();
+        list._prevSeen = prevSeen;
+        renderList();
+        /* remember this visit so the next one can mark what arrived since */
+        var newest = (j.rows || []).reduce(function (m, r) { return Math.max(m, new Date(r.last_append_at).getTime()); }, 0);
+        if (newest) { lastSeen = newest; sset(LAST_SEEN_KEY, String(newest)); }
+        setStatus("");
+      })
+      .catch(function (e) { setStatus("Could not load: " + e.message, true); })
+      .then(function () { listLoading = false; });
+  }
+  $("lrefresh").onclick = function () { loadList(); };
+  $("lnew").onchange = function () { loadList(); };
+  $("lfilter").addEventListener("input", renderList);
+  setInterval(function () { if (!currentId && !document.hidden && KEY) loadList(); }, AUTO_MS);
+
+  function renderList() {
+    if (!list) return;
+    var rows = list.rows || [];
+    var prevSeen = list._prevSeen || 0;
+    /* KPIs */
+    var hubsCount = {}, facts = 0, sinceVisit = 0;
+    rows.forEach(function (r) {
+      facts += r.new_facts_last || 0;
+      if (prevSeen && new Date(r.last_append_at).getTime() > prevSeen) sinceVisit++;
+      (r.hubs || []).forEach(function (h) { hubsCount[h.label] = (hubsCount[h.label] || 0) + 1; });
+    });
+    var top = Object.keys(hubsCount).sort(function (a, b) { return hubsCount[b] - hubsCount[a]; });
+    var span = rows.length ? (new Date(rows[0].last_append_at) - new Date(rows[rows.length - 1].last_append_at)) / 60000 : 0;
+    $("lkpis").innerHTML =
+      kpi(rows.length, "records in this list") +
+      kpi(facts, "new facts in their latest delivery") +
+      kpi(prevSeen ? sinceVisit : "—", prevSeen ? "arrived since your last check" : "first visit in this browser") +
+      kpi(top.length ? esc(shortHub(top[0])) : "—", "busiest source right now") +
+      kpi(span < 120 ? Math.round(span) + " min" : (span / 60).toFixed(1) + " hr", "time span covered by the list");
+    $("lmeta").textContent = "updated " + fmtWhen(list.generated_at) + " AZ";
+
+    /* source chips */
+    $("lhubs").innerHTML = '<button type="button" data-hub="" aria-pressed="' + (!hubFilter) + '">All sources</button>' +
+      top.map(function (h) { return '<button type="button" data-hub="' + esc(h) + '" aria-pressed="' + (hubFilter === h) + '">' + esc(shortHub(h)) + ' · ' + hubsCount[h] + '</button>'; }).join("");
+
+    var f = norm($("lfilter").value);
+    var shown = rows.filter(function (r) {
+      if (hubFilter && !(r.hubs || []).some(function (h) { return h.label === hubFilter; })) return false;
+      if (!f) return true;
+      var hay = norm([r.name, r.city, r.state, r.current_peo, (r.fields || []).join(" "), (r.hubs || []).map(function (h) { return h.label; }).join(" "), r.path].join(" "));
+      return hay.indexOf(f) >= 0;
+    });
+    $("lempty").classList.toggle("hidden", shown.length > 0);
+    $("lrows").innerHTML = shown.map(function (r) {
+      var isNew = prevSeen && new Date(r.last_append_at).getTime() > prevSeen;
+      var fl = r.fields || [];
+      var fx = fl.slice(0, 5).map(esc).join(", ") + (fl.length > 5 ? " +" + (fl.length - 5) + " more" : "");
+      return '<li><button type="button" class="rec" data-id="' + esc(r.company_id) + '">' +
+        '<span class="nm">' + (isNew ? '<span class="newdot" title="Arrived since your last check"></span>' : '') + esc(r.name) +
+          ' <span class="loc">' + esc([r.city, r.state].filter(Boolean).join(", ")) + '</span>' +
+          (r.current_peo ? '<span class="peo">' + esc(r.current_peo) + '</span>' : '') +
+          (r.kind === "new_record" ? '<span class="kindtag">new record</span>' : '') + '</span>' +
+        '<span class="when">' + esc(fmtWhen(r.last_append_at)) + '<small>' + esc(ago(r.last_append_at)) + '</small></span>' +
+        '<span class="what"><b>+' + esc(r.new_facts_last) + ' new</b> · ' + fx + '</span>' +
+        '<span class="how">from ' + (r.hubs || []).map(function (h) { return esc(shortHub(h.label)); }).join(", ") + (r.path ? ' · ' + esc(r.path) : '') + '</span>' +
+        '</button></li>';
+    }).join("");
+  }
+  function kpi(v, k) { return '<div class="kpi"><span class="v">' + v + '</span><span class="k">' + k + '</span></div>'; }
+  function shortHub(s) { return String(s || "").replace(/ data hub$/i, "").replace(/ hub$/i, "").replace(/\s*\((.*)\)$/, ""); }
+  $("lhubs").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-hub]"); if (!b) return;
+    hubFilter = b.dataset.hub || null; renderList();
+  });
+  $("lrows").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-id]"); if (b) openRecord(b.dataset.id);
+  });
+
+  /* ================= RECORD ================= */
+  var rec = null, loadToken = 0, tlShown = 30;
+  function loadRecord(id, note) {
+    currentId = id; var tok = ++loadToken;
+    $("listView").classList.add("hidden"); $("recView").classList.remove("hidden");
+    $("rid").innerHTML = '<h2 style="color:var(--ink-muted)">Loading…</h2>';
+    $("rstory").textContent = ""; $("rorigin").innerHTML = ""; $("rkpis").innerHTML = "";
+    ["evo", "tl", "srcs", "app", "grd"].forEach(function (k) { $(k).innerHTML = ""; });
+    setStatus("Loading record…");
+    window.scrollTo(0, 0);
+    sql("select record_lineage('" + id + "'::uuid) as j", "lineage record", 45000)
+      .then(function (res) {
+        if (tok !== loadToken) return;
+        var j = res.rows && res.rows[0] && res.rows[0].j;
+        if (j && j.error === "merged" && j.merged_into) { openRecordNoted(j.merged_into, "That record was merged into this one; showing the surviving record."); return; }
+        if (!j || j.error) {
+          $("rid").innerHTML = '<h2>' + esc(j && j.error === "blocked" ? "This record is not shown on the desk." : "Record not found.") + '</h2>';
+          setStatus(""); return;
+        }
+        rec = j; tlShown = 30;
+        renderRecord(note);
+        setStatus("");
+      })
+      .catch(function (e) { if (tok === loadToken) setStatus("Could not load: " + e.message, true); });
+  }
+  function openRecordNoted(id, note) { tellShell(id); history.replaceState(null, "", "#id=" + id); loadRecord(id, note); }
+
+  function renderRecord(note) {
+    var co = rec.company || {}, s = rec.summary || {}, o = rec.origin || {};
+    document.title = "PEO Engine — " + (co.name || "Record Lineage");
+    $("rid").innerHTML =
+      (note ? '<div class="note" style="color:var(--warning)">' + esc(note) + '</div>' : '') +
+      '<h2>' + esc(co.name) + '</h2>' +
+      '<div class="idline">' + esc([co.city, co.state].filter(Boolean).join(", ")) +
+        (co.current_peo ? '<span class="peo">Current PEO: ' + esc(co.current_peo) + '</span>' : '<span class="peo">No current PEO on the record</span>') +
+        (co.ein ? '<span>EIN ' + esc(co.ein) + '</span>' : '<span class="gap">No EIN on file</span>') +
+        '<a href="client.html#id=' + esc(co.id) + '" id="toClient">Client lifecycle →</a></div>' +
+      '<div class="mono">record id ' + esc(co.id) + (co.identity_basis ? ' · matched by ' + esc(co.identity_basis) : '') + '</div>';
+    $("toClient").onclick = function (e) { try { if (window.parent !== window) { e.preventDefault(); window.parent.location.hash = "#/client?id=" + co.id; } } catch (err) {} };
+
+    $("rstory").textContent = rec.story || "";
+    var fb = o.first_batch || {};
+    var oc = [];
+    oc.push(['Born', fmtWhen(o.record_created_at) + ' AZ']);
+    oc.push(['First source', (fb.hub_label || "—") + (fb.path_label ? ' — ' + fb.path_label : '')]);
+    if (o.seed_source_file) oc.push(['Seed file', o.seed_source_file + (o.load_key ? ' · load ' + o.load_key : '')]);
+    var mi = o.merged_in || [];
+    if (mi.length) oc.push(['Merged in', plural(mi.length, "duplicate record") + ': ' + mi.map(function (m) { return (m.match_name || "") + (m.folded_seed ? " (" + m.folded_seed + ")" : "") + " on " + fmtDay(m.at); }).join("; ")]);
+    $("rorigin").innerHTML = oc.map(function (c) { return '<div class="ocard"><span class="k">' + esc(c[0]) + '</span><span class="v">' + esc(c[1]) + '</span></div>'; }).join("");
+
+    $("rkpis").innerHTML =
+      kpi(s.facts || 0, "facts landed in total") +
+      kpi(s.new_facts || 0, "pieces of new information") +
+      kpi(s.changes || 0, "values changed") +
+      kpi(s.confirmations || 0, "re-confirmations") +
+      kpi(s.sources || 0, "sources") +
+      kpi(s.last_new_at ? esc(ago(s.last_new_at)) : "—", "last new information");
+
+    var fields = rec.fields || [], srcs = rec.sources || [], app = rec.applied || [], grd = rec.guards || [];
+    $("n-evo").textContent = fields.length; $("n-tl").textContent = rec.timeline_batches_total || (rec.timeline || []).length;
+    $("n-src").textContent = srcs.length; $("n-app").textContent = app.length; $("n-grd").textContent = grd.length;
+    renderEvo(); renderTl(); renderSrc(); renderApp(); renderGrd();
+  }
+
+  /* ----- tab: field evolution ----- */
+  $("ffilter").addEventListener("input", function () { if (rec) renderEvo(); });
+  $("fchanged").addEventListener("change", function () { if (rec) renderEvo(); });
+  function stepMeta(st) {
+    var bits = ["from " + st.hub_label];
+    bits.push(st.path);
+    bits.push("landed " + fmtWhen(st.landed_at));
+    if (st.as_of) bits.push("as of " + fmtAsOf(st.as_of) + (st.valid_through ? " – " + fmtAsOf(st.valid_through) : ""));
+    return bits.map(esc).join(" · ");
+  }
+  function evidenceBlock(st) {
+    var l = st.letter;
+    return '<details class="ev"><summary>evidence</summary>' +
+      '<div><code>' + esc(st.evidence || "(none)") + '</code></div>' +
+      (l ? '<div>Mesh letter #' + esc(l.id) + (l.from_hub ? ' sent by ' + esc(l.from_hub) : '') + (l.origin_hub && l.origin_hub !== l.from_hub ? ', first found by ' + esc(l.origin_hub) : '') + (l.hop != null ? ', hop ' + esc(l.hop) : '') + (l.kind ? ' (' + esc(l.kind) + ')' : '') + '</div>' : '') +
+      (st.status && st.status !== "active" ? '<div>Status: ' + esc(st.status) + '</div>' : '') +
+      '</details>';
+  }
+  function renderEvo() {
+    var f = norm($("ffilter").value), onlyChanged = $("fchanged").checked;
+    var fields = (rec.fields || []).filter(function (x) {
+      if (onlyChanged && x.distinct_values < 2) return false;
+      return !f || norm(x.label + " " + x.field + " " + x.group).indexOf(f) >= 0;
+    });
+    var html = "", grp = null;
+    fields.forEach(function (x) {
+      if (x.group !== grp) { grp = x.group; html += '<div class="grp">' + esc(grp) + '</div>'; }
+      var curN = norm(x.current_value);
+      var set = x.current_set_by;
+      html += '<div class="fld"><div class="fhead"><span class="fl">' + esc(x.label) + '</span>' +
+        '<span class="cur">today: ' + (x.current_value != null && x.current_value !== "" ? '<b>' + esc(x.current_value) + '</b>' : '<span class="gap">' + (x.current_basis === "live record" ? "blank on the live record" : "nothing on file") + '</span>') + '</span>' +
+        '<span class="basis">' + esc(x.current_basis) + (set ? ' · set by ' + esc(set.source) + (set.at ? ' on ' + esc(fmtWhen(set.at)) : '') : '') +
+          ' · ' + (x.distinct_values === 1 ? "one value seen, never changed" : x.distinct_values + " different values seen") + '</span></div>' +
+        '<ol class="chain">' + (x.steps || []).map(function (st) {
+          var isCur = curN && norm(st.value) === curN;
+          return '<li class="' + esc(st.kind) + '"><span class="k-' + esc(st.kind) + '">' + esc(st.kind) + '</span> <span class="val">' + esc(st.value) + '</span>' +
+            (isCur ? '<span class="iscur">current</span>' : '') +
+            '<div class="meta">' + stepMeta(st) + '</div>' +
+            (st.confirmations ? '<div class="meta">re-confirmed ' + plural(st.confirmations, "time") + ' by ' + esc((st.said_by || []).join(", ")) + ', last ' + esc(fmtWhen(st.last_seen_at)) + '</div>' : '') +
+            evidenceBlock(st) + '</li>';
+        }).join("") + '</ol></div>';
+    });
+    $("evo").innerHTML = html || '<div class="empty">No fields match.</div>';
+  }
+
+  /* ----- tab: timeline ----- */
+  $("tlhide").addEventListener("change", function () { tlShown = 30; renderTl(); });
+  $("tlmore").onclick = function () { tlShown += 30; renderTl(); };
+  function renderTl() {
+    if (!rec) return;
+    var hide = $("tlhide").checked;
+    var all = (rec.timeline || []).filter(function (b) { return !hide || b.new_facts > 0; });
+    var rows = all.slice(0, tlShown);
+    $("tl").innerHTML = rows.map(function (b) {
+      var conf = b.facts - b.new_facts;
+      var via = esc(b.path) + (b.letter_from ? ' · letter sent by ' + esc(b.letter_from) + (b.letter_origin && b.letter_origin !== b.letter_from ? ', first found by ' + esc(b.letter_origin) : '') : '');
+      return '<div class="batch' + (b.new_facts ? '' : ' onlyconf') + '"><div class="bhead"><span class="t">' + esc(fmtWhen(b.at)) + '</span>' +
+        '<span class="h">' + esc(b.hub_label) + '</span><span class="mono">' + (b.new_facts ? b.new_facts + ' new' : '') + (b.new_facts && conf ? ' · ' : '') + (conf ? conf + ' confirmed' : '') + '</span>' +
+        '<span class="p">' + via + '</span></div>' +
+        '<ul class="items">' + (b.items || []).map(function (it) {
+          return '<li><span class="k-' + esc(it.kind) + '">' + esc(it.kind) + '</span><span class="f">' + esc(it.field) + '</span><span class="v">' + esc(it.value) + '</span>' +
+            (it.as_of ? '<span class="a">as of ' + esc(fmtAsOf(it.as_of)) + '</span>' : '') + '</li>';
+        }).join("") + '</ul></div>';
+    }).join("") || '<div class="empty">No deliveries to show.</div>';
+    $("tlmore").classList.toggle("hidden", all.length <= tlShown);
+    if ((rec.timeline_batches_total || 0) > (rec.timeline || []).length && all.length <= tlShown)
+      $("tl").insertAdjacentHTML("beforeend", '<p class="note">Showing the newest ' + (rec.timeline || []).length + ' of ' + rec.timeline_batches_total + ' deliveries. Field evolution above covers every fact.</p>');
+  }
+
+  /* ----- tab: sources ----- */
+  function renderSrc() {
+    $("srcs").innerHTML = (rec.sources || []).map(function (x) {
+      return '<div class="src"><h4>' + esc(x.label) + '</h4>' +
+        '<div class="nums"><span><b>' + x.new_facts + '</b> new</span><span><b>' + x.changes + '</b> changed</span><span><b>' + (x.facts - x.new_facts) + '</b> confirmed</span></div>' +
+        '<div class="sub">First ' + esc(fmtWhen(x.first_at)) + ' · last ' + esc(fmtWhen(x.last_at)) + '</div>' +
+        '<div class="sub">How: ' + esc((x.paths || []).join("; ")) + '</div>' +
+        (x.fields && x.fields.length ? '<div class="sub">Added: ' + esc(x.fields.join(", ")) + '</div>' : '<div class="sub">Only re-confirmed facts already on file.</div>') +
+        '</div>';
+    }).join("") || '<div class="empty">No sources on file.</div>';
+  }
+
+  /* ----- tab: writes to the live record ----- */
+  function renderApp() {
+    var a = rec.applied || [];
+    $("app").innerHTML = a.length ? '<thead><tr><th>When</th><th>Field</th><th>Value written</th><th>By</th><th>As of</th><th>Today</th></tr></thead><tbody>' +
+      a.map(function (r) {
+        return '<tr><td class="d">' + esc(fmtWhen(r.at)) + '</td><td>' + esc(r.field) + '</td><td>' + esc(r.value) + '</td><td>' + esc(r.source) +
+          (r.detail ? '<div class="mono">' + esc(r.detail) + '</div>' : '') + '</td><td class="d">' + esc(fmtAsOf(r.as_of)) + '</td><td>' + (r.is_winner ? '<span class="iscur" style="margin:0">winner</span>' : '') + '</td></tr>';
+      }).join("") + '</tbody>' : '<tbody><tr><td class="gap">No logged writes to the live record for this company. Its live values came in with the original load.</td></tr></tbody>';
+  }
+
+  /* ----- tab: held back ----- */
+  function renderGrd() {
+    var g = rec.guards || [];
+    $("grd").innerHTML = g.length ? '<thead><tr><th>When</th><th>Who</th><th>What</th><th>Why</th></tr></thead><tbody>' +
+      g.map(function (r) { return '<tr><td class="d">' + esc(fmtWhen(r.at)) + '</td><td>' + esc(r.who) + '</td><td>' + esc(String(r.what || "").replace(/_/g, " ")) + '</td><td>' + esc(r.why) + '</td></tr>'; }).join("") +
+      '</tbody>' : '<tbody><tr><td class="note">Nothing was held back from this record.</td></tr></tbody>';
+  }
+
+  /* ----- tabs ----- */
+  $("tabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-tab]"); if (!b) return;
+    Array.prototype.forEach.call($("tabs").querySelectorAll("button"), function (x) { x.setAttribute("aria-selected", String(x === b)); });
+    ["evo", "tl", "src", "app", "grd"].forEach(function (k) { $("tab-" + k).classList.toggle("hidden", k !== b.dataset.tab); });
+  });
+
+  /* boot */
+  if (!KEY) askKey(""); else route(true);
+})();
+</script>
+</body>
+</html>
