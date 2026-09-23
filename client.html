@@ -415,7 +415,8 @@
 
     /* company facts */
     var f = [];
-    f.push(["Employees", co.employees ? "≈" + Number(co.employees).toLocaleString() + (co.employee_band ? '<span class="sub">' + esc(co.employee_band) + '</span>' : '<span class="sub">Estimate</span>') : '<span class="gap">Not on record</span>']);
+    f.push(["Employees", co.employees ? esc(co.employees) + '<span class="sub">' + esc(co.employee_band || "") + '</span>' : '<span class="gap">' + (co.employee_band === "Under review" ? "Under review" : "Counting…") + '</span>']);
+    if (co.linkedin_employee_count) f.push(["LinkedIn Employee Count", esc(co.linkedin_employee_count) + '<span class="sub">As shown on the company’s LinkedIn page</span>']);
     var ind = [];
     if (co.industry_description) ind.push(esc(co.industry_description));
     if (co.naics) ind.push('<span class="sub">NAICS ' + esc(co.naics) + (co.sector ? " · " + esc(co.sector) : "") + '</span>');
