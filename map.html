@@ -2276,7 +2276,11 @@ function ensureData(){
 }
 function prepLayer(L){
   var n=L.n||0; L.mx=new Float64Array(n); L.my=new Float64Array(n); L.cz=new Float32Array(n);
-  for(var i=0;i<n;i++){ L.mx[i]=mercX(+L.lng[i]); L.my[i]=mercY(+L.lat[i]); L.cz[i]=0.000185/Math.cos((+L.lat[i])*Math.PI/180); }
+  for(var i=0;i<n;i++){
+    var la,ln;
+    if(L.lat){ la=+L.lat[i]; ln=+L.lng[i]; } else { var c=h3.cellToLatLng(L.h[i]); la=c[0]; ln=c[1]; }
+    L.mx[i]=mercX(ln); L.my[i]=mercY(la); L.cz[i]=0.000185/Math.cos(la*Math.PI/180);
+  }
   L.poly={};
 }
 function prepPts(P){
