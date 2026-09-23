@@ -124,8 +124,10 @@
     { id:"send",   file:"send.html",   label:"Send Desk",     hint:"outbound gate + lanes",       refresh:true  },
     { id:"review", file:"review.html", label:"Review",        hint:"adjudication queue",          refresh:false },
     { id:"intel",  file:"intel.html",  label:"Industry Intel", hint:"pick a PEO: industry yardsticks + full profile", refresh:false },
-    { id:"client", file:"client.html", label:"Client Lifecycle", hint:"one company: lifecycle story, PEO periods, renewal clock", refresh:false }
+    { id:"client", file:"client.html", label:"Client Lifecycle", hint:"one company: lifecycle story, PEO periods, renewal clock", refresh:false },
+    { id:"lineage", file:"lineage.html", label:"Record Lineage", hint:"owner only: latest 100 appended records; where each record came from and every append since", refresh:false }
   ];
+  var DEEP = { client:1, lineage:1 };   /* routes that take a record id: #/<route>?id=<uuid> */
   var STALE_MS = 5 * 60 * 1000;   /* a refreshable surface hidden this long reloads on return */
 
   var stage   = document.getElementById("stage");
@@ -180,7 +182,7 @@
 
   /* ---------- keep cross-links between surfaces inside the shell ---------- */
   var FILE2ID = { "index.html":"desk", "":"desk", "desk.html":"desk", "map.html":"map",
-                  "ask.html":"ask", "send.html":"send", "review.html":"review", "intel.html":"intel", "client.html":"client" };
+                  "ask.html":"ask", "send.html":"send", "review.html":"review", "intel.html":"intel", "client.html":"client", "lineage.html":"lineage" };
   function wire(f) {
     var d;
     try { d = f.contentDocument; } catch (e) { return; }
@@ -194,7 +196,11 @@
       if (u.origin !== location.origin) return;
       var file = u.pathname.split("/").pop();
       var id = FILE2ID[file];
-      if (id) { e.preventDefault(); location.hash = "#/" + id; }
+      if (id) {
+        e.preventDefault();
+        var m = DEEP[id] ? (u.hash || "").match(/id=([0-9a-f-]{36})/i) : null;
+        location.hash = "#/" + id + (m ? "?id=" + m[1] : "");
+      }
     }, true);
   }
 
@@ -212,7 +218,7 @@
     var f = frames[id];
     if (!f) {
       f = document.createElement("iframe");
-      f.src = r.file + (id === "client" && clientParam() ? "#id=" + clientParam() : "");
+      f.src = r.file + (DEEP[id] && clientParam() ? "#id=" + clientParam() : "");
       f.title = r.label;
       f.setAttribute("allow", "clipboard-write");
       loading.classList.add("show");
@@ -237,7 +243,7 @@
     if (frames[current]) { loading.classList.add("show"); frames[current].contentWindow.location.reload(); }
   };
   document.getElementById("popBtn").onclick = function () {
-    var r = route(current); if (r) window.open(r.file + (current === "client" && clientParam() ? "#id=" + clientParam() : ""), "_blank", "noopener");
+    var r = route(current); if (r) window.open(r.file + (DEEP[current] && clientParam() ? "#id=" + clientParam() : ""), "_blank", "noopener");
   };
 
   /* ---------- keyboard 1..6 ---------- */
@@ -249,7 +255,7 @@
     if (n >= 1 && n <= ROUTES.length) location.hash = "#/" + ROUTES[n - 1].id;
   });
 
-  /* deep link #/client?id=<uuid> (client lifecycle, 2026-09-22) */
+  /* deep link #/client?id=<uuid> (client lifecycle, 2026-09-22) and #/lineage?id=<uuid> (record lineage, 2026-09-23) */
   function clientParam() {
     var m = (location.hash || "").match(/[?&]id=([0-9a-f-]{36})/i);
     return m ? m[1] : null;
@@ -257,8 +263,13 @@
   function fromHash() {
     var h = (location.hash || "").replace(/^#\/?/, "").split("?")[0];
     show(h || ROUTES[0].id);
-    if (h === "client" && clientParam() && frames.client && frames.client.dataset.loaded) {
-      try { var cw = frames.client.contentWindow; if (cw.location.hash !== "#id=" + clientParam()) cw.location.hash = "id=" + clientParam(); } catch (e) {}
+    if (DEEP[h] && frames[h] && frames[h].dataset.loaded) {
+      try {
+        var cw = frames[h].contentWindow, want = clientParam() ? "#id=" + clientParam() : "";
+        if (clientParam() && cw.location.hash !== want) cw.location.hash = "id=" + clientParam();
+        /* the nav tab (no id) takes Record Lineage back to its list */
+        else if (!clientParam() && h === "lineage" && cw.location.hash) cw.location.hash = "";
+      } catch (e) {}
     }
   }
   window.addEventListener("hashchange", fromHash);
