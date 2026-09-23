@@ -1543,6 +1543,9 @@ function tipShow(html,ev){
 function closeTip(){ $('tip').style.display='none'; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}); }
 function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
+// 1215 Employee Count Brain: the card reads the brain's text/level + LinkedIn pass-through from the detail wave (hct/hcl/lie).
+function empOf(p){ try{ var d=S.pinData[p.state], dd=d&&d.detail; if(!dd||!dd.ids) return null; var i=dd.ids.indexOf(String(p.company_id)); if(i<0) return null; return {t:dd.hct?dd.hct[i]:null, l:dd.hcl?dd.hcl[i]:4, li:dd.lie?dd.lie[i]:null}; }catch(e){ return null; } }
+function empCard(p){ var e=empOf(p); if(!e) return '—'; var L=['','Confirmed','Likely','Indicated','Counting…','Under review']; if(e.t) return esc(e.t)+' <span class="mut">'+(L[e.l]||'')+'</span>'; return '<span class="mut">'+(L[e.l]||'—')+'</span>'; }
 // v3.22 SOURCING LAW (owner 2026-09-06): sourcing is proprietary and is NEVER displayed. The page shows a
 // confidence TIER only (cs = internal corroboration count, cx = internal conflict flag) — never source names,
 // never counts of sources, never raw basis strings. basisWord() reduces any basis text to a tier word.
@@ -1606,7 +1609,7 @@ function openCard(p,slug,history){
     '<div class="bd">'+formerBanner+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
     (p.historical?'':(kv('Health renewal',hren)+kv('WC renewal',ren)))+
-    kv('Est. employees',p.headcount_est?Number(p.headcount_est).toLocaleString():'—')+
+    kv('Employees',empCard(p))+(function(){var e=empOf(p);return (e&&e.li)?kv('LinkedIn Employee Count',esc(e.li)):'';})()+
     (p.historical?'':(kv('With PEO since',since)+kv('Operating footprint',fpText(p))))+
     (p.historical?'':kv('Confidence',(function(){
         var n=Number(p.peo_source_count)||0;
@@ -1857,7 +1860,7 @@ var TBL_COLS=[
   {k:'nm', t:'Company'},
   {k:'loc',t:'City, ST ZIP'},
   {k:'peo',t:'PEO'},
-  {k:'hc', t:'Employees (est)'},
+  {k:'hc', t:'Employees'},
   {k:'hrm',t:'Health renewal'},
   {k:'rm', t:'WC renewal'},
   {k:'pcs',t:'With PEO since'},
@@ -2100,7 +2103,7 @@ function tblPaintInner(){
     var city=dd?String(dd.cities[i]||''):'';
     var zip=(dd&&dd.z5)?String(dd.z5[i]||''):'';
     var loc=(city?city+', ':'')+st+(zip?' '+zip:'');
-    var hc=(dd&&dd.hc&&dd.hc[i])?Number(dd.hc[i]).toLocaleString():'<span class="mut">—</span>';
+    var hc=(dd&&dd.hct&&dd.hct[i])?esc(dd.hct[i])+((dd.hcl&&dd.hcl[i]>1)?' <span class="mut">'+(['','','Likely','Indicated'][dd.hcl[i]]||'')+'</span>':''):'<span class="mut">'+((dd&&dd.hcl&&dd.hcl[i]===5)?'Under review':'Counting…')+'</span>';
     var since=(dd&&dd.pcs&&dd.pcs[i])?(esc(String(dd.pcs[i]))+'<span class="tier">'+esc(RMB_LABELS[(dd.pcsb?dd.pcsb[i]:0)]||'unverified')+'</span>'):'<span class="mut">—</span>';
     out.push('<tr data-st="'+esc(st)+'" data-i="'+i+'" data-slug="'+esc(slug)+'" title="Open this company">'+
       '<td class="nm">'+esc(nm)+'</td>'+
