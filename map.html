@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.59 (2026-09-23, owner): click open map inside a state (not a pin) -> the Quick Card shows that state's PEO stats
+            (same math/filters as This view, live) and the state gets a thin outline. Click again / water / x / Esc clears.
      v3.26: owner ruling — ZIP on hover OFF (hover = company · PEO · City, ST). ZIP shows only on the single-company card. The
             hover wave no longer carries zips (0749). Pins stay at the exact address; the address text never leaves the shelf.
      v3.25: owner ruling — shared-address counts are never displayed; the "Shared address" card row is gone (shelf 0746, map-data v2.11.5).
@@ -255,6 +257,9 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #card .kv .k{color:var(--muted)}
 #card .kv .v{color:var(--ink2);text-align:right}
 #card .note{margin-top:8px;padding:7px 9px;border-radius:7px;background:rgba(224,152,92,.12);color:#f0c9a6;font-size:11.5px}
+#card .stsw{width:12px;height:12px;border-radius:3px;border:1.5px solid var(--accent);background:rgba(99,144,238,.10);margin-top:4px;flex:none}
+#card .sthd{margin-top:10px;padding-top:8px;border-top:1px solid var(--grid);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+#card .stmore{font-size:11px;color:var(--muted);margin-top:2px}
 #card .lk{display:block;margin-top:10px;color:var(--accent);font-size:12.5px;text-decoration:none}
 #sharepanel{position:absolute;bottom:24px;right:12px;z-index:35;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:none;max-height:46%;overflow-y:auto}
 #sharepanel .hd{padding:10px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink)}
@@ -412,7 +417,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.58 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.59 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -834,6 +839,7 @@ window.initMap=function(){
   mapDiv.addEventListener('mousemove',onMove);
   mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
   mapDiv.addEventListener('click',onClick);
+  initStateClick();   // v3.59 state Quick Card
   mapDiv.addEventListener('mousedown',onDrawDown,true);
   mapDiv.addEventListener('mouseup',onDrawUp,true);
   window.addEventListener('resize',scheduleDraw);
@@ -1183,7 +1189,7 @@ function onDrawMove(e){
 }
 function onDrawUp(){
   if(!S.drawMode||!S._drawStart) return;
-  S._drawStart=null;
+  S._drawStart=null; S._drawEndAt=Date.now();   // v3.59: the mouseup that ends a circle is not a state click
   S.drawMode=false; $('draw-btn').className='ghost';
   if(S.map) S.map.setOptions({draggable:true});
   $('mapwrap').style.cursor='';
@@ -1264,7 +1270,7 @@ function closeTerr(){ S.terr=null; $('terr').style.display='none'; scheduleDraw(
 // current PEO users only, renewal heat off with all bands on, confidence Any, address placement,
 // no circle, no multi-state-only.
 function resetAll(){
-  closeTerr();
+  closeTerr(); stClear();
   S.drawMode=false; $('draw-btn').className='ghost';
   if(S.map) S.map.setOptions({draggable:true});
   $('mapwrap').style.cursor='';
@@ -1285,6 +1291,7 @@ $('reset-btn').onclick=resetAll;
 document.addEventListener('keydown',function(e){
   if(e.key!=='Escape') return;
   var t=e.target||{}; if(t.tagName==='INPUT'||t.tagName==='TEXTAREA') return;
+  if(STG.sel) stClear();   // v3.59
   if(S.terr||S.drawMode){ S.drawMode=false; $('draw-btn').className='ghost';
     if(S.map) S.map.setOptions({draggable:true}); $('mapwrap').style.cursor=''; closeTerr(); }
 });
@@ -1650,7 +1657,7 @@ function fpText(p){
   return 'not yet established';
 }
 function openCard(p,slug,history){
-  var c=$('card');
+  var c=$('card'); stClear(true); c.dataset.kind='company';   // v3.59: a company card replaces the state card + outline
   // v3.22: basis fields arrive as tier words/classes from map-data v2.10 (never raw source text); basisWord() is the belt-and-braces.
   // 1129: say WHY, not just a tier word — an expired policy is not a current renewal.
   var fpr=fpOf(p.company_id);
@@ -1754,6 +1761,7 @@ $('permalink').onclick=function(){
 var vlTimer=null;
 function scheduleViewLegend(){ if(vlTimer) clearTimeout(vlTimer); vlTimer=setTimeout(computeViewLegend,250); }
 function computeViewLegend(){
+  try{ stRender(); }catch(_){}   // v3.59: the state Quick Card follows every filter, like This view
   if(!S.map||!S.catalog) return;
   var b=S.map.getBounds(); if(!b) return;
   var ne=b.getNorthEast(), sw=b.getSouthWest();
@@ -1810,6 +1818,135 @@ function computeViewLegend(){
     r.onclick=function(){ var sm=selMap(); Object.keys(sm).forEach(function(k2){sm[k2]=false}); sm[t[0]]=true; afterSel(); };
     host.appendChild(r);
   });
+}
+
+// ------------------------- v3.59 STATE QUICK CARD (owner 2026-09-23) -------------------------
+// Click open map inside a state (not a pin, HQ chip or ring) -> the Quick Card (top right) shows that
+// state's PEO stats and the state gets a thin outline. Same math and the same filters as "This view",
+// and it refreshes live with every filter change. Click the same state again, open water, x or Esc to clear.
+// State shapes: Census cartographic boundaries via the us-atlas package (same CDN as the heat mask).
+var ST_FIPS={'01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE','11':'DC','12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA','20':'KS','21':'KY','22':'LA','23':'ME','24':'MD','25':'MA','26':'MI','27':'MN','28':'MS','29':'MO','30':'MT','31':'NE','32':'NV','33':'NH','34':'NJ','35':'NM','36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI','45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA','54':'WV','55':'WI','56':'WY','60':'AS','66':'GU','69':'MP','72':'PR','78':'VI'};
+var STG={feats:null,loading:null,layer:null,sel:null,t:null};
+function stLoadGeo(){
+  if(STG.feats) return Promise.resolve(STG.feats);
+  if(STG.loading) return STG.loading;
+  var p=(typeof topojson==='undefined')?new Promise(function(ok,no){ var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js'; s.onload=ok; s.onerror=no; document.head.appendChild(s); }):Promise.resolve();
+  STG.loading=p.then(function(){ return fetch('https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json').then(function(r){ return r.json(); }); }).then(function(t){
+    var fc=topojson.feature(t,t.objects.states);
+    STG.feats=fc.features.map(function(f){
+      var st=ST_FIPS[String(f.id)]; if(!st||!f.geometry) return null;
+      var polys=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+      var bb=[180,90,-180,-90];
+      polys.forEach(function(pl){ pl[0].forEach(function(c){ if(c[0]<bb[0])bb[0]=c[0]; if(c[1]<bb[1])bb[1]=c[1]; if(c[0]>bb[2])bb[2]=c[0]; if(c[1]>bb[3])bb[3]=c[1]; }); });
+      return {st:st,polys:polys,bb:bb,geom:f.geometry};
+    }).filter(Boolean);
+    return STG.feats;
+  }).catch(function(e){ STG.loading=null; throw e; });
+  return STG.loading;
+}
+function stRingHas(r,x,y){ var inside=false; for(var i=0,j=r.length-1;i<r.length;j=i++){ var xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];
+  if(((yi>y)!==(yj>y)) && (x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+function stAt(lng,lat){
+  var F=STG.feats; if(!F) return null;
+  for(var k=0;k<F.length;k++){ var f=F[k], b=f.bb;
+    if(lng<b[0]||lng>b[2]||lat<b[1]||lat>b[3]) continue;
+    for(var p=0;p<f.polys.length;p++){ var inn=false; f.polys[p].forEach(function(r){ if(stRingHas(r,lng,lat)) inn=!inn; }); if(inn) return f; } }
+  return null;
+}
+function stOutline(f){
+  if(!S.map) return;
+  if(!STG.layer){
+    var col=DARK?'#9db9f4':'#3a68cf';
+    STG.layer=new google.maps.Data({map:S.map});
+    STG.layer.setStyle({clickable:false,strokeColor:col,strokeOpacity:0.9,strokeWeight:1.4,fillColor:col,fillOpacity:0.04,zIndex:1});
+  }
+  var L=STG.layer; L.forEach(function(x){ L.remove(x); });
+  if(f) L.addGeoJson({type:'Feature',geometry:f.geom,properties:{st:f.st}});
+}
+function stHitXY(de){ if(!de) return null; if(de.clientX!=null) return de; var t=(de.changedTouches&&de.changedTouches[0])||(de.touches&&de.touches[0]); return t||null; }
+function initStateClick(){
+  setTimeout(function(){ stLoadGeo().catch(function(){}); },2500);   // warm the shapes so the first click is instant
+  S.map.addListener('click',function(ev){
+    if(S.drawMode||(S._drawEndAt&&Date.now()-S._drawEndAt<450)) return;
+    var xy=stHitXY(ev.domEvent); if(xy&&pick(xy)) return;              // a pin / HQ chip / ring owns this click
+    if(!ev.latLng) return;
+    var lat=ev.latLng.lat(), lng=ev.latLng.lng();
+    if(STG.t) clearTimeout(STG.t);
+    STG.t=setTimeout(function(){ STG.t=null;                               // wait out a double-click zoom
+      stLoadGeo().then(function(){
+        var f=stAt(lng,lat);
+        if(!f||(STG.sel&&STG.sel.st===f.st)){ if(STG.sel) stClear(); return; }
+        STG.sel=f; stOutline(f); stRender();
+      }).catch(function(){});
+    },280);
+  });
+  S.map.addListener('dblclick',function(){ if(STG.t){ clearTimeout(STG.t); STG.t=null; } });
+}
+function stClear(keepCard){
+  var had=!!STG.sel; STG.sel=null; stOutline(null);
+  var c=$('card'); if(!keepCard&&had&&c&&c.dataset.kind==='state') c.style.display='none';
+}
+function stStats(st){
+  var sel=selMap(), counts={}, o={total:0,nat:0,ms:0,ren4:0,hist:0};
+  for(var s in S.pinData){
+    if(S.histOnly) break;
+    if(S.states[s]===false&&s!==st) continue;
+    var d=S.pinData[s], mine=(s===st), dd=d.detail;
+    var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    for(var i=0;i<d.n;i++){
+      if(!vis[IDX[i]]) continue;
+      if(S.msOnly && dd && !dd.ms[i]) continue;
+      if(S.minSrc && dd && dd.cs && dd.cs[i]<S.minSrc) continue;
+      if(!svcOk(dd,i)) continue;
+      if(!heatOk(d,i)) continue;
+      if(!brandOk(d,i)) continue;
+      if(S.states[s]!==false) o.nat++;
+      if(!mine) continue;
+      o.total++; var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1;
+      if(dd&&dd.ms&&dd.ms[i]) o.ms++;
+      if(dd&&dd.hrm&&dd.hrm[i]&&urgClass(dd.hrm[i])===0) o.ren4++;
+    }
+  }
+  if(S.hist&&S.histData){ var hd=S.histData;
+    for(var j=0;j<hd.n;j++){ if(hd.sts[j]!==st) continue; if(sel[hd.fams[hd.fis[j]]]===false) continue; o.hist++; } }
+  o.top=Object.keys(counts).map(function(x){return [x,counts[x]]}).sort(function(a,b){return b[1]-a[1]});
+  var hq={}; (S.beacons||[]).forEach(function(b){ if(b.kind==='hq'&&b.state===st) hq[b.family_slug]=b.peo_display||famDisp(b.family_slug); });
+  o.hq=Object.keys(hq).map(function(k){return hq[k]}).sort();
+  return o;
+}
+function stRender(){
+  var f=STG.sel; if(!f) return;
+  var st=f.st, nm=STATE_NAMES[st]||st, o=stStats(st), c=$('card'), n=function(v){ return Number(v||0).toLocaleString(); };
+  var off=S.states[st]===false;
+  var share=o.nat?(Math.round(1000*o.total/o.nat)/10):0;
+  var rows=o.top.slice(0,8).map(function(t){ var pct=o.total?Math.round(100*t[1]/o.total):0;
+    return '<div class="vl-row" data-slug="'+esc(t[0])+'" title="'+esc(dispOf(t[0]))+' · '+t[1].toLocaleString()+' clients in '+esc(nm)+' — click to show only them">'+
+      '<span class="dot" style="background:'+colorOf(t[0])+'"></span><span class="nm">'+esc(dispOf(t[0]))+'</span>'+
+      '<span class="bar"><i style="width:'+Math.max(3,pct)+'%;background:'+colorOf(t[0])+'"></i></span><span class="ct">'+n(t[1])+' · '+pct+'%</span></div>'; }).join('');
+  var hqV=o.hq.length?('<span title="'+esc(o.hq.join(', '))+'">'+o.hq.length+'</span>'):'0';
+  c.dataset.kind='state';
+  c.innerHTML='<div class="hd"><span class="stsw"></span>'+
+    '<div><b>'+esc(nm)+'</b><div style="font-size:11.5px;color:var(--muted)">State view · follows your filters</div></div>'+
+    '<button class="x" id="stcard-x">×</button></div>'+
+    '<div class="bd">'+
+    (off?'<div class="note" style="margin-top:0;margin-bottom:6px">This state is switched off in the States filter, so its pins are hidden. The numbers below still count it.</div>':'')+
+    (S.histOnly?'':kv('Clients on the map','<b>'+n(o.total)+'</b>')+
+      kv('Share of all clients shown',(o.total&&share<0.1)?'&lt;0.1%':share+'%')+
+      kv('PEOs with clients here',n(o.top.length)))+
+    kv('PEO HQs in '+esc(st),hqV)+
+    (S.histOnly?'':kv('Multi-state clients',n(o.ms))+kv('Health renewal ≤4 mo',n(o.ren4)))+
+    ((S.hist&&S.histData)?kv('Former PEO users',n(o.hist)):'')+
+    (rows?'<div class="sthd">Top PEOs in '+esc(nm)+'</div><div id="stcard-top">'+rows+'</div>'+(o.top.length>8?'<div class="stmore">+'+(o.top.length-8)+' more PEOs</div>':''):'')+
+    '<a class="lk" href="#" id="stcard-list">List every client in '+esc(nm)+' →</a>'+
+    '<a class="lk" href="#" id="stcard-share" style="margin-top:6px">Full market-share table →</a>'+
+    '</div>';
+  c.style.display='block';
+  $('stcard-x').onclick=function(){ stClear(); };
+  $('stcard-list').onclick=function(e){ e.preventDefault(); openArea({kind:'state',state:st,label:nm}); };
+  $('stcard-share').onclick=function(e){ e.preventDefault(); openSharePanel(st); };
+  var tp=$('stcard-top'); if(tp) tp.onclick=function(e){ var r=e.target.closest('.vl-row'); if(!r) return;
+    var sm=selMap(); Object.keys(sm).forEach(function(k){sm[k]=false}); sm[r.dataset.slug]=true; afterSel(); };
 }
 
 // ------------------------- search-and-fly -------------------------
