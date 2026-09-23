@@ -400,7 +400,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.47 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.48 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2289,7 +2289,7 @@ function renderList(){
     if(open) cars.forEach(function(c){
       html+='<div class="netcar"><i class="netsw" style="background:'+carrierHex(c.carrier)+'"></i><b>'+esc(shortCarrier(c.carrier))+'</b>'+
         '<span class="netmut">'+(c.lives||0).toLocaleString()+' people'+(c.share_pct!=null?' · '+c.share_pct+'% of the plan':'')+'</span></div>';
-      if(!(c.networks||[]).length){ html+='<div class="netpend">Network not identified yet (research queued)</div>'; return; }
+      if(!(c.networks||[]).length){ var ps=c.pair_status||''; html+='<div class="netpend">'+(ps==='not a medical carrier'?'Not a medical carrier (supplemental, stop-loss or similar)':ps==='researched - not public'?'Network not published by the PEO yet · rechecked before each renewal':'Network not identified yet (research queued)')+'</div>'; return; }
       (c.networks||[]).forEach(function(x){
         var tag=/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':'';
         var where=x.region&&!/^national$/i.test(x.region)?' <span class="netmut">('+esc(x.region)+')</span>':'';
@@ -2301,7 +2301,7 @@ function renderList(){
               '<div class="netmut" title="Carrier network file '+fmtDate(m.data_as_of)+' · provider registry '+fmtDate(m.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(m.data_as_of,m.registry_as_of)+' · updates monthly</div>'+
               (N.layers[x.network_key]&&!N.layers[x.network_key].n?'<div class="netmut">Map is being built from the carrier\'s file, check back shortly</div>':''):'')+
             '</div></label>';
-        } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.network)+tag+where+' · map not built yet</div>';
+        } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+' · map not built yet</div>';
       });
     });
     row.innerHTML=html;
