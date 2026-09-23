@@ -200,7 +200,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .spacer{flex:1}
 #stats{font-size:12px;color:var(--ink2);white-space:nowrap}
 #main{display:flex;flex:1;min-height:0}
-#panel{width:280px;min-width:280px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
+#panel{width:var(--panelw,clamp(320px,22vw,440px));min-width:300px;max-width:640px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
 #panel>.sec{flex-shrink:0}  /* v3.49: panel scrolls; sections keep their height so every filter is reachable */
 #panel>.sec:last-child{flex:1 0 auto!important;min-height:300px!important}
 #panel #peo-list{max-height:60vh}
@@ -272,6 +272,11 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
   border-radius:20px;padding:5px 14px;font-size:12px;color:var(--ink2);display:none}
 #panel-toggle{font-size:15px;padding:4px 10px}
 #panel.off{display:none}
+/* v3.55 (owner 2026-09-23: "make the filter section wider - everything is crammed to the far left"): drag the edge to resize */
+#panelgrip{flex:0 0 7px;margin-left:-4px;cursor:col-resize;position:relative;z-index:6;background:transparent;transition:background .12s}
+#panelgrip:hover,#panelgrip.drag{background:rgba(94,145,255,.35)}
+#panel.off+#panelgrip{display:none}
+body.panel-drag{cursor:col-resize;user-select:none}
 #lenslegend{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:33;display:none;gap:10px;
   background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:6px 14px;font-size:11px;color:var(--ink2)}
 #lenslegend span{display:inline-flex;align-items:center;gap:5px;margin:0 4px}
@@ -298,6 +303,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
     transform:translateX(-106%);transition:transform .18s ease}
   #panel.off{display:flex;transform:translateX(-106%)}
   #panel.open{transform:none}
+  #panelgrip{display:none}
   #card{width:calc(100vw - 24px);max-width:360px}
   #aidock{width:calc(100vw - 24px);max-width:360px;bottom:12px}
   #sharepanel{width:calc(100vw - 24px);max-width:340px}
@@ -403,7 +409,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.54 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.55 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -454,6 +460,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
         <div id="peo-list"></div>
       </div>
     </div>
+    <div id="panelgrip" title="Drag to resize the filter panel · double-click to reset"></div>
     <div class="mapwrap" id="mapwrap">
       <div id="map"></div>
       <canvas id="pincanvas"></canvas>
@@ -2745,6 +2752,23 @@ function boot(){
   hook();
 }
 boot();
+})();
+</script>
+<script>
+// v3.55 filter panel resize: drag the edge; width is remembered in this browser; double-click resets
+(function(){
+  var g=document.getElementById('panelgrip'), p=document.getElementById('panel'), root=document.documentElement, KEY='map_panel_w';
+  if(!g||!p) return;
+  function setW(w){ w=Math.max(300,Math.min(640,Math.round(w))); root.style.setProperty('--panelw',w+'px'); return w; }
+  function nudge(){ try{ window.dispatchEvent(new Event('resize')); }catch(e){} try{ if(window.S&&S.map&&window.google) google.maps.event.trigger(S.map,'resize'); }catch(e){} }
+  try{ var s=+localStorage.getItem(KEY); if(s>=300) setW(s); }catch(e){}
+  var x0=0, w0=0, on=false;
+  g.addEventListener('pointerdown',function(e){ on=true; x0=e.clientX; w0=p.getBoundingClientRect().width; g.classList.add('drag'); document.body.classList.add('panel-drag'); try{ g.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
+  g.addEventListener('pointermove',function(e){ if(!on) return; setW(w0+e.clientX-x0); nudge(); });
+  function end(){ if(!on) return; on=false; g.classList.remove('drag'); document.body.classList.remove('panel-drag');
+    try{ localStorage.setItem(KEY,String(Math.round(p.getBoundingClientRect().width))); }catch(e){} nudge(); }
+  g.addEventListener('pointerup',end); g.addEventListener('pointercancel',end);
+  g.addEventListener('dblclick',function(){ root.style.removeProperty('--panelw'); try{ localStorage.removeItem(KEY); }catch(e){} nudge(); });
 })();
 </script>
 </body>
