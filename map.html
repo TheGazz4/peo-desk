@@ -2163,7 +2163,7 @@ if(!deskKey()){ showGate(false); } else { boot(); }
 var NET_EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-net';
 var CARRIER_HEX={aetna:'#9b4fd0',unitedhealthcare:'#2f7fe0',cigna:'#16a3c9',anthem:'#2f6fd6',elevance:'#2f6fd6',kaiser:'#3aa0a0',bcbs:'#3b82f6',humana:'#4caf50'};
 var BAND_NAMES=['Thin','Moderate','Solid','Strong'];
-var BAND_RANGE=['under 30','30–49','50–69','70+'];
+var BAND_RANGE=['under 35%','35–44%','45–54%','55%+'];
 var N={cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
        layers:{},pts:{},loading:{},carriersOff:{},hover:null};
 window.NETSTATE=N;
@@ -2197,7 +2197,9 @@ function ramp(hex){
   }
   return rampCache[hex]=out;
 }
-function bandOf(s){ return s>=70?3:(s>=50?2:(s>=30?1:0)); }
+function bandOf(s){ return s>=55?3:(s>=45?2:(s>=35?1:0)); }
+// colour depth spans the real range (15%..65% of registered local clinicians signed) so strong areas read deep
+function ri(s){ return Math.max(0,Math.min(100,Math.round((s-15)*2))); }
 
 // ---------- UI ----------
 function buildSection(){
@@ -2320,7 +2322,7 @@ function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
       var sz=Math.max(1.6, L.cz[i]*scale*0.62);
       if(x<-sz||x>hw+sz||y<-sz||y>hh+sz) continue;
       var a=0.35+0.65*(m[i]/100);
-      octx.globalAlpha=a; octx.fillStyle=rp[sc]; octx.fillRect(x-sz/2,y-sz/2,sz,sz);
+      octx.globalAlpha=a; octx.fillStyle=rp[ri(sc)]; octx.fillRect(x-sz/2,y-sz/2,sz,sz);
     }
     octx.globalAlpha=1;
     var blur=Math.max(2,Math.min(9,11-z));
@@ -2337,7 +2339,7 @@ function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
       var pl=L.poly[j]; if(!pl){ var bd=h3.cellToBoundary(L.h[j]); pl=L.poly[j]=bd.map(function(v){ return [mercX(v[1]),mercY(v[0])]; }); }
       nctx.beginPath();
       for(var q=0;q<pl.length;q++){ var X=(pl[q][0]-cx)*scale+W/2, Y=(pl[q][1]-cy)*scale+H/2; if(q) nctx.lineTo(X,Y); else nctx.moveTo(X,Y); }
-      nctx.closePath(); nctx.globalAlpha=0.45+0.55*(m[j]/100); nctx.fillStyle=rp[sc2]; nctx.fill();
+      nctx.closePath(); nctx.globalAlpha=0.45+0.55*(m[j]/100); nctx.fillStyle=rp[ri(sc2)]; nctx.fill();
     }
     nctx.globalAlpha=1;
   }
@@ -2355,7 +2357,7 @@ function drawPins(P,rp,W,H,z,scale,cx,cy,net){
       N.hitsP.push({x:x,y:y,r:h,P:P,i:i,net:net});
     } else {
       var rad=Math.max(1.6,Math.min(z<7?4:9,(z<7?0.9:1.4)*Math.sqrt(P.nc[i]||1)/3))*ps;
-      nctx.beginPath(); nctx.arc(x,y,rad,0,Math.PI*2); nctx.fillStyle=rp[sc==null?0:sc]; nctx.fill();
+      nctx.beginPath(); nctx.arc(x,y,rad,0,Math.PI*2); nctx.fillStyle=rp[sc==null?0:ri(sc)]; nctx.fill();
       if(z>=8){ nctx.lineWidth=0.8; nctx.strokeStyle='rgba(0,0,0,.35)'; nctx.stroke(); }
       if(z>=6) N.hitsP.push({x:x,y:y,r:Math.max(5,rad),P:P,i:i,net:net});
     }
@@ -2375,7 +2377,7 @@ function legend(){
       '<div class="netmut">Carrier data as of '+fmtDate(n.data_as_of)+' · registry '+fmtDate(n.registry_as_of)+'</div>';
     if(N.loading['h'+n.network_key]||N.loading['p'+n.network_key]) html+='<div class="netmut">loading…</div>';
   });
-  html+='<div class="netmut" style="margin-top:4px">Deeper colour = larger share of the area\'s doctors &amp; hospitals in network.</div>';
+  html+='<div class="netmut" style="margin-top:4px">Deeper colour = larger share of the area\'s registered doctors &amp; hospitals in network (Strong = 55%+, Solid 45–54%, Moderate 35–44%, Thin under 35%).</div>';
   if(N.hover) html+='<div class="lghover">'+N.hover+'</div>';
   lg.innerHTML=html; lg.style.display='block';
 }
@@ -2385,7 +2387,7 @@ function hoverAt(mx,my){
     if(Math.abs(hp.x-mx)<=hp.r&&Math.abs(hp.y-my)<=hp.r){
       var P=hp.P,i=hp.i;
       if(P.k[i]===1) return '<b>'+P.lb[i]+'</b><br>'+(P.city[i]||'')+', '+(P.st[i]||'')+' · in-network hospital';
-      return '<b>ZIP '+P.lb[i]+'</b> · '+(P.city[i]||'')+', '+(P.st[i]||'')+'<br>'+(P.nc[i]||0).toLocaleString()+' in-network clinicians'+(P.nh[i]?' · '+P.nh[i]+' hospital'+(P.nh[i]>1?'s':''):'')+(P.s[i]!=null?' · strength '+P.s[i]+' ('+BAND_NAMES[bandOf(P.s[i])]+')':'');
+      return '<b>ZIP '+P.lb[i]+'</b> · '+(P.city[i]||'')+', '+(P.st[i]||'')+'<br>'+(P.nc[i]||0).toLocaleString()+' in-network clinicians'+(P.nh[i]?' · '+P.nh[i]+' hospital'+(P.nh[i]>1?'s':''):'')+(P.s[i]!=null?' · area '+P.s[i]+'% signed ('+BAND_NAMES[bandOf(P.s[i])]+')':'');
     } }
   if(N.view==='pins') return null;
   var best=null,bd=1e9;
@@ -2395,7 +2397,7 @@ function hoverAt(mx,my){
       var d=(x-mx)*(x-mx)+(y-my)*(y-my); if(d<bd){ bd=d; best={L:L,i:i,n:n}; } } });
   if(!best) return null;
   var L2=best.L,j=best.i;
-  return '<b>'+best.n.network_name+'</b> · strength '+L2.s[j]+' ('+BAND_NAMES[bandOf(L2.s[j])]+')'+
+  return '<b>'+best.n.network_name+'</b> · '+L2.s[j]+'% of area doctors/hospitals signed ('+BAND_NAMES[bandOf(L2.s[j])]+')'+
     (L2.ac[j]?'<br>This cell: '+L2.nc[j].toLocaleString()+' of '+L2.ac[j].toLocaleString()+' clinicians in network':'')+
     (L2.ah[j]?' · '+L2.nh[j]+' of '+L2.ah[j]+' hospitals':'');
 }
