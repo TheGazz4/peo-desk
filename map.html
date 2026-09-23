@@ -214,6 +214,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .btnrow{display:flex;gap:6px;margin-top:8px}
 .btnrow button,.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:6px;padding:4px 9px;font-size:11.5px;cursor:pointer}
 .btnrow button:hover,.ghost:hover{border-color:var(--accent);color:var(--ink)}
+#peo-az{margin-left:auto;font-style:italic;letter-spacing:.3px}
+#peo-az.on{border-color:var(--accent);color:var(--ink);background:rgba(94,145,255,.18);font-style:normal}
 #peo-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12.5px;margin-bottom:8px}
 #peo-list{overflow-y:auto;flex:1;padding:4px 6px}
 .peo-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
@@ -417,7 +419,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.59 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.60 · 2026-09-23</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -466,7 +468,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
       <div class="sec" style="flex:1;display:flex;flex-direction:column;min-height:120px;border-bottom:0">
         <h2>PEOs <span id="peo-count" style="color:var(--muted);font-weight:400"></span></h2>
         <input id="peo-search" placeholder="Search PEOs…">
-        <div class="btnrow" style="margin:0 0 6px"><button id="peo-all">All</button><button id="peo-none">None</button></div>
+        <div class="btnrow" style="margin:0 0 6px"><button id="peo-all">All</button><button id="peo-none">None</button><button id="peo-az" aria-pressed="false" title="Sort A–Z (click again for biggest first)">abc…</button></div>
         <div id="peo-list"></div>
       </div>
     </div>
@@ -1401,7 +1403,10 @@ function buildPeoPanel(){
   var q=($('peo-search').value||'').toLowerCase();
   // Gazz 2026-09-14: the list reads in order of the count it SHOWS (clients placed on the map),
   // not the raw attributed count — otherwise a PEO with many location-pending clients jumps the queue.
-  var rows=catRows().slice().sort(function(x,y){
+  // v3.60 (owner 2026-09-23): the "abc…" button flips the list to A–Z; click again for biggest first.
+  var AZ=(PEO_SORT==='az');
+  function byName(x,y){ return String(x.display||x.slug).localeCompare(String(y.display||y.slug),undefined,{sensitivity:'base'}); }
+  var rows=catRows().slice().sort(AZ?byName:function(x,y){
     var px=Math.max(0,(Number(x.n_clients)||0)-(Number(x.n_unplaced)||0));
     var py=Math.max(0,(Number(y.n_clients)||0)-(Number(y.n_unplaced)||0));
     return py-px || String(x.display||x.slug).localeCompare(String(y.display||y.slug));
@@ -1419,7 +1424,7 @@ function buildPeoPanel(){
       (kids[f]=kids[f]||[]).push(bb);
     });
     Object.keys(kids).forEach(function(f){
-      kids[f].sort(function(x,y){ return placedOf(y)-placedOf(x) || String(x.display||x.slug).localeCompare(String(y.display||y.slug)); });
+      kids[f].sort(AZ?byName:function(x,y){ return placedOf(y)-placedOf(x) || String(x.display||x.slug).localeCompare(String(y.display||y.slug)); });
     });
   }
   var bsel=(S.grain==='family')?selMapFor('brand'):null;
@@ -1474,6 +1479,12 @@ function afterSel(){ bump(); buildPeoPanel(); scheduleDraw(); updateStats(); wri
 $('peo-search').addEventListener('input',buildPeoPanel);
 $('peo-all').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=true}); afterSel(); };
 $('peo-none').onclick=function(){ var sel=selMap(); Object.keys(sel).forEach(function(k){sel[k]=false}); afterSel(); };
+// v3.60 A–Z sort toggle; remembered in this browser only
+var PEO_SORT='count';
+try{ if(localStorage.getItem('peo_sort')==='az') PEO_SORT='az'; }catch(_){}
+function syncAzBtn(){ var b=$('peo-az'); if(!b) return; var on=(PEO_SORT==='az'); b.className=on?'on':''; b.setAttribute('aria-pressed',on?'true':'false'); b.title=on?'Sorted A–Z · click for biggest first':'Sort A–Z'; }
+$('peo-az').onclick=function(){ PEO_SORT=(PEO_SORT==='az')?'count':'az'; try{ localStorage.setItem('peo_sort',PEO_SORT); }catch(_){} syncAzBtn(); buildPeoPanel(); };
+syncAzBtn();
 $('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
 $('hqcand-on').onchange=function(){ S.hqCand=$('hqcand-on').checked; scheduleDraw(); writeUrl(); };
 $('hqlogo-on').onchange=function(){ S.hqLogos=$('hqlogo-on').checked; scheduleDraw(); writeUrl(); };
