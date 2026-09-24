@@ -1015,6 +1015,7 @@ function renderDecisions(d) {
     stateChip(Number(b.rulings_queued) > 0 ? "warn" : "ok", n(b.rulings_queued) + " queued"),
     stateChip(blocked > 0 ? "serious" : "ok", n(blocked) + " blocked"),
     stateChip(needs > 0 ? "critical" : "ok", needs + " need Gazz"),
+    (rows.filter((r) => r.state === "ready_to_apply").length ? stateChip("critical", rows.filter((r) => r.state === "ready_to_apply").length + " ready to apply - say \"apply the queued rulings\" in chat") : ""),
     stateChip("ok", (b.decided_without_gazz_pct == null ? "—" : b.decided_without_gazz_pct + "%") + " decided without you"),
     stateChip("ok", n(b.judge_verdicts_total) + " verdicts / $" + Number(b.judge_spend_usd || 0).toFixed(2)),
   ].join(" ");
@@ -1023,9 +1024,10 @@ function renderDecisions(d) {
     ' · executor ' + esc(ago(b.executor_last_at)) + '</span>';
 
   const CHIP = { applied: "ok", queued: "ok", in_window: "warn", blocked: "serious",
-                 opinion_for_gazz: "critical", awaiting_judge: "warn" };
+                 opinion_for_gazz: "critical", awaiting_judge: "warn", ready_to_apply: "critical" };
   const LABEL = { applied: "applied", queued: "queued", in_window: "in window",
-                  blocked: "blocked", opinion_for_gazz: "needs Gazz", awaiting_judge: "awaiting judge" };
+                  blocked: "blocked", opinion_for_gazz: "needs Gazz", awaiting_judge: "awaiting judge",
+                  ready_to_apply: "ready to apply" };
 
   $("#tblDecisions tbody").innerHTML = rows.map((r) => {
     const st = String(r.state || "");
