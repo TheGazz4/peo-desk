@@ -599,6 +599,7 @@ function boot(){
   if(booted) return; booted=true;
   Promise.all([api({mode:'catalog'}),api({mode:'beacons'})]).then(function(rs){
     S.catalog=rs[0];
+    try{ renderSvcChips(); }catch(_){}   // v3.65 (3020): Relationship chip totals arrive with the catalog
     ['families','brands'].forEach(function(k){
       var g=k==='families'?'family':'brand';
       (S.catalog[k]||[]).forEach(function(r){ S.colors[g][r.slug]=r.color_hex||null; S.displays[g][r.slug]=r.display||r.slug; });
@@ -1626,7 +1627,12 @@ function svcOk(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) ret
 function renderSvcChips(){
   var box=$('svc-chips'); if(!box) return;
   var cnt={0:0,1:0,2:0,3:0,4:0,5:0,6:0}, have=false;
-  Object.keys(S.pinData||{}).forEach(function(st){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.sv) return; have=true; for(var i=0;i<dd.sv.length;i++) cnt[dd.sv[i]]=(cnt[dd.sv[i]]||0)+1; });
+  // v3.65 (owner 2026-09-24, 3020): totals come from the DATABASE - catalog.relationship = pub.map_relationship_counts, compiled
+  // with the same rule as every pin's sv at each rebake. Never a sum of whatever detail parts happen to be loaded (that varied
+  // while parts loaded and dropped a state whose part failed). The loaded-part sum is only a fallback for an older catalog.
+  var rel=S.catalog&&S.catalog.relationship;
+  if(rel&&Object.keys(rel).length){ have=true; Object.keys(rel).forEach(function(k){ cnt[k]=Number(rel[k])||0; }); }
+  else Object.keys(S.pinData||{}).forEach(function(st){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.sv) return; have=true; for(var i=0;i<dd.sv.length;i++) cnt[dd.sv[i]]=(cnt[dd.sv[i]]||0)+1; });
   // counts are each chip's OWN pins; PEO and HRO/ASO also show the PEO & ASO pins, flagged as +shared (owner 2026-09-23: counts must not look inflated)
   box.innerHTML=SVC_ORDER.map(function(k){ return '<span class="netchip'+(S.svcOff[k]?'':' on')+'" data-sv="'+k+'" data-tip-t="'+SVC[k].name+'" data-tip="'+SVC[k].tip+'">'+SVC[k].name+(have?' <span class="svcn">'+cnt[k].toLocaleString()+'</span>':'')+'</span>'; }).join('');
   svcTipBind(box);
