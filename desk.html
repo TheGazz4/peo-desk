@@ -272,6 +272,13 @@
     <table id="tblPeoNet"><thead><tr><th>PEO</th><th>carrier</th><th class="num">people on plan</th><th>network</th><th>tier</th><th>label</th><th>pair status</th><th>plan year · source</th><th>next check</th><th>strength map</th></tr></thead><tbody></tbody></table>
   </section>
 
+  <section class="wide" id="nonPeo">
+    <h2>PEO list cleanup: profiles classed as PEOs with no clients <small>— owner only · where each one came from · 2026-09-23</small></h2>
+    <p class="blurb">These are classed as PEOs but have no current clients and no website. Most entered from the federal Form 5500 plan data: the sponsor filed a multiple-employer retirement plan and ticked the plan-type box our loader reads as "maintained by a PEO" (Schedule MEP type code 2), and automatic loads took that box at face value. Some are real PEOs we simply have no clients for. Nothing has been removed; each needs a keep / move-out decision.</p>
+    <div class="sc-tiles" id="npTiles"></div>
+    <div class="tw" style="max-height:560px;overflow:auto"><style>#tblNonPeo td{white-space:normal;vertical-align:top}#tblNonPeo td.num{white-space:nowrap}#tblNonPeo th.num,#tblNonPeo td.num{text-align:right}</style><table id="tblNonPeo"><thead><tr><th>Shown as</th><th>Why it was called a PEO</th><th>How it entered our list</th><th>Filer on the federal filing</th><th class="num">Plan participants</th><th class="num">Latest filing</th><th class="num">Clients ever attached</th></tr></thead><tbody><tr><td colspan="7" class="age cold">loading…</td></tr></tbody></table></div>
+  </section>
+
   <section class="wide" id="dataCal">
     <h2>Health data calendar <small>— when each PEO's new data is due, and when it arrived</small></h2>
     <p class="blurb">Checked every hour. <b>Form 5500</b> (carriers and people covered) is due the last day of the 7th month after the plan year ends, or the 15th day of the 10th month with an extension (<a href="https://www.irs.gov/retirement-plans/form-5500-corner" target="_blank" rel="noopener">IRS</a>); every DOL dataset file is under an hourly change check, so a new filing is picked up the hour DOL publishes it. <b>SBCs</b> must go out at least 30 days before an auto-renewing plan year (<a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-147/section-147.200" target="_blank" rel="noopener">45 CFR 147.200</a>), so network research runs 60 days before renewal. <b>Carrier network files</b> refresh monthly and are checked daily. <b>Form M-1</b> (MEWAs) is due March 1 (<a href="https://www.askebsa.dol.gov/mewa/" target="_blank" rel="noopener">DOL</a>) — dated here, not yet loaded.</p>
@@ -1207,6 +1214,52 @@ setInterval(poll, POLL_MS);
   }
   load();
   setInterval(load, 5 * 60 * 1000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+})();
+</script>
+<script>
+/* PEO list cleanup panel (instanceB_industry_intel 2026-09-23, migration 2155). Owner: "show these to me - I want to know where this
+   data originated." Reads peo_nonpeo_origin_json() through dash-ai (desk key), on its own 10-minute clock. */
+(function () {
+  "use strict";
+  var FN = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/dash-ai";
+  var ANONK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+  var tb = document.querySelector("#tblNonPeo tbody"), tiles = document.getElementById("npTiles");
+  if (!tb) return;
+  function e(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function n0(v) { return v == null || v === "" ? "—" : Number(v).toLocaleString(); }
+  function shortHow(h) { h = String(h || ""); if (/^Auto-registered 2026-09-15/.test(h)) return "Auto-added 2026-09-15 during a gate outage (quarantined)";
+    if (/^Legacy name list/.test(h)) return "Legacy name list (before 2026-08-19)"; if (/^Profile only/.test(h)) return "Profile created by the plan-filing load (no name-registry row)";
+    if (/^Owner ruling/.test(h)) return "Owner ruling 92 (2026-09-15)"; return h.length > 80 ? h.slice(0, 80) + "…" : h; }
+  function shortWhy(w) { return /Schedule MEP/.test(w) ? "Federal 5500 filing: plan-type box read as PEO" : /Website/.test(w) ? "Website read by an earlier research pass" : /IRS/.test(w) ? "IRS certified-PEO list" : w; }
+  function load() {
+    var k = null; try { k = localStorage.getItem("desk_key") || localStorage.getItem("peo_dash_key"); } catch (x) {}
+    if (!k || document.hidden) return;
+    fetch(FN, { method: "POST", headers: { "Content-Type": "application/json", "apikey": ANONK, "Authorization": "Bearer " + ANONK, "x-desk-key": k },
+      body: JSON.stringify({ mode: "sql", sql: "select peo_nonpeo_origin_json() as j", label: "desk PEO list cleanup panel", quiet: true }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        var j = res && res.rows && res.rows[0] && res.rows[0].j;
+        if (!j) throw new Error((res && (res.detail || res.error)) || "no reply");
+        var byWhy = {}, byHow = {};
+        (j.rows || []).forEach(function (r) { var w = shortWhy(r.why), h = shortHow(r.how); byWhy[w] = (byWhy[w] || 0) + 1; byHow[h] = (byHow[h] || 0) + 1; });
+        var t = [["Profiles to review", n0(j.total), "classed PEO · no clients · no website"]];
+        Object.keys(byWhy).sort(function (a, b) { return byWhy[b] - byWhy[a]; }).forEach(function (w) { t.push([w, n0(byWhy[w]), "why it was called a PEO"]); });
+        var of = j.other_flags || {}, other = Object.keys(of).reduce(function (s, x) { return s + of[x]; }, 0);
+        t.push(["Other records flagged", n0(other), "duplicates " + (of.duplicate_profile || 0) + " · wrong website " + (of.wrong_website || 0) + " · not a PEO " + (of.not_a_peo || 0) + " · wrong HQ " + (of.wrong_hq || 0)]);
+        if (tiles) tiles.innerHTML = t.map(function (x) { return '<div class="tile"><div class="k">' + e(x[0]) + '</div><div class="v">' + x[1] + '</div><div class="d">' + e(x[2]) + "</div></div>"; }).join("");
+        tb.innerHTML = (j.rows || []).map(function (r) {
+          var f = (r.filers || [])[0] || {};
+          var filer = f.name ? e(f.name) + ' <span class="age cold">EIN ' + e(f.ein) + " · plan-type code " + e(f.mep_codes || "—") + " · " + e(f.years || "") + " · loaded by " + e(f.loaded_by || "—") + "</span>" : '<span class="age cold">no filer entity linked</span>';
+          var shown = (r.name === r.slug && f.name) ? f.name : r.name;
+          return "<tr><td>" + e(shown) + (shown !== r.slug ? ' <span class="age cold">' + e(r.slug) + "</span>" : "") + "</td><td>" + e(shortWhy(r.why)) + "</td><td>" + e(shortHow(r.how)) + "</td><td>" + filer + "</td><td class=\"num\">" + n0(r.participants) +
+            "</td><td class=\"num\">" + e(r.latest_filing_year || "—") + "</td><td class=\"num\">" + n0(r.ever_clients) + "</td></tr>";
+        }).join("") || "<tr><td colspan=\"7\" class=\"age cold\">nothing to review</td></tr>";
+      })
+      .catch(function (err) { tb.innerHTML = "<tr><td colspan=\"7\" class=\"age cold\">could not load: " + e(err.message) + "</td></tr>"; });
+  }
+  load();
+  setInterval(load, 10 * 60 * 1000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
 })();
 </script>
