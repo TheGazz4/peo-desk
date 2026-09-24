@@ -1466,6 +1466,15 @@ setInterval(poll, POLL_MS);
     });
   }
   show(cur);
+  /* deep link to a panel: desk.html#decisionDesk opens that panel's tab and scrolls to it */
+  (function () {
+    var a = decodeURIComponent(location.hash.replace(/^#/, ""));
+    var el = a && !/^tab=/.test(a) ? document.getElementById(a) : null;
+    if (el && el.dataset && el.dataset.tab) {
+      show(el.dataset.tab);
+      setTimeout(function () { el.scrollIntoView({ block: "start" }); window.scrollBy(0, -56); }, 600);
+    }
+  })();
   setInterval(function () { capTables(); badges(); }, 2000);
   setTimeout(function () { capTables(); badges(); }, 300);
 })();
