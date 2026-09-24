@@ -542,7 +542,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'brand', placement:'address', msOnly:false, minSrc:0, svcOff:{}, empOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
+  grain:'brand', placement:'address', msOnly:false, minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -1330,7 +1330,7 @@ function resetAll(){
   S.heat=[true,true,true,true];
   S.lens='peo'; try{ syncLensButtons(); renderLensLegend(); }catch(_){}
   S.minSrc=0; try{ syncSrcButtons(); }catch(_){}
-  S.svcOff={}; try{ renderSvcChips(); }catch(_){}
+  S.svcOff=svcDefaultOff(); try{ renderSvcChips(); }catch(_){}   // v3.69: Reset returns to the default (PEO only)
   S.empOff={}; try{ renderEmpChips(); }catch(_){}
   S.wcoOnly=false; S.bcoOnly=false; try{ syncCoSeg(); }catch(_){}
   S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
@@ -1683,6 +1683,8 @@ function coLines(dd,i){ if(!dd) return ''; var s='';
   return s; }
 function coOf(cid){ for(var st in S.pinData){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.ids) continue; var j=dd.ids.indexOf(String(cid)); if(j>=0) return {dd:dd,i:j}; } return null; }
 function svcOk(dd,i){ if(!coOk(dd,i)) return false; if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
+// v3.69 (owner 2026-09-24: "I want the default map to load only with PEO"): Relationship chips start with PEO on, the rest off.
+function svcDefaultOff(){ return {0:true,2:true,3:true,4:true,5:true}; }
 function svcOkRel(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) return !(S.svcOff[6]&&S.svcOff[1]&&S.svcOff[2]); return !S.svcOff[v]; }
 function renderSvcChips(){
   var box=$('svc-chips'); if(!box) return;
@@ -1910,7 +1912,7 @@ function buildUrl(){
     if(S.minSrc) p.set('src',String(S.minSrc));
     if(S.showNP===false) p.set('np','0');
     if(S.wcoOnly) p.set('wco','1'); if(S.bcoOnly) p.set('bco','1');
-    var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }); if(svo.length) p.set('svoff',svo.join(','));
+    var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }).sort(); if(svo.join(',')!=='0,2,3,4,5') p.set('svoff',svo.length?svo.join(','):'none');   // v3.69: default (PEO only) is not written
     var eo=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(eo.length) p.set('eoff',eo.join(','));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.hist) p.set('hist', S.histOnly?'2':'1');
@@ -1932,7 +1934,7 @@ function readUrl(){
     if(p.get('np')==='0'){ S.showNP=false; $('np-on').checked=false; }
     if(p.get('wco')==='1') S.wcoOnly=true; if(p.get('bco')==='1') S.bcoOnly=true; syncCoSeg();
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
-    if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
+    if(p.get('svoff')){ S.svcOff={}; p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }   // v3.69: an explicit link overrides the PEO-only default ('none' = every chip on)
     if(p.get('eoff')){ p.get('eoff').split(',').forEach(function(k){ if(/^[0-7]$/.test(k)) S.empOff[k]=true; }); try{ renderEmpChips(); }catch(_){} }
     if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
     var lz=p.get('lens');
