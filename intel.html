@@ -371,13 +371,15 @@
       return;
     }
     // not on the map filter: an older entity / acquired brand, or not a listed PEO
-    sql("select directory_slug, directory_display, relation, current_clients from mv_peo_directory_members where member_slug = '" + slug + "'", "directory parent", 20000)
+    sql("select member_legal_name, directory_slug, directory_display, relation, current_clients from mv_peo_directory_members where member_slug = '" + slug + "'", "directory parent", 20000)
       .then(function (res) {
         if (tok !== loadToken) return;
         var m = (res.rows || [])[0];
+        if (m && m.member_legal_name) { var h2 = document.querySelector(".title h2"); if (h2) h2.textContent = m.member_legal_name; }
         if (m && m.directory_slug) {
-          box.innerHTML = '<div class="also notlisted">Not listed on its own on the map: ' + esc(m.relation) + '. Its clients show under ' +
-            '<a href="#peo=' + esc(m.directory_slug) + '">' + esc(m.directory_display) + '</a> · <a class="maplink" href="' + mapHref(m.directory_slug) + '" target="_blank" rel="noopener">see on the map →</a></div>';
+          var pl = '<a href="#peo=' + esc(m.directory_slug) + '">' + esc(m.directory_display) + '</a>';
+          box.innerHTML = '<div class="also notlisted">Not listed on its own on the map — ' + esc(String(m.relation).replace("this PEO", "\u0001")).replace("\u0001", pl) +
+            '. On the map and in the PEO list it is part of ' + pl + ' · <a class="maplink" href="' + mapHref(m.directory_slug) + '" target="_blank" rel="noopener">see ' + esc(m.directory_display) + ' on the map →</a></div>';
         } else {
           box.innerHTML = '<div class="also notlisted">Not on the map filter (no current clients, or not a PEO). Kept here for history only.</div>';
         }
