@@ -464,7 +464,10 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="netchips" id="svc-chips"></div>
         <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Employees" data-tip="Filter by employee count - the Employee Count Brain's best number for each client (the middle of its range).&#10;&#10;Click a chip to hide or show that size. No count yet = no number we can back up.">Employees <i>?</i></span></h2>
         <div class="netchips" id="emp-chips"></div>
-        <label class="chk" style="margin-top:6px" title="Payroll and HR-outsourcing clients of Paychex, ADP and Paycor that are NOT PEO clients (Paychex pooled 401(k) plan = HRO/ASO; Florida comp policies placed through the vendor's own insurance agency = Payroll Only). Grey pins; never counted as PEO market share. Untick to hide them all."><input type="checkbox" id="np-on" checked> Non-PEO vendor clients <span style="color:var(--muted)">(Paychex · ADP · Paycor)</span></label>
+        <label class="chk" style="margin-top:6px" title="Payroll and HR-outsourcing clients of Paychex, ADP and Paycor that are NOT PEO clients. Grey pins; never counted as PEO market share. Untick to hide them all."><input type="checkbox" id="np-on" checked> Non-PEO vendor clients <span style="color:var(--muted)">(Paychex · ADP · Paycor)</span></label>
+        <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Carve Outs" data-tip="PEO clients that stay with their PEO but keep one piece in-house.&#10;&#10;Workers Comp Carve Out = keeps its own workers comp policy.&#10;Benefits Carve Out = runs its own health plan instead of the PEO's.&#10;&#10;Tick one or both to show only those clients.">Carve Outs <i>?</i></span></h2>
+        <label class="chk" title="Show only PEO clients that keep their own workers comp policy while staying with their PEO"><input type="checkbox" id="wco-only"> Workers Comp Carve Out</label>
+        <label class="chk" title="Show only PEO clients that run their own health plan instead of the PEO's"><input type="checkbox" id="bco-only"> Benefits Carve Out</label>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
           <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO user departures">Both</button><button id="hist-2" title="Former PEO user departures only — current pins hidden">Former only</button></div>
@@ -566,7 +569,7 @@ function brandOk(d,i){
 function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
 function colorOf(slug){ if(isNP(slug)) return NP_COLOR[slug]||'#a0a8b0'; return S.colors[S.grain][slug]||OTHER; }
 // v3.66 (owner 2026-09-24, Owner ruling 192 / 1278e): NON-PEO VENDOR CLIENTS. Payroll / HR-outsourcing clients of vendors that also sell PEO
-// (Paychex pooled 401(k) book = HRO/ASO; FL comp-agency clients of ADP / Paychex / Paycor = Payroll Only). Muted pins, never a PEO:
+// (Paychex HR-outsourcing book = HRO/ASO; ADP / Paychex / Paycor payroll clients = Payroll Only). Muted pins, never a PEO:
 // kept out of PEO market share, This view PEO list and the state card; one toggle hides them all; the Relationship chips split them.
 var NP_LABEL={nonpeo_paychex:'Paychex (non-PEO client)',nonpeo_adp:'ADP (non-PEO client)',nonpeo_paycor:'Paycor (non-PEO client)'};
 var NP_COLOR={nonpeo_paychex:'#9aa7b1',nonpeo_adp:'#b8a58c',nonpeo_paycor:'#a59cba'};
@@ -1371,6 +1374,7 @@ function onMove(e){
               renLine+='WC renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+ww+')</span><br>'; }
       else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
       renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
+      renLine+=coLines(d.detail,h.i);   // v3.68 carve-outs
       if(d.detail.sv){ var svq=d.detail.sv[h.i]; renLine+='Relationship: '+(svq?'<b>'+SVC[svq].name+'</b>':'<span class="mut">unconfirmed</span>')+' <span class="mut">('+SVC[svq].card+')</span><br>'; }   // v3.58
       if(d.detail.ld&&d.detail.ld[h.i]){ renLine+='<span style="color:#ff7b72">! address disputed — a public listing puts this exact company name in another state</span><br>'; }   // v3.39
       if(d.detail.ec){ var EC=['not testable — no roster covers this company yet','UNCONFIRMED — not on any PEO roster that covers this name','likely — a name variant is on a public PEO roster','confirmed on a public PEO roster','confirmed by a second source'];
@@ -1644,16 +1648,18 @@ function setMinSrc(v){
   bump(); scheduleDraw(); updateStats(); writeUrl();
 }
 $('np-on').onchange=function(){ S.showNP=!!this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); };
+$('wco-only').onchange=function(){ S.wcoOnly=!!this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); };
+$('bco-only').onchange=function(){ S.bcoOnly=!!this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); };
 $('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ setMinSrc(1) }; $('src-2').onclick=function(){ setMinSrc(2) };
 // v3.58 PREVIEW Relationship filter (owner 2026-09-23: "a toggle that said PEO or HRO/ASO", plus HR Only and Payroll Only).
 // Each pin carries sv (1266 client_service_bucket): what service THIS client gets from the company on its pin.
 // Vendor = public.vendor_service_model (falls back to entity_class). A vendor selling both PEO and ASO counts the client as
 // PEO only on filing-grade co-employment evidence; otherwise Unconfirmed. All chips on = the map exactly as before.
 var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares the employer role with the client and runs payroll, benefits and HR under its own plans.'},
-  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer. Includes Paychex pooled 401(k) plan clients (grey pins).'},
+  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer. Includes Paychex HR-outsourcing clients (grey pins).'},
   6:{name:'PEO & ASO',card:'company offers both PEO and ASO',tip:'Clients of companies confirmed to offer both PEO and ASO/HRO. They also show under PEO and under HRO/ASO.'},
   3:{name:'HR Only',card:'HR help, no payroll',tip:'HR help without payroll: HR consulting, benefits administration or a PEO/benefits broker.'},
-  4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software. Includes Florida clients whose own comp policy runs through ADP, Paychex or Paycor\'s insurance agency (grey pins).'},
+  4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software. Includes ADP, Paychex and Paycor payroll clients (grey pins).'},
   5:{name:'Staffing / other',card:'not an HR vendor for this client',tip:'Not an HR vendor for this client: staffing agencies, insurers and employer-of-record payrolling.'},
   0:{name:'Unconfirmed',card:'only a CRM record links it; company also sells payroll or isn\'t classified yet',tip:'Only our CRM record links this client, and the company mainly sells payroll or HR outsourcing (Paychex, CertiPay, Rippling) or is not classified yet, so we cannot tell which service the client uses.'}};
 var SVC_ORDER=['1','2','3','4','5','0'];   // owner 2026-09-23: no separate PEO & ASO chip
@@ -1664,7 +1670,14 @@ function empBand(v){ v=Number(v)||0; if(v<=0) return 7; if(v<10) return 0; if(v<
 function empOk(dd,i){ for(var k in S.empOff){ if(S.empOff[k]){ if(!dd||!dd.hc) return true; return !S.empOff[empBand(dd.hc[i])]; } } return true; }
 function renderEmpChips(){ var box=$('emp-chips'); if(!box) return;
   box.innerHTML=EMP_BANDS.map(function(t,k){ return '<span class="netchip'+(S.empOff[k]?'':' on')+'" data-eb="'+k+'" title="'+(k===7?'Clients with no employee number we can back up yet':'Clients whose best employee count is '+t)+'">'+t+'</span>'; }).join(''); }
-function svcOk(dd,i){ if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
+// v3.68 (1278h, owner 2026-09-24): Carve Outs filter - ticked boxes show only pins carrying that carve-out (either one when both ticked).
+function coOk(dd,i){ if(!S.wcoOnly&&!S.bcoOnly) return true; if(!dd) return false; return !!((S.wcoOnly&&dd.wco&&dd.wco[i])||(S.bcoOnly&&dd.bco&&dd.bco[i])); }
+function coLines(dd,i){ if(!dd) return ''; var s='';
+  if(dd.wco&&dd.wco[i]) s+='<b style="color:#e8a33d">Workers Comp Carve Out</b> <span class="mut">('+(dd.wco[i]===2?'own comp policy alongside the PEO\'s':'keeps its own comp policy')+')</span><br>';
+  if(dd.bco&&dd.bco[i]) s+='<b style="color:#4fb3a9">Benefits Carve Out</b> <span class="mut">(runs its own health plan)</span><br>';
+  return s; }
+function coOf(cid){ for(var st in S.pinData){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.ids) continue; var j=dd.ids.indexOf(String(cid)); if(j>=0) return {dd:dd,i:j}; } return null; }
+function svcOk(dd,i){ if(!coOk(dd,i)) return false; if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
 function svcOkRel(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) return !(S.svcOff[6]&&S.svcOff[1]&&S.svcOff[2]); return !S.svcOff[v]; }
 function renderSvcChips(){
   var box=$('svc-chips'); if(!box) return;
@@ -1805,6 +1818,7 @@ function openCard(p,slug,history){
         var t=n>=2?'cross-verified':(n===1?'verified':'pending verification');
         if(p.peo_source_conflict) t+='<br><span style="color:#d9822b;font-weight:650">Under review — the PEO shown is our current determination</span>';
         return t; })()))+
+    (function(){ var co=p.historical?null:coOf(p.company_id), s=co?coLines(co.dd,co.i):''; return s?kv('Carve Outs',s.replace(/<br>$/,'')):''; })()+
     kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
     histRows+
     '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase.</div>'+
@@ -1890,6 +1904,7 @@ function buildUrl(){
     if(S.msOnly) p.set('ms','1');
     if(S.minSrc) p.set('src',String(S.minSrc));
     if(S.showNP===false) p.set('np','0');
+    if(S.wcoOnly) p.set('wco','1'); if(S.bcoOnly) p.set('bco','1');
     var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }); if(svo.length) p.set('svoff',svo.join(','));
     var eo=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(eo.length) p.set('eoff',eo.join(','));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
@@ -1910,6 +1925,7 @@ function readUrl(){
     if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('np')==='0'){ S.showNP=false; $('np-on').checked=false; }
+    if(p.get('wco')==='1'){ S.wcoOnly=true; $('wco-only').checked=true; } if(p.get('bco')==='1'){ S.bcoOnly=true; $('bco-only').checked=true; }
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
     if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
     if(p.get('eoff')){ p.get('eoff').split(',').forEach(function(k){ if(/^[0-7]$/.test(k)) S.empOff[k]=true; }); try{ renderEmpChips(); }catch(_){} }
