@@ -222,6 +222,50 @@
   .sc-grid { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
   td .cl { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
   td .cl.open { display: block; overflow: visible; }
+  /* ---- mesh scorecard v4 (cowork 2026-09-24): answer first - verdict, what needs a look, what happened, how full the book is ---- */
+  #scV4 { display: grid; gap: 14px; margin: 4px 0 10px; }
+  .s4-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: color-mix(in srgb, var(--vcol, var(--ink-muted)) 10%, transparent); }
+  .s4-verdict .big { font-size: 22px; font-weight: 750; letter-spacing: .02em; color: var(--vcol, var(--ink-1)); display: flex; align-items: center; gap: 8px; }
+  .s4-verdict .big i { width: 12px; height: 12px; border-radius: 50%; background: var(--vcol, var(--ink-muted)); display: inline-block; }
+  .s4-verdict .say { font-size: 14px; color: var(--ink-1); }
+  .s4-verdict .meta { font-size: 12px; color: var(--ink-muted); margin-left: auto; }
+  .s4-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+  .s4-box { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 12px; }
+  .s4-box h4 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-muted); }
+  .s4-box h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .s4-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .s4-list li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; line-height: 1.45; }
+  .s4-list li b.ic { flex: none; width: 16px; text-align: center; font-size: 12px; }
+  .s4-list li.bad b.ic { color: var(--critical); } .s4-list li.watch b.ic { color: var(--warning); } .s4-list li.good b.ic { color: var(--good); }
+  .s4-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+  .s4-hero .h { position: relative; border: 1px solid var(--grid); border-radius: 10px; padding: 9px 12px; }
+  .s4-hero .k { font-size: 11px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .s4-hero .v { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 1px 0; }
+  .s4-hero .c { font-size: 11.5px; color: var(--ink-2); line-height: 1.5; }
+  .s4-hero svg { position: absolute; top: 30px; right: 12px; }
+  .s4-up { color: var(--good); } .s4-dn { color: var(--serious); } .s4-flat { color: var(--ink-muted); }
+  .s4-bars { display: grid; gap: 5px; }
+  .s4-bar { display: grid; grid-template-columns: minmax(160px, 1.6fr) 2fr 56px 84px; align-items: center; gap: 10px; font-size: 12.5px; }
+  .s4-bar .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s4-bar .lab small { color: var(--ink-muted); margin-left: 4px; }
+  .s4-bar .trk { position: relative; height: 10px; background: var(--grid); border-radius: 0 4px 4px 0; }
+  .s4-bar .trk i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--series-1); border-radius: 0 4px 4px 0; }
+  .s4-bar .pct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .s4-bar .d { text-align: right; font-variant-numeric: tabular-nums; font-size: 11.5px; }
+  .s4-band { font-size: 10.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .07em; margin: 8px 0 2px; }
+  .s4-band:first-child { margin-top: 0; }
+  .s4-note { font-size: 11.5px; color: var(--ink-muted); margin-top: 6px; }
+  .s4-mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+  .s4-mini .m { border: 1px solid var(--grid); border-radius: 8px; padding: 6px 10px; }
+  .s4-mini .m .k { font-size: 10.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .s4-mini .m .v { font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .s4-mini .m .d { font-size: 11px; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #scorecard details.s4-more { border-top: 1px solid var(--grid); padding-top: 8px; margin-top: 4px; }
+  #scorecard details.s4-more > summary { cursor: pointer; font-size: 12px; color: var(--ink-2); list-style: none; }
+  #scorecard details.s4-more > summary::before { content: "\25B8  "; }
+  #scorecard details.s4-more[open] > summary::before { content: "\25BE  "; }
+  #scorecard details.s4-more[open] > summary { margin-bottom: 10px; }
   @media (max-width: 700px) { main { grid-template-columns: 1fr; padding: 0 10px 30px; } #tabs, #strip, header, #legend { padding-left: 10px; padding-right: 10px; } }
 </style>
 </head>
@@ -1790,6 +1834,167 @@ setInterval(poll, POLL_MS);
   load();
   setInterval(load, 10 * 60 * 1000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+})();
+</script>
+<script id="scorecardV4">
+/* ---- mesh scorecard v4 (cowork 2026-09-24): answer first.
+   1 verdict in words  2 what needs a look / what went well  3 what happened (vs last run + trend)
+   4 how full the book is, who delivered, best-covered states & PEOs  5 engine health
+   The original readout, all 19 tiles and the detail tables stay one click away under "Full readout". ---- */
+(function () {
+  "use strict";
+  if (typeof renderScorecard !== "function") return;
+  var N = function (v) { return v == null || v === "" || isNaN(Number(v)) ? "—" : Number(v).toLocaleString(); };
+  var E = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var ago = function (iso) {
+    if (!iso) return "—";
+    var s = (Date.now() - new Date(iso).getTime()) / 1000;
+    return s < 3600 ? Math.max(1, Math.round(s / 60)) + " min ago" : s < 172800 ? (s / 3600).toFixed(1) + " h ago" : (s / 86400).toFixed(1) + " days ago";
+  };
+  function delta(cur, prev, suffix) {
+    if (cur == null || prev == null || isNaN(Number(cur)) || isNaN(Number(prev))) return '<span class="s4-flat">no earlier run</span>';
+    var dlt = Number(cur) - Number(prev);
+    if (dlt === 0) return '<span class="s4-flat">= same as last run</span>';
+    return '<span class="' + (dlt > 0 ? "s4-up" : "s4-dn") + '">' + (dlt > 0 ? "▲ " : "▼ ") + Math.abs(dlt).toLocaleString() + (suffix || "") + "</span> vs last run";
+  }
+  function fieldDelta(v) {
+    if (v == null || isNaN(Number(v)) || Number(v) === 0) return '<span class="s4-flat">—</span>';
+    var n = Number(v);
+    return '<span class="' + (n > 0 ? "s4-up" : "s4-dn") + '">' + (n > 0 ? "▲ +" : "▼ −") + Math.abs(n).toLocaleString() + "</span>";
+  }
+  function spark(vals) {
+    var v = vals.filter(function (x) { return x != null && !isNaN(Number(x)); }).map(Number);
+    if (v.length < 2) return "";
+    var w = 78, h = 22, mx = Math.max.apply(null, v), mn = Math.min.apply(null, v), r = mx - mn || 1;
+    var pts = v.map(function (x, i) { return [(i * (w - 4)) / (v.length - 1) + 2, h - 3 - ((x - mn) / r) * (h - 6)]; });
+    var last = pts[pts.length - 1];
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" aria-hidden="true"><polyline fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="' +
+      pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") + '"/><circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="3" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="1.5"/></svg>';
+  }
+  function bar(label, sub, pct, right, d, title) {
+    var p = Math.max(0, Math.min(100, Number(pct) || 0));
+    return '<div class="s4-bar" title="' + E(title || "") + '"><span class="lab">' + E(label) + (sub ? "<small>" + E(sub) + "</small>" : "") +
+      '</span><span class="trk"><i style="width:' + (p > 0 ? Math.max(p, 1) : 0) + '%"></i></span><span class="pct">' + right + '</span><span class="d">' + (d || "") + "</span></div>";
+  }
+
+  function setup(sec) {
+    var book = document.getElementById("scBook"), head = document.getElementById("scHead");
+    var top = document.createElement("div"); top.id = "scV4top"; top.style.cssText = "display:grid;gap:12px;margin:4px 0 10px";
+    var box = document.createElement("div"); box.id = "scV4";
+    if (book) { book.parentNode.insertBefore(top, book); book.parentNode.insertBefore(box, book.nextSibling); }
+    else { sec.appendChild(top); sec.appendChild(box); }
+    if (head) head.style.display = "none";
+    var det = document.createElement("details"); det.className = "s4-more";
+    det.innerHTML = "<summary>Full readout, every tile and the detail tables</summary>";
+    ["scNarr", "scTiles"].forEach(function (id) { var el = document.getElementById(id); if (el) det.appendChild(el); });
+    var grid = sec.querySelector(".sc-grid"); if (grid) det.appendChild(grid);
+    sec.appendChild(det);
+  }
+
+  function scV4(d) {
+    var sec = document.getElementById("scorecard"); if (!sec) return;
+    if (!document.getElementById("scV4")) setup(sec);
+    var top = document.getElementById("scV4top"), box = document.getElementById("scV4");
+    var row = ((d && d.desk_mesh_scorecard && d.desk_mesh_scorecard.rows) || [])[0];
+    if (!row) { top.innerHTML = '<div class="s4-verdict"><span class="say">Waiting for the first scorecard run.</span></div>'; box.innerHTML = ""; return; }
+    var m = row.metrics || {}, L = m.lifecycle || {}, F = m.flow || {}, C = m.cost || {}, FP = row.fingerprint || {};
+    var H = row.history || [], prev = H[1] || null;
+    var trend = function (k) { return H.slice(0, 8).reverse().map(function (h) { return h[k]; }); };
+    var book = (typeof scBook !== "undefined") ? scBook : "both";
+
+    /* 1 verdict */
+    var V = { green: ["var(--good)", "The mesh is working."], yellow: ["var(--warning)", "Working, with things to watch."], red: ["var(--critical)", "Something is broken — act now."] }[row.verdict] || ["var(--ink-muted)", "No verdict yet."];
+    var bk = m.book || {};
+    var html = '<div class="s4-verdict" style="--vcol:' + V[0] + '"><span class="big"><i></i>' + E(String(row.verdict || "?").toUpperCase()) + '</span><span class="say">' + V[1] + "</span>" +
+      '<span class="meta">last run ' + ago(row.run_at) + " · covers the last " + E(m.hours || "?") + " h · " + N(m.universe) + " companies" + (bk.current != null ? " (" + N(bk.current) + " on a PEO now, " + N(bk.former) + " former)" : "") + "</span></div>";
+
+    /* 2 needs a look / went well (the plain-English readout, sorted) */
+    var bad = [], good = [];
+    if (row.last_attempt_ok === false) bad.push(["bad", "●", "The latest scheduled run failed (" + ago(row.last_attempt_at) + "): " + (row.last_attempt_err || "no error text") + ". Showing the last good run."]);
+    if (row.last_selftest_pass === false) bad.push(["bad", "●", "Self-test failing: " + (row.last_selftest_failed || "unknown check") + "."]);
+    (m.verdict_reasons || []).forEach(function (r) { bad.push(["watch", "▲", r]); });
+    if (Number(F.oldest_unread_hours) > 24) bad.push(["bad", "●", "Mail between sources has been waiting unread for " + F.oldest_unread_hours + " hours."]);
+    var nb = (row.narratives && row.narratives[book]) || [];
+    nb.forEach(function (bl) {
+      if (bl.tone === "stalled") bad.push(["bad", "●", bl.text]);
+      else if (bl.tone === "watch") bad.push(["watch", "▲", bl.text]);
+      else if (bl.tone === "good" && !/^Verdict/i.test(bl.text)) good.push(["good", "✓", bl.text]);
+    });
+    if (!bad.length) bad.push(["good", "✓", "Nothing needs a look this run."]);
+    var li = function (x) { return '<li class="' + x[0] + '"><b class="ic">' + x[1] + "</b><span>" + E(x[2]) + "</span></li>"; };
+    html += '<div class="s4-cols"><div class="s4-box"><h4>Needs a look</h4><ul class="s4-list">' + bad.map(li).join("") + "</ul></div>" +
+      '<div class="s4-box"><h4>What went well</h4><ul class="s4-list">' + (good.slice(0, 6).map(li).join("") || '<li class="watch"><b class="ic">▲</b><span>No gains reported this run.</span></li>') + "</ul></div></div>";
+    top.innerHTML = html;
+
+    /* 3 what happened */
+    var wm = Number(L.through_mesh) || 0, wn = Number(L.through_mesh_with_new_data) || 0;
+    var hero = [
+      ["Records changed", m.records_changed, prev && prev.records_changed, trend("records_changed"), N(m.records_created) + " brand-new companies"],
+      ["New PEO users", L.entries, prev && prev.entries, trend("entries"), N(L.entries_new_companies) + " new to the book"],
+      ["Switched PEO", L.switches, prev && prev.switches, trend("switches"), N(L.switches_competitive) + " to a competitor"],
+      ["Left the PEO model", L.exits, prev && prev.exits, trend("exits"), N(L.exits_confirmed) + " confirmed"],
+      ["Mesh came back with new data", wn, prev && prev.through_mesh_with_new_data, trend("through_mesh_with_new_data"), wm ? Math.round((100 * wn) / wm) + "% of " + N(wm) + " sent through" : "none sent through"],
+      ["Confirmed by 2+ sources", L.corroborated_total, prev && prev.corroborated_total, trend("corroborated_total"), (L.corroborated_pct != null ? L.corroborated_pct + "% of the book" : "")]
+    ];
+    var out = '<div class="s4-box"><h4>What happened this run <small>— compared with the run before, and the last 8 runs</small></h4><div class="s4-hero">' +
+      hero.map(function (h) {
+        return '<div class="h" title="' + E(h[4]) + '"><div class="k">' + E(h[0]) + '</div><div class="v">' + N(h[1]) + '</div><div class="c"><span>' + delta(h[1], h[2]) + "<br>" + E(h[4]) + "</span>" + spark(h[3]) + "</div></div>";
+      }).join("") + "</div></div>";
+
+    /* 4 book fill / who delivered / best covered */
+    var byBook = (book !== "both" && m.fields_by_book && m.fields_by_book[book]) ? m.fields_by_book[book] : null;
+    var bmap = {}; ((byBook && byBook.fields) || []).forEach(function (f) { bmap[f.key] = f; });
+    var fields = (m.fields || []).map(function (f0) { var b = bmap[f0.key]; return b ? Object.assign({}, f0, b, { delta_filled: null }) : f0; });
+    var bands = [["Strong — 80% or more", function (p) { return p >= 80; }], ["Building — 30 to 79%", function (p) { return p >= 30 && p < 80; }], ["Thin — under 30%", function (p) { return p < 30; }]];
+    var fh = bands.map(function (b) {
+      var fs = fields.filter(function (f) { return b[1](Number(f.pct) || 0); }).sort(function (a, c) { return (Number(c.pct) || 0) - (Number(a.pct) || 0); });
+      if (!fs.length) return "";
+      return '<div class="s4-band">' + b[0] + " · " + fs.length + "</div>" + fs.map(function (f) {
+        var t = (f.why || "") + (f.strong_pct != null ? " · strong: " + Number(f.strong_pct).toFixed(1) + "%" : "") + (f.top_source ? " · top source: " + f.top_source : "") + " · " + N(f.filled) + " companies filled";
+        return bar(f.label, "#" + f.rank, f.pct, (Number(f.pct) || 0).toFixed(1) + "%", fieldDelta(f.delta_filled), t);
+      }).join("");
+    }).join("");
+    var cols = '<div class="s4-box"><h4>How full is the book <small>— the 16 agreed fields' + (byBook ? ", " + E(book) + " PEO users only" : "") + '</small></h4><div class="s4-bars">' + fh +
+      '</div><div class="s4-note">▲ / ▼ = companies gained or lost on that field since the last run. #1 is the most important field. Hover a row for why it matters.</div></div>';
+    var srcs = (m.sources || []).slice().sort(function (a, c) { return (Number(c.subjects) || 0) - (Number(a.subjects) || 0); }).slice(0, 8);
+    var smax = Math.max.apply(null, srcs.map(function (s) { return Number(s.subjects) || 0; }).concat([1]));
+    cols += '<div class="s4-box"><h4>Who delivered this run <small>— companies each source added to or changed</small></h4><div class="s4-bars">' +
+      (srcs.map(function (s) {
+        var conf = Number(s.letters_conflicting) > 0 ? " · ▲ " + N(s.letters_conflicting) + " conflicting" : "";
+        return bar(s.display, conf, 100 * (Number(s.subjects) || 0) / smax, N(s.subjects), '<span class="s4-flat">' + N(s.fields_touched) + " fields</span>",
+          (s.kind || "") + (s.state ? " · " + s.state : "") + " · " + N(s.letters_accepted) + " facts accepted");
+      }).join("") || '<div class="s4-note">No source delivered anything in this window.</div>') + "</div></div>";
+    var best = function (arr, key) {
+      return (arr || []).slice().sort(function (a, c) { return Number(c.completeness_pct) - Number(a.completeness_pct); }).slice(0, 5).map(function (r) {
+        return bar(r[key], "", r.completeness_pct, (Number(r.completeness_pct) || 0).toFixed(1) + "%", fieldDelta(r.delta_pts), N(r.companies) + " companies · " + N(r.touched_in_window) + " touched this run");
+      }).join("");
+    };
+    cols += '<div class="s4-box"><h4>Most complete states <small>— share of the 16 fields filled</small></h4><div class="s4-bars">' + (best(m.states, "state") || '<div class="s4-note">—</div>') +
+      '</div><h4 style="margin-top:12px">Most complete PEO books</h4><div class="s4-bars">' + (best(m.peos, "peo") || '<div class="s4-note">—</div>') +
+      '</div><div class="s4-note">▲ / ▼ here = percentage points since the last run.</div></div>';
+    out += '<div class="s4-cols">' + cols + "</div>";
+
+    /* 5 engine health */
+    var fpDepth = FP.with_5_plus_fields != null ? (100 * Number(FP.with_5_plus_fields) / Math.max(1, Number(FP.book))).toFixed(1) + "%" : "—";
+    var mini = [
+      ["Facts moved between sources", N(F.letters_sent), N(F.accepted) + " accepted · " + N(F.conflicting) + " conflicting"],
+      ["Waiting unread", N(F.unread_backlog), F.oldest_unread_hours != null ? "oldest " + F.oldest_unread_hours + " h" : "nothing waiting"],
+      ["Contradictions", N(L.contradictions), N(L.contested_facts) + " contested facts"],
+      ["Verified by federal filing", FP.fed_verified != null ? N(Number(FP.fed_verified) + Number(FP.fed_adopted || 0)) : "—", "PEO named on a filed Form 5500"],
+      ["Unique EINs", N(FP.book_unique_eins), N(FP.ein_pending) + " locations still need an EIN"],
+      ["Known by 5+ facts", fpDepth, N(FP.with_10_plus_fields) + " by 10+ · avg " + (FP.avg_fields_observed || "—") + " facts"],
+      ["Self-healed (24 h)", N(FP.heals_24h), "merges, EIN reroutes, address fixes"],
+      ["Cost this run", C.anthropic_usd != null ? "$" + Number(C.anthropic_usd).toFixed(2) : "—", C.usd_per_accepted_fact != null ? "$" + C.usd_per_accepted_fact + " per accepted fact" : ""]
+    ];
+    out += '<div class="s4-box"><h4>Engine health</h4><div class="s4-mini">' + mini.map(function (x) {
+      return '<div class="m" title="' + E(x[2]) + '"><div class="k">' + E(x[0]) + '</div><div class="v">' + E(x[1]) + '</div><div class="d">' + E(x[2]) + "</div></div>";
+    }).join("") + "</div></div>";
+    box.innerHTML = out;
+  }
+
+  var orig = renderScorecard;
+  window.renderScorecard = function (d) { orig(d); try { scV4(d); } catch (e) { if (window.console) console.error("scorecard v4", e); } };
+  try { if (typeof latest !== "undefined" && latest && Object.keys(latest).length) scV4(latest); } catch (e) {}
 })();
 </script>
 </body>
