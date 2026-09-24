@@ -334,7 +334,7 @@
   </section>
 
   <section class="wide" id="peoPrecision">
-    <h2>PEO precision check: what each PEO says vs what we have <small>— owner only · researched 2026-09-24 · rebuilt hourly</small></h2>
+    <h2>PEO precision check: what each PEO says vs what we have <small>— owner only · researched 2026-09-24 · rebuilt hourly · "current" = seen with the PEO in the last 24 months (2172)</small></h2>
     <p class="blurb">For the top 100 PEOs by clients we captured, word for word, every size figure the PEO states about itself (its website, press releases, filings), with the date and what the number really counts. Each one is compared with our own data: current clients in our records, people in its own benefit and retirement plans, and our size model. Numbers that count something else (all-time totals, a year's W-2 forms, a whole group of companies, new clients in one year) are saved but never compared as if they were a headcount. The Quick Card and the profile now show only stated figures or "Not stated" plus our exact counts; no estimate ranges.</p>
     <div class="sc-tiles" id="prTiles"></div>
     <div class="pn-bar" style="margin:0 0 8px"><label>verdict <select id="prFilter"><option value="">all with a finding</option><option value="mixed">mixed</option><option value="ours_high">our count too high</option><option value="ours_low">our count too low</option><option value="apples_oranges">apples and oranges</option><option value="consistent">matches</option><option value="stale">over 2 years old</option><option value="not_stated">states nothing</option><option value="*">everything</option></select></label><span id="prCount"></span></div>
@@ -1372,7 +1372,7 @@ setInterval(poll, POLL_MS);
     if (cnt) cnt.textContent = " " + rows.length + " PEOs";
     tb.innerHTML = rows.map(function (r) {
       var v = V[r.overall] || [r.overall, "inherit"];
-      var have = n0(r.book_clients) + " current clients in our records";
+      var have = n0(r.book_clients) + " current clients (seen with it in the last 24 months)" + (r.book_unconfirmed ? "<br>" + n0(r.book_unconfirmed) + " unconfirmed (older sighting, not counted)" : "");   // 2173
       if (r.wse_status === "published") have += "<br>published headcount on file";
       else if (r.plan_participants != null) have += "<br>" + n0(r.plan_participants) + " in its own plans (" + e(r.plan_year) + ")";
       if (r.wse_low != null && r.wse_status !== "published") have += '<br><span class="age cold">size model ' + n0(r.wse_low) + "–" + n0(r.wse_high) + "</span>";
