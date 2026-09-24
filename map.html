@@ -1029,12 +1029,17 @@ function draw(){
   // owner: no stars)
   if(S.beaconsOn||S.hqLogos){
     var bps=z<6?0.7:1;
+    // owner 2026-09-23: a logo/beacon shows ONLY when its PEO is selected (was: hidden only when explicitly unchecked, so a
+    // company missing from the PEO list - e.g. a retired non-PEO - showed under every selection). Brand view: any of its brands.
+    var famOn={};
+    if(S.grain==='family'){ Object.keys(sel).forEach(function(k){ if(sel[k]===true) famOn[k]=true; }); }
+    else { (S.catalog&&S.catalog.brands||[]).forEach(function(r){ if(sel[r.slug]===true){ famOn[r.slug]=true; if(r.family_slug) famOn[r.family_slug]=true; } }); }
     var bDraw=[];   // v3.10: collect first, fan out overlaps, THEN render with leader lines
     for(var b2=0;b2<S.beacons.length;b2++){
       var b=S.beacons[b2];
       var isHq=b.kind==='hq';
       if(!isHq && b.state && S.states[b.state]===false) continue;   // v3.18: States culls pins+admin beacons, never HQ chips (owner: None wiped the logos)
-      if(sel[b.family_slug]===false) continue;
+      if(!b.family_slug||!famOn[b.family_slug]) continue;
       if(isHq){ if(!S.hqLogos) continue; }                       // "PEO HQ pins (logos)" governs headquarters
       else if(b.kind==='administrative'){ if(!S.beaconsOn||z<6) continue; }   // ◆ verified admin office
       else if(b.kind==='hq_candidate'){ if(!S.hqCand||z<6) continue; }       // ✩ UNVERIFIED hq guess — own toggle
