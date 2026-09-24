@@ -248,6 +248,9 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .peo-row .ct.pend{border-bottom:1px dotted var(--muted);cursor:help}
 .peo-row .solo{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden}
 .peo-row:hover .solo{visibility:visible}
+.peo-row .prof{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden;text-decoration:none;margin-left:3px}
+.peo-row:hover .prof{visibility:visible}
+.peo-row .prof:hover{color:var(--ink)}
 .peo-row.off .sw{opacity:.25}
 #states{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;max-height:150px;overflow-y:auto}
 .st{font-size:10.5px;text-align:center;padding:4px 0;border-radius:5px;background:var(--surface2);border:1px solid var(--border);color:var(--ink2);cursor:pointer;user-select:none}
@@ -1503,6 +1506,13 @@ function buildPeoPanel(){
       so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
       d.appendChild(so);
     }
+    // 1283 (owner 2026-09-24): every PEO in this list has a profile with the same name - one click away
+    if(r.slug && !isNP(r.slug) && r.slug!=='unattributed'){
+      var pf=document.createElement('a'); pf.className='prof'; pf.textContent='profile'; pf.target='_blank'; pf.rel='noopener';
+      pf.href='intel.html#peo='+encodeURIComponent(r.slug); pf.title='Open the '+(r.display||r.slug)+' profile';
+      pf.onclick=function(e){ e.stopPropagation(); };
+      d.appendChild(pf);
+    }
     d.onclick=function(){ map[r.slug]=map[r.slug]===false?true:false; afterSel(); };
     host.appendChild(d);
   }
@@ -1787,6 +1797,7 @@ function openCard(p,slug,history){
     kv('Pin placement',p.geo_precision==='street'?'exact address':'ZIP area (exact coming)')+
     histRows+
     '<div class="note">Full record detail (lifecycles, timeline, documents) lands here in a later phase.</div>'+
+    ((slug && slug!=='unattributed' && !isNP(slug))?'<a class="lk" href="intel.html#peo='+encodeURIComponent(slug)+'" target="_blank" rel="noopener">Open the '+esc(dispOf(slug))+' profile →</a><br>':'')+   // 1283
     '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
     '</div>';
   c.style.display='block';
