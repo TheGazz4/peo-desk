@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.68 (2026-09-24, owner: "one click should show the PEO's quick card in the upper right (with an ability to click to see the
+            full profile) but a double click should take you direct to the PEO's Profile"): single click on any PEO logo/beacon opens
+            its Quick Card in the #card slot (name, former name, "Acquired by" + month/year when it applies, IRS-certified, website,
+            clients, worksite employees + national rank, national market share, "Open full profile"); double click opens
+            intel.html#peo=<slug>. Every PEO, not just the top 25. Data: map-data v2.17 mode=peo_card + pub.peo_quick_card (2164).
      v3.67 (2026-09-24, owner: "when i click on a peo's logo on the map it should take me directly to the PEO's profile where we
             display Profile and Intel"; "with the city & state it's assumed that it's headquarters, you don't need to label it.
             You can leave the client count and then that's it"): clicking an HQ logo chip / PEO beacon opens intel.html#peo=<slug>
@@ -884,6 +889,7 @@ window.initMap=function(){
   mapDiv.addEventListener('mousemove',onMove);
   mapDiv.addEventListener('mouseleave',function(){ S.hover=null; closeTip(); });
   mapDiv.addEventListener('click',onClick);
+  mapDiv.addEventListener('dblclick',onDblClick);   // v3.68: double-click a PEO logo -> its full profile
   initStateClick();   // v3.59 state Quick Card
   try{ initFullscreen(); }catch(_){}   // v3.61 full screen keeps pins + Quick Card
   mapDiv.addEventListener('mousedown',onDrawDown,true);
@@ -1351,7 +1357,7 @@ document.addEventListener('keydown',function(e){
 
 var hoverRaf=false;
 // v3.67: pointer cursor while over a clickable PEO beacon (Google Maps owns the cursor, so set it through the map)
-function beaconCursor(on){ on=!!on; if(S.map&&S.beaconCur!==on){ S.beaconCur=on; S.map.setOptions({draggableCursor:on?'pointer':null}); } }
+function beaconCursor(on){ on=!!on; if(S.map&&S.beaconCur!==on){ S.beaconCur=on; S.map.setOptions({draggableCursor:on?'pointer':null,disableDoubleClickZoom:on}); } }   // v3.68: a double-click on a logo opens the profile, not a zoom
 function onMove(e){
   if(S.drawMode){ onDrawMove(e); return; }
   if(hoverRaf) return; hoverRaf=true;
@@ -1414,9 +1420,9 @@ function onClick(e){
     if(cid) api({mode:'company',id:cid}).then(function(r){ if(r.company) openCard(r.company,hsl2,r.history); });
     return;
   }
-  if(h.kind==='beacon'){   // v3.67 (owner 2026-09-24): click a PEO's logo -> straight to its profile (PEO PROFILE + INDUSTRY INTEL)
+  if(h.kind==='beacon'){   // v3.68 (owner 2026-09-24): ONE click = the PEO's Quick Card (upper right); DOUBLE click = full profile (onDblClick)
     var bslug=h.b&&h.b.family_slug;
-    if(bslug&&!isNP(bslug)){ window.open('intel.html#peo='+encodeURIComponent(bslug),'_blank','noopener'); return; }
+    if(bslug&&!isNP(bslug)){ closeTip(); openPeoCard(h.b); return; }
     tipBeacon(h.b,e); return;   // a beacon with no PEO on file keeps the tooltip
   }
   var d=S.pinData[h.st]; if(!d||!d.detail) return;
@@ -1424,6 +1430,65 @@ function onClick(e){
   var slug=slugArr[IDX[h.i]];
   var id=d.detail.ids[h.i];
   if(id) api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slug,r.history); });
+}
+// v3.68 (owner 2026-09-24): ONE click on a PEO's logo opens its Quick Card (upper right); a DOUBLE click goes straight to
+// its full profile (PEO PROFILE + INDUSTRY INTEL). Card content per owner ruling 2026-09-24: name, former name, "Acquired by"
+// + month/year only when it applies, IRS-certified PEO, website, clients, worksite employees + national rank, national market
+// share, and the link to the full profile. Works for every PEO on the map, not just the top 25. Data: map-data mode=peo_card
+// (published shelf pub.peo_profiles + pub.peo_quick_card; never sources).
+function onDblClick(e){
+  if(S.drawMode) return;
+  var h=pick(e); if(!h||h.kind!=='beacon') return;
+  var s=h.b&&h.b.family_slug; if(!s||isNP(s)) return;
+  e.preventDefault(); e.stopPropagation();
+  window.open('intel.html#peo='+encodeURIComponent(s),'_blank','noopener');
+}
+var PEO_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function peoAcqDate(d,prec){ if(!d) return ''; var y=String(d).slice(0,4), m=+String(d).slice(5,7); return (prec==='year'||!m)?y:(PEO_MONTHS[m-1]+' '+y); }
+function peoPct(x,d){ return x.toFixed(d==null?(x<1?2:1):d)+'%'; }
+function peoCardHtml(b,pc){
+  var slug=b.family_slug, name=(pc&&pc.display_name)||b.peo_display||dispOf(slug)||slug;
+  var logo=S.logoCache&&S.logoCache[slug];
+  var n=function(v){ return Number(v).toLocaleString(); };
+  var rows='';
+  if(pc===undefined||pc===null){ rows='<div class="note" style="margin-top:0">Loading…</div>'; }
+  else if(pc===false){ rows='<div class="note" style="margin-top:0">This PEO’s card could not be loaded just now.</div>'; }
+  else {
+    if(pc.former_name) rows+=kv('Formerly',esc(pc.former_name));
+    if(pc.acquired_by_name) rows+=kv('Acquired by',esc(pc.acquired_by_name)+(pc.acquired_on?' · '+esc(peoAcqDate(pc.acquired_on,pc.acquired_precision)):''));
+    rows+=kv('IRS-certified PEO',({certified:'Yes',suspended:'Suspended',revoked:'Revoked'})[pc.cpeo_status]||'No');
+    if(pc.website){ var w=String(pc.website), href=/^https?:/i.test(w)?w:'https://'+w;
+      rows+=kv('Website','<a class="lk" href="'+esc(href)+'" target="_blank" rel="noopener">'+esc(w.replace(/^https?:\/\/(www\.)?/i,'').replace(/\/$/,''))+'</a>'); }
+    rows+=kv('Clients',pc.client_count!=null?n(pc.client_count):'—');
+    var wse;
+    if(pc.size_contradicted) wse='<span class="mut">being re-checked</span>';
+    else if(pc.wse_high==null) wse='<span class="mut">not sized yet</span>';
+    else if(pc.wse_published||Number(pc.wse_low)===Number(pc.wse_high)) wse=n(pc.wse_high)+(pc.wse_published?' <span class="mut">(reported)</span>':'');
+    else wse=n(pc.wse_low)+' – '+n(pc.wse_high)+' <span class="mut">(estimate)</span>';
+    rows+=kv('Worksite employees',wse);
+    if(pc.rank_best!=null) rows+=kv('National rank',(pc.rank_best===pc.rank_worst?'#'+pc.rank_best:'#'+pc.rank_best+' – #'+pc.rank_worst)+' <span class="mut">of '+pc.rank_of_n+'</span>');
+    if(pc.share_high!=null){ var lo=+pc.share_low, hi=+pc.share_high;
+      rows+=kv('National market share', hi<0.01?'under 0.01%':(lo===hi?peoPct(hi):(lo<0.01?'up to '+peoPct(hi):peoPct(lo,lo<1?2:1)+' – '+peoPct(hi,lo<1?2:1)))); }
+  }
+  var mark=logo?'<span style="background:#fff;border-radius:6px;padding:4px;display:inline-block;flex:none"><img src="'+logo+'" alt="" style="display:block;width:40px;height:40px;object-fit:contain"></span>'
+               :'<span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>';
+  return '<div class="hd">'+mark+'<div><b>'+esc(name)+'</b></div>'+
+    '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
+    '<div class="bd">'+rows+
+    '<a class="lk" href="intel.html#peo='+encodeURIComponent(slug)+'" target="_blank" rel="noopener">Open full profile →</a>'+
+    '</div>';
+}
+function openPeoCard(b){
+  var c=$('card'); stClear(true); c.dataset.kind='peo';   // replaces a company / state card, like openCard
+  var slug=b.family_slug; S.peoCardSlug=slug; S.peoCard=S.peoCard||{};
+  var pc=S.peoCard[slug];
+  c.innerHTML=peoCardHtml(b,pc); c.style.display='block';
+  if(pc===undefined||pc===null||(pc&&pc.rank_of_n===undefined)){   // not fetched yet, or fetched by an older hover payload
+    api({mode:'peo_card',slug:slug}).then(function(r){
+      S.peoCard[slug]=(r&&r.card)?r.card:false;
+      if(S.peoCardSlug===slug&&c.dataset.kind==='peo') c.innerHTML=peoCardHtml(b,S.peoCard[slug]);
+    }).catch(function(){ if(S.peoCardSlug===slug&&c.dataset.kind==='peo') c.innerHTML=peoCardHtml(b,false); });
+  }
 }
 function tipBeacon(b,ev){
   // v3.64 (owner 2026-09-23: "this intel should also live on each PEO profile's card"): the HQ card now carries
