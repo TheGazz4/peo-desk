@@ -1428,6 +1428,8 @@ function tipBeacon(b,ev){
   if(pc&&pc.owner_line) lines.push('<span style="color:var(--muted)">'+esc(pc.owner_line)+'</span>');
   lines.push(esc(kinds[b.kind]||b.kind)+': '+esc((b.city||'')+', '+(b.state||''))+(b.kind==='hq'&&pc&&pc.hq_confirmed?' &#10003;':''));
   if(pc&&pc.client_count) lines.push(esc(Number(pc.client_count).toLocaleString())+' clients');
+  // 1297 (owner law 1296, 2026-09-24): does this PEO offer a group medical plan / its own workers' comp policy?
+  if(pc){ [pc.medical_offering,pc.wc_offering].forEach(function(o){ if(o&&o.state&&o.state!=='not_determined') lines.push(esc(o.label)); }); }
   tipShow(logoHtml+'<b>'+esc(name)+'</b><br>'+lines.join('<br>'),ev);
   if(!cached && b.has_logo && S.logoCache[b.family_slug]!==''){
     S.logoCache[b.family_slug]='';
@@ -1794,7 +1796,8 @@ function openCard(p,slug,history){
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
     '<div class="bd">'+formerBanner+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
-    (p.historical?'':(kv('Health renewal',hren)+kv('WC renewal',ren)))+
+    (p.historical?'':(kv('Health renewal','<span id="cardHren">'+hren+'</span>')+kv('WC renewal','<span id="cardWren">'+ren+'</span>')))+
+    '<div id="cardOffer"></div>'+
     kv('Employees',empCard(p))+(function(){var e=empOf(p);return (e&&e.li)?kv('LinkedIn Employee Count',esc(e.li)):'';})()+
     (p.historical?'':(kv('With PEO since',since)+kv('Operating footprint',fpText(p))))+
     (p.historical?'':kv('Confidence',(function(){
@@ -1809,6 +1812,29 @@ function openCard(p,slug,history){
     '<a class="lk" href="ask.html" target="_blank">Ask the AI Data Desk about this company →</a>'+
     '</div>';
   c.style.display='block';
+  fillCardOffer(slug,p);   // 1297
+}
+// 1297 (owner law 1296, 2026-09-24): some real PEOs offer no group medical plan (clients keep their own) and some offer
+// no workers' comp policy of their own (clients keep their own policy). The client card says so, and a PEO/brand plan
+// month is never presented as this client's health renewal when the PEO has no group medical plan.
+function fillCardOffer(slug,p){
+  var box=$('cardOffer'); if(!box||!slug||slug==='unattributed'||isNP(slug)) return;
+  function go(pc){
+    if(!pc||$('cardOffer')!==box) return;
+    var m=pc.medical_offering, w=pc.wc_offering, h='';
+    if(m&&m.state&&m.state!=='not_determined') h+=kv('PEO group medical',esc(m.label));
+    if(w&&w.state&&w.state!=='not_determined') h+=kv('PEO workers\u2019 comp',esc(w.label));
+    box.innerHTML=h;
+    if(!p.historical){
+      var hr=$('cardHren');
+      if(hr&&m&&m.state==='does_not_offer') hr.innerHTML='Client\u2019s own health plan'+(p.health_renewal_month&&Number(p.health_renewal_basis)>=3?(' \u00b7 '+MONTHS[p.health_renewal_month]):' \u00b7 date not confirmed');
+      var wr=$('cardWren');
+      if(wr&&w&&w.state==='does_not_offer'&&!p.wc_renewal_month) wr.innerHTML='Client\u2019s own WC policy \u00b7 date not confirmed';
+    }
+  }
+  S.peoCard=S.peoCard||{};
+  if(S.peoCard[slug]) return go(S.peoCard[slug]);
+  api({mode:'peo_card',slug:slug}).then(function(r){ if(r&&r.card){ S.peoCard[slug]=r.card; go(r.card); } }).catch(function(){});
 }
 function openSharePanel(st){
   // v3.62: counted in the browser from the pins already loaded, so it opens instantly and matches the map.
