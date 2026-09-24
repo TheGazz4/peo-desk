@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
-  INDUSTRY INTEL surface v1.2 (2026-09-23: column-aligned tables, share-price tile, count-coverage note, contradiction guard; mig 2150/2151). v1.1 (2026-09-23: tabs PEO PROFILE | INDUSTRY INTEL; size rank, market share on the 2026 industry count, book coverage, filed-facts-first outlook; mig 2148/2149). v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
+  INDUSTRY INTEL surface v1.3 (2026-09-23: employees-per-client card restored with calculation + honest ranks; mig 2153). v1.2 (2026-09-23: column-aligned tables, share-price tile, count-coverage note, contradiction guard; mig 2150/2151). v1.1 (2026-09-23: tabs PEO PROFILE | INDUSTRY INTEL; size rank, market share on the 2026 industry count, book coverage, filed-facts-first outlook; mig 2148/2149). v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
   Pick a PEO from the dropdown -> Industry Intel panel (size, market share, size-group yardsticks, model, checks,
   12-month outlook, open flags) + the full PEO profile (template v1).
   Data: dash-ai mode 'sql' (read-only, desk key) calling
@@ -113,6 +113,11 @@
   table.aligned th:last-child, table.aligned td:last-child { padding-right: 0; }
   table.aligned tbody tr:hover td { background: color-mix(in srgb, var(--ink-1) 3%, transparent); }
   section table th { text-align: left; }
+  .big { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .big .unit { font-size: 13px; font-weight: 500; color: var(--ink-2); margin-left: 6px; }
+  .rank { font-size: 13px; font-weight: 600; margin: 6px 0 10px; }
+  table.calc td { font-size: 12.5px; padding: 6px 12px 6px 0; vertical-align: top; }
+  table.calc td:first-child { color: var(--ink-muted); white-space: nowrap; width: 1%; }
   section table th.num { text-align: right; }
 
   #overlay { position: fixed; inset: 0; background: var(--page); display: flex; align-items: center; justify-content: center; z-index: 20; }
@@ -425,6 +430,34 @@
       p += "</section>";
     }
 
+    p += '<div class="grid2">';
+    /* average worksite employees per client: how it is calculated, and where it ranks */
+    var w = j.wse_per_client, wt = j.wse_per_client_typical || {};
+    p += "<section><h3>Employees per client (average)</h3>";
+    if (w) {
+      var more = w.clients_qualifier === "more_than";
+      var val = w.low === w.high ? n1(w.mid) + (more ? " or fewer" : "") : n1(w.low) + "–" + n1(w.high);
+      var who = function (basis, asof) { return basis === "reported" ? "reported by " + nm + ", " + monYr(asof) : ""; };
+      var wseTxt = (w.wse_low === w.wse_high ? n0(w.wse_low) : n0(w.wse_low) + "–" + n0(w.wse_high)) + " worksite employees (" +
+                   (w.wse_basis === "reported" ? who("reported", w.wse_as_of) : "our estimate from its plan filings") + ")";
+      var cliTxt = n0(w.clients) + (more ? "+" : "") + (w.clients_basis === "reported" ? " clients (" + who("reported", w.clients_as_of) + ")"
+                   : " current clients in our records");
+      var rankTxt = !w.believable ? "Not ranked: " + val + " per client is not believable, so its size figure or client count needs research."
+        : w.firm ? "#" + w.firm_rank + " of " + w.firm_n + " PEOs with a reported employee count (larger average client ranks higher)"
+        : "Likely rank: between #" + w.range_rank_best + " and #" + w.range_rank_worst + " of " + w.believable_n + " (its employee count is an estimate)";
+      p += '<div class="big">' + esc(val) + '<span class="unit"> employees per client</span></div>' +
+        '<p class="rank">' + esc(rankTxt) + "</p>" +
+        '<table class="calc"><tr><td>How it is calculated</td><td>' + esc(wseTxt) + " ÷ " + esc(cliTxt) + "</td></tr>" +
+        (w.clients_basis === "our_records" ? '<tr><td>Caveat</td><td>We may not see every client, so the true average can be lower than shown.</td></tr>' : "") +
+        (w.believable && w.firm ? "<tr><td>Among all PEOs</td><td>Between #" + w.range_rank_best + " and #" + w.range_rank_worst + " of " + w.believable_n + " PEOs with a believable figure (most of them are estimates)</td></tr>" : "") +
+        (wt.median != null ? "<tr><td>Typical</td><td>" + n1(wt.median) + " " + esc(peerWord(wt.group).replace(/^typical /, "")) +
+          (wt.p25 != null ? " (middle half " + n1(wt.p25) + "–" + n1(wt.p75) + ")" : "") + " · industry survey FY2024</td></tr>" : "") +
+        "</table>";
+    } else {
+      p += '<p class="muted">Needs an employee count and at least 25 clients behind the figure.</p>';
+    }
+    p += "</section>";
+
     /* how much of the book we see */
     var c = j.book_coverage;
     p += "<section><h3>How much of this PEO's book we see</h3>";
@@ -442,7 +475,7 @@
     } else {
       p += '<p class="muted">Needs an employee count and clients we can see.</p>';
     }
-    p += "</section>";
+    p += "</section></div>";
     $("profFacts").innerHTML = p;
 
     /* ===== INDUSTRY INTEL: comparison with typical PEOs its size ===== */
