@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
-  INDUSTRY INTEL surface v1.1 (2026-09-23: tabs PEO PROFILE | INDUSTRY INTEL; size rank, market share on the 2026 industry count, book coverage, filed-facts-first outlook; mig 2148/2149). v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
+  INDUSTRY INTEL surface v1.2 (2026-09-23: column-aligned tables, share-price tile, count-coverage note, contradiction guard; mig 2150/2151). v1.1 (2026-09-23: tabs PEO PROFILE | INDUSTRY INTEL; size rank, market share on the 2026 industry count, book coverage, filed-facts-first outlook; mig 2148/2149). v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
   Pick a PEO from the dropdown -> Industry Intel panel (size, market share, size-group yardsticks, model, checks,
   12-month outlook, open flags) + the full PEO profile (template v1).
   Data: dash-ai mode 'sql' (read-only, desk key) calling
@@ -107,6 +107,13 @@
   .md table { margin: 8px 0 12px; }
   .md .tw { overflow-x: auto; }
   .md td, .md th { white-space: normal; }
+  table.aligned th, table.aligned td { text-align: left; padding: 7px 14px 7px 0; }
+  table.aligned th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted); font-weight: 600; border-bottom: 1px solid var(--baseline); vertical-align: bottom; }
+  table.aligned th.num, table.aligned td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 14px; }
+  table.aligned th:last-child, table.aligned td:last-child { padding-right: 0; }
+  table.aligned tbody tr:hover td { background: color-mix(in srgb, var(--ink-1) 3%, transparent); }
+  section table th { text-align: left; }
+  section table th.num { text-align: right; }
 
   #overlay { position: fixed; inset: 0; background: var(--page); display: flex; align-items: center; justify-content: center; z-index: 20; }
   #overlay .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; width: 360px; }
@@ -322,6 +329,7 @@
       .then(function (res) {
         if (tok !== loadToken) return;
         var text = (res.rows || []).slice().sort(function (a, b) { return a.part - b.part; }).map(function (r) { return r.body || ""; }).join("");
+        text = text.replace(/^# [^\n]*\n/, "");   /* the page title already names the PEO */
         $("profText").innerHTML = text ? '<div class="md">' + md(text) + "</div>" : '<div class="empty">No profile text for this PEO yet.</div>';
       })
       .catch(function (e) { if (tok !== loadToken) return; $("profText").innerHTML = '<div class="empty">Could not load the profile: ' + esc(e.message) + "</div>"; });
@@ -363,18 +371,21 @@
     if (j.entity_class) meta.push(j.entity_class);
     if (j.head_office) meta.push(titleCase(j.head_office));
     if (j.irs_certified) meta.push(j.irs_certified === "certified" ? "IRS-certified PEO" : "not IRS-certified");
+    var pubc = j.public_company, cov = j.coverage || {};
+    if (pubc) meta.push(pubc.exchange + ": " + pubc.ticker);
+    if (cov.is_public || cov.is_top5) meta.push((cov.is_public ? "public PEO" : "top 5 by clients") + (cov.last_researched_on ? " · researched " + monYr(cov.last_researched_on) : ""));
     $("titleMeta").textContent = meta.join(" · ");
 
     /* ===== PEO PROFILE: fact tiles ===== */
     var p = "";
     var rk = j.size_rank, share = j.market_share_pct;
-    var rankV = "Not ranked", rankD = e.low != null ? "not classed as a PEO for ranking" : "no employee count yet";
+    var rankV = "Not ranked", rankD = j.size_contradicted ? "size estimate under review (see flag)" : e.low != null ? "not classed as a PEO for ranking" : "no employee count yet";
     if (rk) {
       rankV = rk.rank_best === rk.rank_worst ? "#" + rk.rank_best : "#" + rk.rank_best + "–#" + rk.rank_worst;
       rankD = (rk.rank_best === rk.rank_worst ? "largest" : "by size") + " of " + n0(rk.of_n) + " PEOs we've sized" +
         (rk.rank_best === rk.rank_worst ? "" : (rk.size_published ? " (PEOs near it are estimates)" : " (its size is an estimate)"));
     }
-    var shareV = "—", shareD = "needs an employee count";
+    var shareV = "—", shareD = j.size_contradicted ? "size estimate under review (see flag)" : "needs an employee count";
     if (share) {
       shareV = (share.low === share.high || pctFmt(share.low) === pctFmt(share.high)) ? "About " + pctFmt(share.high) : pctFmt(share.low).replace("%", "") + "–" + pctFmt(share.high);
       shareD = "of " + bigNum(share.industry_wse_total) + " PEO employees nationwide · industry count, " + monYr(share.industry_published_on) + (share.industry_stale ? " (over 2 years old)" : "");
@@ -383,10 +394,13 @@
     if (f.clients) { cliV = clientsFiled(f.clients); cliD = "reported by the PEO, " + monYr(f.clients.as_of) + " · " + n0(j.clients_seen) + " in our records"; }
     p += '<div class="tiles">' +
       tile("Worksite employees", e.low != null ? range(e.low, e.high) : "No count yet",
-           e.low != null ? (e.status === "published" ? "reported by the PEO · " + monYr(e.newest_data) : "our estimate · data through " + monYr(e.newest_data)) : "no size figure on file yet") +
+           e.low != null ? (j.size_contradicted ? "our estimate · too low for its client count (see flag)" : e.status === "published" ? (pubc && !pubc.peo_only_count_published ? "whole company count · " : "reported by the PEO · ") + monYr(e.newest_data) : "our estimate · data through " + monYr(e.newest_data)) : "no size figure on file yet") +
       tile("Size rank", rankV, rankD) +
       tile("Market share", shareV, shareD) +
-      tile("Clients", cliV, cliD) + "</div>";
+      tile("Clients", cliV, cliD) +
+      (pubc && pubc.quote ? tile("Share price", "$" + Number(pubc.quote.close).toFixed(2), pubc.exchange + ": " + pubc.ticker + " · close " + dateFmt(pubc.quote.trade_date) +
+        (pubc.quote.change_pct != null ? " · " + (pubc.quote.change_pct >= 0 ? "+" : "") + n1(pubc.quote.change_pct) + "% on the day" : "")) : "") + "</div>";
+    if (pubc) p += '<p class="note" style="margin:-6px 0 8px"><b>What the employee count covers:</b> ' + esc(pubc.wse_disclosure) + "</p>";
 
     if (f.wse && f.wse_yoy_pct != null) {
       p += '<p class="note" style="margin:-6px 0 12px">Last 12 months, from its own filings: ' + (f.wse_yoy_pct >= 0 ? "+" : "") + n1(f.wse_yoy_pct) + "% worksite employees (" +
@@ -401,6 +415,8 @@
         var d = fl.detail || {};
         var txt = fl.kind === "wse_estimate_below_industry_yardstick"
           ? "The size estimate looks low for the clients we see: at most " + n1(d.max_wse_per_visible_client) + " WSEs per client, where even the lowest quarter of small PEOs run " + n1(d.yardstick_wse_per_client_p25_smallest_cohort) + " WSEs per client."
+          : fl.kind === "size_estimate_below_clients"
+          ? "Our filing-based size estimate (" + range(d.est_low, d.est_high) + ") is lower than the " + n0(d.clients_seen) + " current clients we track, so it cannot be right. Rank and market share are held back until it is researched."
           : fl.kind === "current_clients_exceed_filed_count"
           ? "We show " + n0(d.clients_seen) + " current clients, but " + nm + " reports " + n0(d.filed_clients) + (d.filed_qualifier === "more_than" ? "+" : "") + " (" + monYr(d.filed_as_of) + ")."
           : fl.kind;
@@ -508,6 +524,12 @@
     s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
     return s;
   }
+  /* a cell counts as a number if, once bold/links are stripped, it is a figure (optionally with %, $, sign, "over"/"about", or a short note in brackets) */
+  function numLike(x) {
+    var s = String(x == null ? "" : x).replace(/\*\*/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim();
+    if (s === "" || /^[—–\-]$/.test(s) || /^(n\/a|none|not filed yet)$/i.test(s)) return null;
+    return /^(over |about |more than |~|≈)?[+\-−$(]*\d[\d,]*(\.\d+)?[%x]?\)?(\s*\([^)]*\))?$/i.test(s);
+  }
   function md(text) {
     var lines = text.replace(/\r/g, "").split("\n"), out = [], i = 0;
     while (i < lines.length) {
@@ -519,15 +541,27 @@
         var rows = [];
         while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(lines[i]); i++; }
         var cells = function (r) { return r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(function (c) { return c.trim(); }); };
-        var t = '<div class="tw"><table>', start = 0;
-        if (rows.length > 1 && /^\s*\|?\s*:?-{2,}/.test(rows[1].replace(/\|/g, "|"))) {
-          var head = cells(rows[0]);
-          if (head.some(function (x) { return x; })) t += "<tr>" + head.map(function (x) { return "<th>" + inline(x) + "</th>"; }).join("") + "</tr>";
+        var t = '<div class="tw"><table class="aligned">', start = 0, head = null, aligns = [];
+        if (rows.length > 1 && /^\s*\|?\s*:?-{2,}/.test(rows[1])) {
+          head = cells(rows[0]);
+          aligns = cells(rows[1]).map(function (c) { return /-:\s*$/.test(c) ? "num" : ""; });
           start = 2;
         }
-        for (var r = start; r < rows.length; r++) {
-          t += "<tr>" + cells(rows[r]).map(function (x) { return /^[\d$,.%–\- ]+$/.test(x) && /\d/.test(x) ? '<td class="num">' + inline(x) + "</td>" : "<td>" + inline(x) + "</td>"; }).join("") + "</tr>";
+        var body = rows.slice(start).map(cells), ncol = Math.max.apply(null, body.map(function (b) { return b.length; }).concat([head ? head.length : 0]));
+        for (var ci = 1; ci < ncol; ci++) {           /* first column is always the label column */
+          if (aligns[ci]) continue;
+          var yes = 0, no = 0;
+          body.forEach(function (b) { var v = numLike(b[ci]); if (v === true) yes++; else if (v === false) no++; });
+          if (yes > 0 && yes / (yes + no) >= 0.6) aligns[ci] = "num";
         }
+        if (head && head.some(function (x) { return x; })) t += "<thead><tr>" + head.map(function (x, k) { return "<th" + (aligns[k] ? ' class="num"' : "") + ">" + inline(x) + "</th>"; }).join("") + "</tr></thead>";
+        t += "<tbody>";
+        body.forEach(function (b) {
+          var tr = "";
+          for (var k = 0; k < ncol; k++) { var x = b[k] == null ? "" : b[k]; tr += "<td" + (aligns[k] ? ' class="num"' : "") + ">" + inline(x) + "</td>"; }
+          t += "<tr>" + tr + "</tr>";
+        });
+        t += "</tbody>";
         out.push(t + "</table></div>");
         continue;
       }
