@@ -1563,14 +1563,14 @@ $('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ se
 // Each pin carries sv (1266 client_service_bucket): what service THIS client gets from the company on its pin.
 // Vendor = public.vendor_service_model (falls back to entity_class). A vendor selling both PEO and ASO counts the client as
 // PEO only on filing-grade co-employment evidence; otherwise Unconfirmed. All chips on = the map exactly as before.
-var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares the employer role with the client and runs payroll, benefits and HR under its own plans. Also shows the PEO & ASO clients (counted as +shared).'},
-  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer. Also shows the PEO & ASO clients (counted as +shared).'},
+var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares the employer role with the client and runs payroll, benefits and HR under its own plans.'},
+  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer.'},
   6:{name:'PEO & ASO',card:'company offers both PEO and ASO',tip:'Clients of companies confirmed to offer both PEO and ASO/HRO. They also show under PEO and under HRO/ASO.'},
   3:{name:'HR Only',card:'HR help, no payroll',tip:'HR help without payroll: HR consulting, benefits administration or a PEO/benefits broker.'},
   4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software.'},
   5:{name:'Staffing / other',card:'not an HR vendor for this client',tip:'Not an HR vendor for this client: staffing agencies, insurers and employer-of-record payrolling.'},
   0:{name:'Unconfirmed',card:'only a CRM record links it; company also sells payroll or isn\'t classified yet',tip:'Only our CRM record links this client, and the company mainly sells payroll or HR outsourcing (Paychex, CertiPay, Rippling) or is not classified yet, so we cannot tell which service the client uses.'}};
-var SVC_ORDER=['1','2','6','3','4','5','0'];
+var SVC_ORDER=['1','2','3','4','5','0'];   // owner 2026-09-23: no separate PEO & ASO chip
 // 1269: a PEO & ASO pin (6) shows when PEO, HRO/ASO or PEO & ASO is on
 function svcOk(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) return !(S.svcOff[6]&&S.svcOff[1]&&S.svcOff[2]); return !S.svcOff[v]; }
 function renderSvcChips(){
@@ -1578,7 +1578,7 @@ function renderSvcChips(){
   var cnt={0:0,1:0,2:0,3:0,4:0,5:0,6:0}, have=false;
   Object.keys(S.pinData||{}).forEach(function(st){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.sv) return; have=true; for(var i=0;i<dd.sv.length;i++) cnt[dd.sv[i]]=(cnt[dd.sv[i]]||0)+1; });
   // counts are each chip's OWN pins; PEO and HRO/ASO also show the PEO & ASO pins, flagged as +shared (owner 2026-09-23: counts must not look inflated)
-  box.innerHTML=SVC_ORDER.map(function(k){ return '<span class="netchip'+(S.svcOff[k]?'':' on')+'" data-sv="'+k+'" data-tip-t="'+SVC[k].name+'" data-tip="'+SVC[k].tip+'">'+SVC[k].name+(have?' <span class="svcn">'+cnt[k].toLocaleString()+((k==='1'||k==='2')&&cnt[6]?' +'+cnt[6].toLocaleString()+' shared':'')+'</span>':'')+'</span>'; }).join('');
+  box.innerHTML=SVC_ORDER.map(function(k){ return '<span class="netchip'+(S.svcOff[k]?'':' on')+'" data-sv="'+k+'" data-tip-t="'+SVC[k].name+'" data-tip="'+SVC[k].tip+'">'+SVC[k].name+(have?' <span class="svcn">'+cnt[k].toLocaleString()+'</span>':'')+'</span>'; }).join('');
   svcTipBind(box);
 }
 $('svc-chips').addEventListener('click',function(e){ var el=e.target.closest?e.target.closest('[data-sv]'):null; if(!el) return; var k=el.dataset.sv; S.svcOff[k]=!S.svcOff[k]; if(!S.svcOff[k]) delete S.svcOff[k];
