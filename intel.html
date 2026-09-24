@@ -56,6 +56,20 @@
   .dirlinks .maplink { font-weight: 600; }
   .dirlinks .mut { color: var(--ink-muted); font-size: 12px; }
   .dirlinks .also { flex-basis: 100%; color: var(--ink-2); line-height: 1.6; }
+  .acqbanner { margin: -4px 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 14px; background: color-mix(in srgb, var(--series-1) 14%, transparent); border: 1px solid color-mix(in srgb, var(--series-1) 45%, transparent); }
+  .evsec { margin: 16px 0 18px; }
+  .evsec h3 { font-size: 15px; margin: 0 0 8px; }
+  .evsec .mut, .evtl .mut { color: var(--ink-muted); font-weight: 400; font-size: 12px; }
+  .evtl { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line, #d8d4cc); }
+  .evtl li { position: relative; display: grid; grid-template-columns: 118px 1fr; gap: 10px; padding: 7px 0; }
+  .evtl li::before { content: ""; position: absolute; left: -20px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--ink-muted); }
+  .evtl li.ev-acquisition::before { background: #2e8b57; } .evtl li.ev-acquired::before, .evtl li.ev-merger::before { background: #d9822b; }
+  .evtl li.ev-rebrand::before { background: #6c7fd8; } .evtl li.ev-ownership::before { background: #9b4fd0; }
+  .evtl li.ev-certification::before { background: #3a9ad9; } .evtl li.ev-certification-lost::before { background: #c0392b; }
+  .evtl .evd { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .evtl .evk { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 1px 7px; border-radius: 8px; border: 1px solid var(--line, #d8d4cc); margin-right: 4px; }
+  .evtl .evs { font-size: 12px; margin-top: 2px; }
+  @media (max-width: 640px) { .evtl li { grid-template-columns: 1fr; gap: 2px; } }
   .dirlinks .also.notlisted { border-left: 3px solid var(--warning); padding: 4px 10px; background: color-mix(in srgb, var(--warning) 8%, transparent); border-radius: 0 8px 8px 0; }
 
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; }
@@ -331,6 +345,7 @@
         '<button type="button" role="tab" data-tab="intel" aria-selected="false">INDUSTRY INTEL</button>' +
       "</div>" +
       '<div id="tab-profile"><div id="profFacts"><div class="empty">Loading…</div></div>' +
+        '<section class="evsec" id="profEvents"><h3>Acquisitions &amp; major events</h3><div class="empty">Loading…</div></section>' +
         '<div id="profText"><div class="empty">Loading the full profile… (large PEOs take up to 15 seconds)</div></div></div>' +
       '<div id="tab-intel" class="hidden"><div class="empty">Loading Industry Intel…</div></div>';
     Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
@@ -339,6 +354,7 @@
     setStatus("loading " + row.peo_name + "…");
     drawLogo(slug, row.peo_name, tok);
     drawDirLinks(slug, row, tok);
+    drawEvents(slug, tok);
 
     sql("select industry_intel_for_peo('" + slug + "') as j", "industry intel panel", 45000)
       .then(function (res) { if (tok !== loadToken) return; renderIntel((res.rows && res.rows[0] && res.rows[0].j) || {}); setStatus(""); })
@@ -352,6 +368,52 @@
         $("profText").innerHTML = text ? '<div class="md">' + md(text) + "</div>" : '<div class="empty">No profile text for this PEO yet.</div>';
       })
       .catch(function (e) { if (tok !== loadToken) return; $("profText").innerHTML = '<div class="empty">Could not load the profile: ' + esc(e.message) + "</div>"; });
+  }
+
+  /* ---------- 3036: acquisitions & major events timeline (every PEO profile) ----------
+     Reads public.peo_events_for_profile(slug): proof-backed peo_corporate_events (both sides of every deal, incl. deals
+     done by this PEO's older entities / acquired brands = "via"), private-equity ownership, IRS CPEO gained / revoked.
+     An acquired / merged / renamed PEO also gets a banner at the top naming the buyer with a link and the proof. */
+  var EV_KIND = { acquisition: "Acquisition", acquired: "Acquired", merger: "Merger", rebrand: "Name change", divestiture: "Sold PEO book",
+                  ownership: "Ownership", certification: "IRS CPEO", "certification lost": "IRS CPEO" };
+  var SRC_WORD = { press_release: "Press release", filing: "Filing", news: "News article", company_website: "Company website", owner_knowledge: "Owner note" };
+  function evDate(d, p) {
+    if (!d) return "Date not published";
+    var t = new Date(String(d).slice(0, 10) + "T00:00:00"); if (isNaN(t)) return String(d);
+    if (p === "year") return String(t.getFullYear());
+    if (p === "month" || p === "quarter") return t.toLocaleDateString(undefined, { year: "numeric", month: "short" });
+    return t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  function evProof(r) {
+    if (!r.url) return '<span class="mut">no public link on file</span>';
+    return '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(SRC_WORD[r.source_kind] || "Source") + ' ↗</a>';
+  }
+  function evOther(r) {
+    return (r.other_has_profile && r.other_slug) ? ' · <a href="#peo=' + esc(r.other_slug) + '">' + esc(r.other_name) + ' profile →</a>' : "";
+  }
+  function drawEvents(slug, tok) {
+    sql("select happened_on, date_precision, kind, perspective, headline, other_slug, other_name, other_has_profile, url, source_kind, via from peo_events_for_profile('" + slug + "')", "profile events", 30000)
+      .then(function (res) {
+        if (tok !== loadToken) return;
+        var rows = res.rows || [], box = $("profEvents"); if (!box) return;
+        // banner: this PEO itself was bought / merged / renamed / sold its book (not via an older entity, not a PE investment)
+        var mine = rows.filter(function (r) { return !r.via && r.perspective === "acquired" && /^(acquired|merger|rebrand|divestiture)$/.test(r.kind); });
+        if (mine.length) {
+          var b = mine[0], word = { acquired: "Acquired by", merger: "Merged into", rebrand: "Now known as", divestiture: "PEO business sold to" }[b.kind];
+          var who = (b.other_has_profile && b.other_slug) ? '<a href="#peo=' + esc(b.other_slug) + '">' + esc(b.other_name) + '</a>' : esc(b.other_name || "");
+          var ban = document.createElement("div"); ban.className = "acqbanner";
+          ban.innerHTML = '<b>' + word + ' ' + who + '</b> · ' + esc(evDate(b.happened_on, b.date_precision)) + ' · ' + evProof(b);
+          var dl = $("dirLinks"); if (dl && dl.parentNode) dl.parentNode.insertBefore(ban, dl);
+        }
+        if (!rows.length) { box.innerHTML = '<h3>Acquisitions &amp; major events</h3><div class="empty">No acquisitions, mergers, name changes, ownership changes or IRS certification changes on file for this PEO yet.</div>'; return; }
+        box.innerHTML = '<h3>Acquisitions &amp; major events <span class="mut">(' + rows.length + ')</span></h3><ol class="evtl">' + rows.map(function (r) {
+          return '<li class="ev-' + esc(String(r.kind).replace(/\s+/g, "-")) + '"><div class="evd">' + esc(evDate(r.happened_on, r.date_precision)) + '</div>' +
+            '<div class="evb"><span class="evk">' + esc(EV_KIND[r.kind] || r.kind) + '</span> ' + esc(r.headline || "") +
+            (r.via ? ' <span class="mut">(via ' + esc(r.via) + ')</span>' : "") +
+            '<div class="evs">' + evProof(r) + evOther(r) + '</div></div></li>';
+        }).join("") + '</ol>';
+      })
+      .catch(function (e) { if (tok !== loadToken) return; var box = $("profEvents"); if (box) box.innerHTML = '<h3>Acquisitions &amp; major events</h3><div class="empty">Could not load events: ' + esc(e.message) + '</div>'; });
   }
 
   /* ---------- 1283: one list, two doors - links between this profile and the map ---------- */
