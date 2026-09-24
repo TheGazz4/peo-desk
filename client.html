@@ -338,13 +338,15 @@
     if (grain === "month" || grain === "floor") return MONL[+a[1] - 1] + " " + a[0];
     return MON[+a[1] - 1] + " " + (+a[2]) + ", " + a[0];
   }
-  function peoName(rels, slug) { for (var i = 0; i < rels.length; i++) if (rels[i].peo === slug) return rels[i].peo_display; return slug; }
+  var PEO_NAMES = {};   /* 1284: record's peo_names map - used when there is no dated relationship to name the PEO */
+  function peoName(rels, slug) { for (var i = 0; i < rels.length; i++) if (rels[i].peo === slug) return rels[i].peo_display; return PEO_NAMES[slug] || slug; }
   function heat(m) { return m <= 4 ? "green" : m <= 6 ? "yellow" : "red"; }
 
   /* ---------- render ---------- */
   function render(j) {
     var co = j.company || {}, st = j.status || {}, story = j.story || {}, conc = j.concurrency || {}, colors = j.peo_colors || {};
     var rels = conc.relationships || [];
+    PEO_NAMES = j.peo_names || {};
     var hold = !!j.hold;   /* story_fact_agreement_law: story and facts disagree -> show neither */
     ["tl", "moments"].forEach(function (k) { var s = $(k) && $(k).closest("section"); if (s) s.classList.toggle("hidden", hold); });
     $("empty").classList.add("hidden"); $("rec").classList.remove("hidden");
@@ -417,6 +419,8 @@
     var f = [];
     f.push(["Employees", co.employees ? esc(co.employees) + '<span class="sub">' + esc(co.employee_band || "") + '</span>' : '<span class="gap">' + (co.employee_band === "Under review" ? "Under review" : "Counting…") + '</span>']);
     if (co.linkedin_employee_count) f.push(["LinkedIn Employee Count", esc(co.linkedin_employee_count) + '<span class="sub">As shown on the company’s LinkedIn page</span>']);
+    // 1282 (owner: "total estimated payroll as a field"): the company's own PPP loan x 12 / 2.5
+    if (co.est_payroll && co.est_payroll.text) f.push(["Est. annual payroll", esc(co.est_payroll.text) + '<span class="sub">' + esc(co.est_payroll.basis || "") + '</span>']);
     var ind = [];
     if (co.industry_description) ind.push(esc(co.industry_description));
     if (co.naics) ind.push('<span class="sub">NAICS ' + esc(co.naics) + (co.sector ? " · " + esc(co.sector) : "") + '</span>');
@@ -463,7 +467,7 @@
       if (y < y1) svg.appendChild(el("text", { x: gx + 4, y: 14, fill: muted, "font-size": 11, "font-family": "ui-monospace, Menlo, monospace" }, String(y)));
     }
     if (!lanes.length) {
-      svg.appendChild(el("text", { x: 450, y: top + 22, fill: muted, "font-size": 13, "text-anchor": "middle" }, "No dated PEO relationship on record."));
+      svg.appendChild(el("text", { x: 24, y: top + 22, fill: muted, "font-size": 13, "text-anchor": "start" }, "No dated PEO relationship on record."));   /* left-anchored: readable on phones, where the timeline scrolls */
       return;
     }
     /* shading straight from the server calculation (peo_concurrency_count_law) */
