@@ -333,6 +333,14 @@
     <div class="tw" style="max-height:620px;overflow:auto"><style>#tblNonPeo td{white-space:normal;vertical-align:top}#tblNonPeo td.num{white-space:nowrap}#tblNonPeo th.num,#tblNonPeo td.num{text-align:right}#tblNonPeo .oc{font-weight:600;white-space:nowrap}</style><table id="tblNonPeo"><thead><tr><th>Outcome</th><th>Company</th><th>What we found</th><th>Profile now</th><th>How it entered our list</th><th>Filer on the federal filing</th><th class="num">Plan participants</th></tr></thead><tbody><tr><td colspan="7" class="age cold">loading…</td></tr></tbody></table></div>
   </section>
 
+  <section class="wide" id="peoPrecision">
+    <h2>PEO precision check: what each PEO says vs what we have <small>— owner only · researched 2026-09-24 · rebuilt hourly</small></h2>
+    <p class="blurb">For the top 100 PEOs by clients we captured, word for word, every size figure the PEO states about itself (its website, press releases, filings), with the date and what the number really counts. Each one is compared with our own data: current clients in our records, people in its own benefit and retirement plans, and our size model. Numbers that count something else (all-time totals, a year's W-2 forms, a whole group of companies, new clients in one year) are saved but never compared as if they were a headcount. The Quick Card and the profile now show only stated figures or "Not stated" plus our exact counts; no estimate ranges.</p>
+    <div class="sc-tiles" id="prTiles"></div>
+    <div class="pn-bar" style="margin:0 0 8px"><label>verdict <select id="prFilter"><option value="">all with a finding</option><option value="mixed">mixed</option><option value="ours_high">our count too high</option><option value="ours_low">our count too low</option><option value="apples_oranges">apples and oranges</option><option value="consistent">matches</option><option value="stale">over 2 years old</option><option value="not_stated">states nothing</option><option value="*">everything</option></select></label><span id="prCount"></span></div>
+    <div class="tw" style="max-height:680px;overflow:auto"><style>#tblPrec td{white-space:normal;vertical-align:top;font-size:12px}#tblPrec .oc{font-weight:600;white-space:nowrap}#tblPrec q{color:var(--ink-muted)}#tblPrec .bad{color:#a33}#tblPrec .ok{color:#1b7f3b}</style><table id="tblPrec"><thead><tr><th>Verdict</th><th>PEO</th><th>What the PEO says</th><th>What we have</th><th>Is it close?</th><th>Does it make sense?</th><th>Research note</th></tr></thead><tbody><tr><td colspan="7" class="age cold">loading…</td></tr></tbody></table></div>
+  </section>
+
   <section class="wide" id="peoIdentity">
     <h2>PEO identity coverage <small>— logo, head office and today's name on every PEO on the map</small></h2>
     <p class="blurb">Every PEO profile should carry its logo, a confirmed head office, and the name customers know it by today. Robots check each PEO's own website around the clock: logos every 3 minutes, head offices every 2, names every 2, and the map refreshes every 3 hours. When a brand has been bought and retired, the map shows the buyer's name with "Formerly …" on the card; the PEO keeps its own family.</p>
@@ -1333,6 +1341,82 @@ setInterval(poll, POLL_MS);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
 })();
 </script>
+<script>
+/* PEO precision check panel (instanceB_industry_intel; 2166-2171). Owner 2026-09-24: "capture it, save it and compare it to our own
+   data - ask ourselves: is this close, does it make sense? or are we speaking apples and oranges". Reads peo_precision_check_json()
+   through dash-ai (desk key), on its own 10-minute clock. */
+(function () {
+  "use strict";
+  var FN = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/dash-ai";
+  var ANONK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+  var tb = document.querySelector("#tblPrec tbody"), tiles = document.getElementById("prTiles"), sel = document.getElementById("prFilter"), cnt = document.getElementById("prCount");
+  if (!tb) return;
+  var DATA = null;
+  function e(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function n0(v) { return v == null || v === "" ? "—" : Number(v).toLocaleString(); }
+  function mon(d) { if (!d) return ""; var t = new Date(String(d).slice(0, 10) + "T00:00:00"); return isNaN(t) ? String(d) : t.toLocaleDateString(undefined, { year: "numeric", month: "short" }); }
+  var V = { mixed: ["Mixed: clients high, headcount low", "#8a3ea8"], ours_high: ["Our count too high", "#a33"], ours_low: ["Our count too low", "#b35c00"],
+            apples_oranges: ["Apples and oranges", "#1f5fa8"], consistent: ["Matches", "#1b7f3b"], stale: ["Their figure is old", "#9a6a00"], not_stated: ["States nothing", "#71808b"] };
+  function said(v, q, d, url, quote, scope, measure) {
+    if (v == null) return '<span class="age cold">not stated</span>';
+    var s = (q === "approximately" ? "about " : "") + n0(v) + (q === "more_than" ? "+" : "") + " <span class=\"age cold\">" + e(mon(d)) + "</span>";
+    if (measure === "group_total") s += ' <span class="bad">(whole group)</span>'; else if (scope === "peo_and_aso") s += ' <span class="bad">(incl. non-PEO)</span>'; else if (scope === "unstated") s += ' <span class="age cold">(not said PEO-only)</span>';
+    if (url) s += ' <a href="' + e(url) + '" target="_blank" rel="noopener">source</a>';
+    if (quote) s += '<br><q>' + e(String(quote).slice(0, 160)) + "</q>";
+    return s;
+  }
+  function draw() {
+    if (!DATA) return;
+    var f = sel ? sel.value : "";
+    var rows = (DATA.rows || []).filter(function (r) { return f === "*" ? true : f ? r.overall === f : r.overall !== "not_stated"; });
+    if (cnt) cnt.textContent = " " + rows.length + " PEOs";
+    tb.innerHTML = rows.map(function (r) {
+      var v = V[r.overall] || [r.overall, "inherit"];
+      var have = n0(r.book_clients) + " current clients in our records";
+      if (r.wse_status === "published") have += "<br>published headcount on file";
+      else if (r.plan_participants != null) have += "<br>" + n0(r.plan_participants) + " in its own plans (" + e(r.plan_year) + ")";
+      if (r.wse_low != null && r.wse_status !== "published") have += '<br><span class="age cold">size model ' + n0(r.wse_low) + "–" + n0(r.wse_high) + "</span>";
+      var theirs = "<b>Clients:</b> " + said(r.stated_clients, r.stated_clients_qual, r.stated_clients_as_of, r.stated_clients_url, r.stated_clients_quote, r.stated_clients_scope, r.stated_clients_measure) +
+                   "<br><b>Worksite employees:</b> " + said(r.stated_wse, r.stated_wse_qual, r.stated_wse_as_of, r.stated_wse_url, r.stated_wse_quote, r.stated_wse_scope, r.stated_wse_measure) +
+                   (r.payroll_annual ? "<br><b>Payroll a year:</b> $" + (r.payroll_annual / 1e9).toFixed(1) + "B" : "") + (r.w2_annual ? "<br><b>W-2s a year:</b> " + n0(r.w2_annual) : "");
+      var sense = (r.sense || []).map(function (c) { return '<span class="' + (c.ok ? "ok" : "bad") + '">' + (c.ok ? "✓" : "✗") + "</span> " + e(c.check) + ": <b>" + e(typeof c.value === "number" ? Number(c.value).toLocaleString() : c.value) + "</b>"; }).join("<br>");
+      if ((r.conflicts || []).length) sense += (sense ? "<br>" : "") + '<span class="bad">✗</span> its own site disagrees with itself: ' + r.conflicts.map(function (c) { return e(n0(c.value) + " " + String(c.what).replace("_", " ")); }).join(" vs ");
+      return "<tr><td class=\"oc\" style=\"color:" + v[1] + "\">" + e(v[0]) + "</td><td><a href=\"intel.html#peo=" + encodeURIComponent(r.family_slug) + "\">" + e(r.display_name || r.family_slug) + "</a></td><td>" + theirs +
+        "</td><td>" + have + "</td><td>" + e(r.clients_note || "") + "<br>" + e(r.wse_note || "") + "</td><td>" + (sense || '<span class="age cold">nothing to check</span>') +
+        "</td><td>" + e((r.notes || "").slice(0, 240)) + "</td></tr>";
+    }).join("") || "<tr><td colspan=\"7\" class=\"age cold\">nothing in this view</td></tr>";
+  }
+  function load() {
+    var k = null; try { k = localStorage.getItem("desk_key") || localStorage.getItem("peo_dash_key"); } catch (x) {}
+    if (!k || document.hidden) return;
+    fetch(FN, { method: "POST", headers: { "Content-Type": "application/json", "apikey": ANONK, "Authorization": "Bearer " + ANONK, "x-desk-key": k },
+      body: JSON.stringify({ mode: "sql", sql: "select peo_precision_check_json() as j", label: "desk PEO precision check panel", quiet: true }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        var j = res && res.rows && res.rows[0] && res.rows[0].j;
+        if (!j) throw new Error((res && (res.detail || res.error)) || "no reply");
+        DATA = j;
+        var t = j.tiles || {};
+        var tl = [["Researched", n0(j.researched), "top 100 PEOs by clients, " + n0(j.with_statement) + " state something"],
+                  ["Mixed", n0(t.mixed || 0), "clients too high, headcount too low"],
+                  ["Our count too high", n0(t.ours_high || 0), "we still hold clients who left"],
+                  ["Our count too low", n0(t.ours_low || 0), "we see only part of the PEO"],
+                  ["Apples and oranges", n0(t.apples_oranges || 0), "their figure counts something else"],
+                  ["Matches", n0(t.consistent || 0), "close to what they state"],
+                  ["Old figure only", n0(t.stale || 0), "over 2 years old"],
+                  ["States nothing", n0(t.not_stated || 0), "no size figure published"]];
+        if (tiles) tiles.innerHTML = tl.map(function (x) { return '<div class="tile"><div class="k">' + e(x[0]) + '</div><div class="v">' + x[1] + '</div><div class="d">' + e(x[2]) + "</div></div>"; }).join("");
+        draw();
+      })
+      .catch(function (err) { tb.innerHTML = "<tr><td colspan=\"7\" class=\"age cold\">could not load: " + e(err.message) + "</td></tr>"; });
+  }
+  if (sel) sel.addEventListener("change", draw);
+  load();
+  setInterval(load, 10 * 60 * 1000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+})();
+</script>
+
 <script>
 /* PEO list cleanup panel (instanceB_industry_intel; 2155, outcomes 2159). Owner: "show these to me - I want to know where this
    data originated" then "establish PEO profiles for each of the legit PEOs that don't have clients yet".
