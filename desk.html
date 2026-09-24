@@ -286,6 +286,17 @@
     <table id="tblDataCal"><thead><tr><th>when</th><th>PEO</th><th>what</th><th>detail</th><th class="num">people</th><th>renewal</th><th>5500 due</th><th>extended due</th></tr></thead><tbody></tbody></table>
   </section>
 
+  <section class="wide" id="relAudit">
+    <h2>Relationship audit <small>— what service each map client buys, the rule that decided it, carve-outs vs exits, and the non-PEO vendor book</small></h2>
+    <p class="blurb">Every map client runs down one fixed checklist (first match wins): not an HR vendor or owner-retired → <b>Staffing / other</b>; vendor holds a state PEO licence / IRS CPEO / ESAC → <b>PEO</b>; the client itself is on a PEO filing → <b>PEO</b>; PEO-only vendor → <b>PEO</b>; PEO + ASO vendor recorded as PEO → <b>PEO</b>; HR outsourcing / HR only / payroll vendor → that bucket; vendor name says PEO or employee leasing → <b>PEO</b>; otherwise <b>Unconfirmed</b> with the reason. Refreshed nightly.</p>
+    <div class="sc-tiles" id="raTiles"></div>
+    <table id="tblRelAudit"><thead><tr><th>relationship</th><th>deciding rule</th><th class="num">map clients</th><th class="num">% of map</th></tr></thead><tbody></tbody></table>
+    <h3 style="margin:14px 0 6px;font-size:13px">Workers' comp carve-out vs PEO exit <small class="mut">— PEO clients holding their own current FL comp policy, resolved on a policy timeline (proposals until approved)</small></h3>
+    <table id="tblCarve"><thead><tr><th>verdict</th><th>confidence</th><th class="num">clients</th><th class="num">claim from a filing</th><th class="num">own comp via payroll vendor</th></tr></thead><tbody></tbody></table>
+    <h3 style="margin:14px 0 6px;font-size:13px">Non-PEO vendor book <small class="mut">— payroll/401(k) clients of PEO-selling vendors; never counted as PEO; ASO possible but not provable</small></h3>
+    <table id="tblVendorBook"><thead><tr><th>vendor</th><th>how we know</th><th class="num">companies</th><th class="num">also a current PEO client</th><th class="num">non-PEO</th><th class="num">with a location</th><th>newest evidence</th></tr></thead><tbody></tbody></table>
+  </section>
+
   <section>
     <h2>Decision desk <small>— what the platform decided without you</small></h2>
     <p class="blurb">Every question the platform raises lands here. The <b>judge</b> researches it against project history and rules tiers 1 and 2; the <b>executor</b> then fixes, audits and re-tests it, and nothing is marked applied without a live-passing acceptance test. Tier 3 — sends, deletes, spend caps, security, or two of your own laws in conflict — is always yours, with an opinion attached.</p>
@@ -395,7 +406,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_service_relationship","desk_vendor_client_universe","desk_wc_carveout_verdicts"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -1020,10 +1031,30 @@ function renderDataCalendar(d) {
   }).join("") || `<tr><td colspan="8">nothing due in the next 45 days</td></tr>`;
 }
 
+function renderRelAudit(d) {
+  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
+  const rel = d.desk_service_relationship?.rows || [];
+  const tot = (name) => rel.filter((r) => r.relationship === name).reduce((a, r) => a + Number(r.pins || 0), 0);
+  const all = rel.reduce((a, r) => a + Number(r.pins || 0), 0);
+  const t = $("#raTiles");
+  if (t) t.innerHTML = [["PEO", tot("PEO"), null], ["HRO/ASO", tot("HRO/ASO"), null], ["HR Only", tot("HR Only"), null], ["Payroll Only", tot("Payroll Only"), null], ["Staffing / other", tot("Staffing / other"), null], ["Unconfirmed", tot("Unconfirmed"), tot("Unconfirmed") > all * 0.01 ? "warn" : "good"]]
+    .map(([k, v, tone]) => `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(k)}</div><div class="v">${fmtN(v)}</div><div class="d">${all ? (100 * v / all).toFixed(2) + "% of map" : ""}</div></div>`).join("");
+  const tb = $("#tblRelAudit tbody");
+  if (tb) tb.innerHTML = rel.map((r) => `<tr><td>${esc(r.relationship)}</td><td>${esc(r.rule)}</td><td class="num">${fmtN(r.pins)}</td><td class="num">${esc(String(r.pct_of_map ?? ""))}</td></tr>`).join("") || `<tr><td colspan="4">no snapshot yet</td></tr>`;
+  const cv = d.desk_wc_carveout_verdicts?.rows || [];
+  const tc = $("#tblCarve tbody");
+  if (tc) tc.innerHTML = cv.map((r) => `<tr><td>${esc(r.verdict)}</td><td>${esc(r.confidence)}</td><td class="num">${fmtN(r.pins)}</td><td class="num">${fmtN(r.claim_from_filing)}</td><td class="num">${fmtN(r.own_policy_via_payroll_vendor)}</td></tr>`).join("") || `<tr><td colspan="5">no verdicts yet</td></tr>`;
+  const vb = d.desk_vendor_client_universe?.rows || [];
+  const how = { retirement_pep_payroll: "Paychex pooled 401(k) plan (federal filing)", payroll_integrated_wc: "own FL comp policy via the vendor's insurance agency" };
+  const tv = $("#tblVendorBook tbody");
+  if (tv) tv.innerHTML = vb.map((r) => `<tr><td>${esc(r.vendor)}</td><td>${esc(how[r.relationship] || r.relationship)}</td><td class="num">${fmtN(r.companies)}</td><td class="num">${fmtN(r.also_current_peo_client)}</td><td class="num">${fmtN(r.non_peo_clients)}</td><td class="num">${fmtN(r.with_location)}</td><td>${esc(r.newest_evidence || "")}</td></tr>`).join("") || `<tr><td colspan="7">no rows yet</td></tr>`;
+}
+
 function renderAll(d) {
   renderScorecard(d);
   renderCarrierSupervisor(d);
   renderPeoNetworks(d);
+  renderRelAudit(d);
   renderDecisions(d);
   renderStrip(d);
   renderPlays(d);
