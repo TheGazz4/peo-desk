@@ -1472,7 +1472,10 @@ setInterval(poll, POLL_MS);
     var el = a && !/^tab=/.test(a) ? document.getElementById(a) : null;
     if (el && el.dataset && el.dataset.tab) {
       show(el.dataset.tab);
-      setTimeout(function () { el.scrollIntoView({ block: "start" }); window.scrollBy(0, -56); }, 600);
+      var tries = 0, t = setInterval(function () {
+        var loaded = el.querySelector("tbody tr") || /live/.test((document.getElementById("conn") || {}).textContent || "");
+        if (loaded || ++tries > 40) { clearInterval(t); setTimeout(function () { el.scrollIntoView({ block: "start" }); window.scrollBy(0, -56); }, 250); }
+      }, 250);
     }
   })();
   setInterval(function () { capTables(); badges(); }, 2000);
