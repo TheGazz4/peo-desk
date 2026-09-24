@@ -466,8 +466,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="netchips" id="emp-chips"></div>
         <label class="chk" style="margin-top:6px" title="Payroll and HR-outsourcing clients of Paychex, ADP and Paycor that are NOT PEO clients. Grey pins; never counted as PEO market share. Untick to hide them all."><input type="checkbox" id="np-on" checked> Non-PEO vendor clients <span style="color:var(--muted)">(Paychex · ADP · Paycor)</span></label>
         <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Carve Outs" data-tip="PEO clients that stay with their PEO but keep one piece in-house.&#10;&#10;Workers Comp Carve Out = keeps its own workers comp policy.&#10;Benefits Carve Out = runs its own health plan instead of the PEO's.&#10;&#10;Tick one or both to show only those clients.">Carve Outs <i>?</i></span></h2>
-        <label class="chk" title="Show only PEO clients that keep their own workers comp policy while staying with their PEO"><input type="checkbox" id="wco-only"> Workers Comp Carve Out</label>
-        <label class="chk" title="Show only PEO clients that run their own health plan instead of the PEO's"><input type="checkbox" id="bco-only"> Benefits Carve Out</label>
+        <div class="seg" id="co-seg"><button id="co-0" class="on" title="No carve-out filter - every client shows">Off</button><button id="co-1" title="Only Workers Comp Carve Out clients">Workers Comp</button><button id="co-2" title="Only Benefits Carve Out clients">Benefits</button><button id="co-3" title="Workers Comp Carve Out and Benefits Carve Out clients together">Both</button></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
           <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO user departures">Both</button><button id="hist-2" title="Former PEO user departures only — current pins hidden">Former only</button></div>
@@ -1333,6 +1332,7 @@ function resetAll(){
   S.minSrc=0; try{ syncSrcButtons(); }catch(_){}
   S.svcOff={}; try{ renderSvcChips(); }catch(_){}
   S.empOff={}; try{ renderEmpChips(); }catch(_){}
+  S.wcoOnly=false; S.bcoOnly=false; try{ syncCoSeg(); }catch(_){}
   S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
   S.placement='address'; try{ syncPlacementButtons(); }catch(_){}
   setHistMode(0);
@@ -1650,8 +1650,11 @@ function setMinSrc(v){
   bump(); scheduleDraw(); updateStats(); writeUrl();
 }
 $('np-on').onchange=function(){ S.showNP=!!this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); };
-$('wco-only').onchange=function(){ S.wcoOnly=!!this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); };
-$('bco-only').onchange=function(){ S.bcoOnly=!!this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); };
+// v3.68c (owner 2026-09-24: "a toggle for inclusion for one, both or none"): Off | Workers Comp | Benefits | Both
+function coMode(){ return (S.wcoOnly?1:0)+(S.bcoOnly?2:0); }
+function syncCoSeg(){ var m=coMode(); [0,1,2,3].forEach(function(k){ var b=$('co-'+k); if(b) b.className=(m===k)?'on':''; }); }
+function setCoMode(m){ S.wcoOnly=!!(m&1); S.bcoOnly=!!(m&2); syncCoSeg(); bump(); scheduleDraw(); updateStats(); writeUrl(); }
+[0,1,2,3].forEach(function(k){ $('co-'+k).onclick=function(){ setCoMode(k); }; });
 $('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ setMinSrc(1) }; $('src-2').onclick=function(){ setMinSrc(2) };
 // v3.58 PREVIEW Relationship filter (owner 2026-09-23: "a toggle that said PEO or HRO/ASO", plus HR Only and Payroll Only).
 // Each pin carries sv (1266 client_service_bucket): what service THIS client gets from the company on its pin.
@@ -1927,7 +1930,7 @@ function readUrl(){
     if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('np')==='0'){ S.showNP=false; $('np-on').checked=false; }
-    if(p.get('wco')==='1'){ S.wcoOnly=true; $('wco-only').checked=true; } if(p.get('bco')==='1'){ S.bcoOnly=true; $('bco-only').checked=true; }
+    if(p.get('wco')==='1') S.wcoOnly=true; if(p.get('bco')==='1') S.bcoOnly=true; syncCoSeg();
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
     if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
     if(p.get('eoff')){ p.get('eoff').split(',').forEach(function(k){ if(/^[0-7]$/.test(k)) S.empOff[k]=true; }); try{ renderEmpChips(); }catch(_){} }
@@ -2491,6 +2494,7 @@ function tblPaintInner(){
   if(renLens()) bits.push('renewal heat on');
   if(S.minSrc) bits.push(S.minSrc>=2?'cross-verified only':'verified only');
   var svh=SVC_ORDER.filter(function(k){ return S.svcOff[k]; }); if(svh.length) bits.push('hiding '+svh.map(function(k){ return SVC[k].name; }).join(', '));
+  if(S.wcoOnly||S.bcoOnly) bits.push('only '+[S.wcoOnly?'Workers Comp Carve Out':null,S.bcoOnly?'Benefits Carve Out':null].filter(Boolean).join(' + ')+' clients');
   var emh=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(emh.length) bits.push('hiding employees '+emh.map(function(k){ return EMP_BANDS[k]; }).join(', '));
   if(S.msOnly) bits.push('multi-state only');
   if(S.hist) bits.push('current users only (former records are on the map, not here)');
