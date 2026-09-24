@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
-  INDUSTRY INTEL surface v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
+  INDUSTRY INTEL surface v1.1 (2026-09-23: tabs PEO PROFILE | INDUSTRY INTEL; size rank, market share on the 2026 industry count, book coverage, filed-facts-first outlook; mig 2148/2149). v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
   Pick a PEO from the dropdown -> Industry Intel panel (size, market share, size-group yardsticks, model, checks,
   12-month outlook, open flags) + the full PEO profile (template v1).
   Data: dash-ai mode 'sql' (read-only, desk key) calling
@@ -302,11 +302,12 @@
     $("main").innerHTML =
       '<div class="title"><span class="plogo" id="pLogo"></span><h2>' + esc(row.peo_name) + '</h2><span class="meta" id="titleMeta"></span></div>' +
       '<div class="tabs" role="tablist">' +
-        '<button type="button" role="tab" data-tab="intel" aria-selected="true">Industry Intel</button>' +
-        '<button type="button" role="tab" data-tab="profile" aria-selected="false">PEO profile</button>' +
+        '<button type="button" role="tab" data-tab="profile" aria-selected="true">PEO PROFILE</button>' +
+        '<button type="button" role="tab" data-tab="intel" aria-selected="false">INDUSTRY INTEL</button>' +
       "</div>" +
-      '<div id="tab-intel"><div class="empty">Loading Industry Intel…</div></div>' +
-      '<div id="tab-profile" class="hidden"><div class="empty">Loading the full profile… (large PEOs take up to 15 seconds)</div></div>';
+      '<div id="tab-profile"><div id="profFacts"><div class="empty">Loading…</div></div>' +
+        '<div id="profText"><div class="empty">Loading the full profile… (large PEOs take up to 15 seconds)</div></div></div>' +
+      '<div id="tab-intel" class="hidden"><div class="empty">Loading Industry Intel…</div></div>';
     Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
       b.onclick = function () { showTab(b.dataset.tab); };
     });
@@ -315,15 +316,15 @@
 
     sql("select industry_intel_for_peo('" + slug + "') as j", "industry intel panel", 45000)
       .then(function (res) { if (tok !== loadToken) return; renderIntel((res.rows && res.rows[0] && res.rows[0].j) || {}); setStatus(""); })
-      .catch(function (e) { if (tok !== loadToken) return; $("tab-intel").innerHTML = '<div class="empty">Could not load Industry Intel: ' + esc(e.message) + "</div>"; setStatus("error", true); });
+      .catch(function (e) { if (tok !== loadToken) return; $("tab-intel").innerHTML = '<div class="empty">Could not load Industry Intel: ' + esc(e.message) + "</div>"; $("profFacts").innerHTML = ""; setStatus("error", true); });
 
     sql("select part, body from industry_intel_profile_chunks('" + slug + "') order by part", "industry intel profile", 60000)
       .then(function (res) {
         if (tok !== loadToken) return;
         var text = (res.rows || []).slice().sort(function (a, b) { return a.part - b.part; }).map(function (r) { return r.body || ""; }).join("");
-        $("tab-profile").innerHTML = text ? '<div class="md">' + md(text) + "</div>" : '<div class="empty">No profile text for this PEO yet.</div>';
+        $("profText").innerHTML = text ? '<div class="md">' + md(text) + "</div>" : '<div class="empty">No profile text for this PEO yet.</div>';
       })
-      .catch(function (e) { if (tok !== loadToken) return; $("tab-profile").innerHTML = '<div class="empty">Could not load the profile: ' + esc(e.message) + "</div>"; });
+      .catch(function (e) { if (tok !== loadToken) return; $("profText").innerHTML = '<div class="empty">Could not load the profile: ' + esc(e.message) + "</div>"; });
   }
 
   function showTab(t) {
@@ -346,79 +347,118 @@
     return s + "</div>";
   }
 
+  /* PEO PROFILE tab = facts about this PEO; INDUSTRY INTEL tab = comparison with typical PEOs its size (owner split 2026-09-23) */
+  function titleCase(s) { return String(s || "").toLowerCase().replace(/\b([a-z])/g, function (m) { return m.toUpperCase(); }).replace(/, ([A-Za-z]{2})$/, function (m, st) { return ", " + st.toUpperCase(); }); }
+  function pctFmt(v) { v = Number(v); if (isNaN(v)) return "—"; if (v > 0 && v < 0.1) return "under 0.1%"; return (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10).toLocaleString() + "%"; }
+  function bigNum(v) { v = Number(v); if (v >= 1e6) return (Math.round(v / 1e5) / 10) + " million"; return n0(v); }
+  function monYr(d) { if (!d) return ""; var t = new Date(String(d).slice(0, 10) + "T00:00:00"); return isNaN(t) ? String(d) : t.toLocaleDateString(undefined, { year: "numeric", month: "short" }); }
+  function peerWord(g) { var w = String(g || "").split(" ")[0].toLowerCase(); return w === "all" || !w ? "typical across all PEOs" : "typical for a " + w + " PEO"; }
+  function clientsFiled(c) { return c ? n0(c.value) + (c.qualifier === "more_than" ? "+" : "") : "—"; }
+
   function renderIntel(j) {
-    if (j.error) { $("tab-intel").innerHTML = '<div class="empty">' + esc(j.error) + "</div>"; return; }
-    var e = j.estimate || {};
+    if (j.error) { $("profFacts").innerHTML = '<div class="empty">' + esc(j.error) + "</div>"; $("tab-intel").innerHTML = ""; return; }
+    var e = j.estimate || {}, f = j.filed || {}, nm = j.sold_as || j.name;
     var meta = [];
     if (j.sold_as && j.sold_as !== j.name) meta.push("sold as " + j.sold_as);
     if (j.entity_class) meta.push(j.entity_class);
-    if (j.head_office) meta.push(j.head_office);
+    if (j.head_office) meta.push(titleCase(j.head_office));
     if (j.irs_certified) meta.push(j.irs_certified === "certified" ? "IRS-certified PEO" : "not IRS-certified");
     $("titleMeta").textContent = meta.join(" · ");
 
-    var h = "";
+    /* ===== PEO PROFILE: fact tiles ===== */
+    var p = "";
+    var rk = j.size_rank, share = j.market_share_pct;
+    var rankV = "Not ranked", rankD = e.low != null ? "not classed as a PEO for ranking" : "no employee count yet";
+    if (rk) {
+      rankV = rk.rank_best === rk.rank_worst ? "#" + rk.rank_best : "#" + rk.rank_best + "–#" + rk.rank_worst;
+      rankD = (rk.rank_best === rk.rank_worst ? "largest" : "by size") + " of " + n0(rk.of_n) + " PEOs we've sized" +
+        (rk.rank_best === rk.rank_worst ? "" : (rk.size_published ? " (PEOs near it are estimates)" : " (its size is an estimate)"));
+    }
+    var shareV = "—", shareD = "needs an employee count";
+    if (share) {
+      shareV = (share.low === share.high || pctFmt(share.low) === pctFmt(share.high)) ? "About " + pctFmt(share.high) : pctFmt(share.low).replace("%", "") + "–" + pctFmt(share.high);
+      shareD = "of " + bigNum(share.industry_wse_total) + " PEO employees nationwide · industry count, " + monYr(share.industry_published_on) + (share.industry_stale ? " (over 2 years old)" : "");
+    }
+    var cliV = n0(j.clients_seen), cliD = "current clients in our records";
+    if (f.clients) { cliV = clientsFiled(f.clients); cliD = "reported by the PEO, " + monYr(f.clients.as_of) + " · " + n0(j.clients_seen) + " in our records"; }
+    p += '<div class="tiles">' +
+      tile("Worksite employees", e.low != null ? range(e.low, e.high) : "No count yet",
+           e.low != null ? (e.status === "published" ? "reported by the PEO · " + monYr(e.newest_data) : "our estimate · data through " + monYr(e.newest_data)) : "no size figure on file yet") +
+      tile("Size rank", rankV, rankD) +
+      tile("Market share", shareV, shareD) +
+      tile("Clients", cliV, cliD) + "</div>";
 
-    /* tiles */
-    var share = j.market_share_pct;
-    h += '<div class="tiles">' +
-      tile("Worksite employees", e.low != null ? range(e.low, e.high) : "no estimate",
-           e.low != null ? (e.status === "published" ? "published by the PEO" : "estimate") + " · newest data " + dateFmt(e.newest_data) : "no size estimate on file yet") +
-      tile("Clients we see", n0(j.clients_seen), "current clients in our records (a floor)") +
-      tile("Size group", GROUP[j.size_group] || "All PEOs", j.size_group === "all" ? "no estimate, compared with all PEOs" : "WSEs" + (j.range_crosses_groups ? " · range spans two groups" : "")) +
-      tile("Share of PEO industry", share ? (share.low === share.high ? n1(share.low) + "%" : n1(share.low) + "–" + n1(share.high) + "%") : "—",
-           share ? "of " + n0(share.industry_wse_total) + " worksite employees" : "needs a size estimate") +
-      "</div>";
+    if (f.wse && f.wse_yoy_pct != null) {
+      p += '<p class="note" style="margin:-6px 0 12px">Last 12 months, from its own filings: ' + (f.wse_yoy_pct >= 0 ? "+" : "") + n1(f.wse_yoy_pct) + "% worksite employees (" +
+        n0(f.wse_prior && f.wse_prior.value) + " → " + n0(f.wse.value) + ", " + monYr(f.wse_prior && f.wse_prior.as_of) + " to " + monYr(f.wse.as_of) + ")" +
+        (f.growth_guidance ? " · its own outlook: " + esc(f.growth_guidance.text) + " growth" : "") + ".</p>";
+    }
 
     /* flags */
     if ((j.flags || []).length) {
-      h += "<section><h3>Open flags</h3>";
-      j.flags.forEach(function (f) {
-        var d = f.detail || {};
-        var txt = f.kind === "wse_estimate_below_industry_yardstick"
+      p += "<section><h3>Open flags</h3>";
+      j.flags.forEach(function (fl) {
+        var d = fl.detail || {};
+        var txt = fl.kind === "wse_estimate_below_industry_yardstick"
           ? "The size estimate looks low for the clients we see: at most " + n1(d.max_wse_per_visible_client) + " WSEs per client, where even the lowest quarter of small PEOs run " + n1(d.yardstick_wse_per_client_p25_smallest_cohort) + " WSEs per client."
-          : f.kind;
-        h += '<div class="flag"><b>' + esc(txt) + "</b><br><span class=\"muted\">" + esc(f.what_to_do || "") + " · as of " + esc(dateFmt(f.as_of)) + "</span></div>";
+          : fl.kind === "current_clients_exceed_filed_count"
+          ? "We show " + n0(d.clients_seen) + " current clients, but " + nm + " reports " + n0(d.filed_clients) + (d.filed_qualifier === "more_than" ? "+" : "") + " (" + monYr(d.filed_as_of) + ")."
+          : fl.kind;
+        p += '<div class="flag"><b>' + esc(txt) + "</b><br><span class=\"muted\">" + esc(fl.what_to_do || "") + " · as of " + esc(dateFmt(fl.as_of)) + "</span></div>";
       });
-      h += "</section>";
+      p += "</section>";
     }
 
-    h += '<div class="grid2">';
-
-    /* WSE per client check */
-    var c = j.wse_per_client_check;
-    h += "<section><h3>Employees per client</h3>";
+    /* how much of the book we see */
+    var c = j.book_coverage;
+    p += "<section><h3>How much of this PEO's book we see</h3>";
     if (c) {
-      h += '<p class="blurb">' + esc(c.reading) + "</p>" +
-        "<table><tr><th>This PEO</th><th class=\"num\">Lowest 25%</th><th class=\"num\">Middle</th><th class=\"num\">Top 25%</th><th>Grade</th></tr>" +
-        "<tr><td class=\"num\" style=\"text-align:left\">" + (c.low === c.high ? n1(c.high) : n1(c.low) + "–" + n1(c.high)) + "</td>" +
-        "<td class=\"num\">" + n1(c.p25) + "</td><td class=\"num\">" + n1(c.median) + "</td><td class=\"num\">" + n1(c.p75) + "</td>" +
-        "<td>" + (c.low === c.high || c.grade_of_low === c.grade_of_high ? gradeChip(c.grade_of_high) : gradeChip(c.grade_of_low) + " to " + gradeChip(c.grade_of_high)) + "</td></tr></table>" + band(c.p25, c.median, c.p75, c.high);
+      var big = c.basis === "filed" ? pctFmt(c.pct) : "About " + pctFmt(c.pct);
+      var line;
+      if (c.basis === "filed") {
+        line = n0(c.clients_seen) + " current clients in our records vs " + n0(c.clients_expected) + (c.filed_qualifier === "more_than" ? "+" : "") + " the PEO reports (" + monYr(c.filed_as_of) + ").";
+        if (c.over_100) line += " We show more than it reports, so some of ours have likely left.";
+      } else {
+        line = n0(c.clients_seen) + " current clients in our records vs about " + n0(c.clients_expected) + " expected for its size (" + n0(c.wse_used) + " employees ÷ " + n1(c.typical_wse_per_client) + " per client, " + peerWord(c.peer_group) + ").";
+        if (c.over_100) line += " We see more than a typical PEO its size would have: its clients may be smaller than typical, or its size figure is low.";
+      }
+      p += '<div class="tile" style="max-width:520px"><div class="v">' + esc(big) + '</div><div class="d">' + esc(line) + "</div></div>";
     } else {
-      h += '<p class="muted">Needs both a size estimate and clients we can see.</p>';
+      p += '<p class="muted">Needs an employee count and clients we can see.</p>';
     }
-    h += '<p class="source">Industry verified stats · FY2024 · ' + esc(j.size_group_label || "") + "</p></section>";
+    p += "</section>";
+    $("profFacts").innerHTML = p;
+
+    /* ===== INDUSTRY INTEL: comparison with typical PEOs its size ===== */
+    var h = "";
+    var grp = j.size_group_label || "All PEOs surveyed";
+    h += '<p class="blurb" style="margin:0 0 12px">Compared with <b>' + esc(grp) + "</b> in the industry survey (FY2024).</p>";
 
     /* outlook */
     var o = j.outlook_12m;
-    h += "<section><h3>Next 12 months if typical</h3>";
+    h += "<section><h3>Next 12 months</h3>";
     if (o) {
-      h += '<p class="blurb">What happens if this PEO grows and keeps clients like the typical PEO its size.</p><table>' +
-        "<tr><td>Worksite employees</td><td class=\"num\">" + range(o.wse_low, o.wse_high) + "</td><td class=\"muted\">at " + n1(o.growth_pct_used) + "% a year</td></tr>" +
+      var gWhy = o.growth_source === "company_guidance" ? "its own outlook" + (o.growth_text ? " (" + o.growth_text + ")" : "")
+               : o.growth_source === "filed_last_12_months" ? "its own last 12 months" : "typical for its size";
+      var baseWhy = o.client_base_source === "filed_clients" ? "of the " + clientsFiled(f.clients) + " clients it reports"
+                  : o.client_base_source === "expected_clients" ? "of about " + n0(o.client_base) + " clients expected for its size"
+                  : "of the clients we see";
+      h += '<p class="blurb">Growth comes from the PEO’s own filings when it has them. Client retention is typical for its size.</p><table>' +
+        "<tr><td>Worksite employees</td><td class=\"num\">" + range(o.wse_low, o.wse_high) + "</td><td class=\"muted\">at " + n1(o.growth_pct_used) + "% a year · " + esc(gWhy) + "</td></tr>" +
         "<tr><td>Clients kept</td><td class=\"num\">" + n1(o.client_retention_pct) + "%</td><td class=\"muted\">typical for its size</td></tr>" +
-        "<tr><td>Clients it would lose</td><td class=\"num\">" + n0(o.clients_lost_if_typical) + "</td><td class=\"muted\">of the clients we see</td></tr>" +
-        '</table><p class="note">Projected from Industry verified stats FY2024. Not a forecast for this PEO.</p>';
+        "<tr><td>Clients it would lose</td><td class=\"num\">" + n0(o.clients_lost_if_typical) + "</td><td class=\"muted\">" + esc(baseWhy) + "</td></tr>" +
+        '</table><p class="note">A projection, not a forecast for this PEO.</p>';
     } else {
-      h += '<p class="muted">Needs a size estimate.</p>';
+      h += '<p class="muted">Needs an employee count.</p>';
     }
     h += "</section>";
-    h += "</div>";
 
     /* model */
     var ml = j.model_low, mh = j.model_high;
     h += "<section><h3>What a PEO this size typically looks like</h3>";
     if (ml) {
       var same = !mh || Number(ml.wse) === Number(mh.wse);
-      h += '<p class="blurb">A model built from the typical figures for its size group. It is not this PEO’s reported financials. Revenue here counts worksite wages; many PEOs report revenue without them.</p>' +
+      h += '<p class="blurb">A model built from the typical figures for its size. It is not this PEO’s reported financials. Revenue here counts worksite wages; many PEOs report revenue without them.</p>' +
         "<table><tr><th>Figure</th><th class=\"num\">" + (same ? "At " + n0(ml.wse) + " WSEs" : "Low end (" + n0(ml.wse) + ")") + "</th>" + (same ? "" : "<th class=\"num\">High end (" + n0(mh.wse) + ")</th>") + "</tr>" +
         modelRow("Worksite payroll", "wse_payroll_est_usd", ml, mh, same, usd) +
         modelRow("Revenue (wages included)", "gross_revenue_est_usd", ml, mh, same, usd) +
@@ -431,25 +471,19 @@
       if (!same && ml.cohort !== mh.cohort) h += '<p class="note">The low and high ends fall in different size groups, so each uses its own group’s figures.</p>';
       h += '<p class="source">Model estimate from Industry verified stats · FY2024</p>';
     } else {
-      h += '<p class="muted">Needs a size estimate.</p>';
+      h += '<p class="muted">Needs an employee count.</p>';
     }
     h += "</section>";
 
     /* yardsticks */
-    h += "<section><h3>Industry yardsticks for its size group</h3>" +
-      '<p class="blurb">Where PEOs of this size sat in FY2024. Use the middle; the lowest and top 25% show the normal spread. n = number of PEOs behind the figure.</p>' +
+    h += "<section><h3>Industry yardsticks for PEOs its size</h3>" +
+      '<p class="blurb">Where PEOs this size sat in FY2024. Use the middle; the lowest and top 25% show the normal spread. n = number of PEOs behind the figure.</p>' +
       "<table><tr><th>Measure</th><th class=\"num\">Lowest 25%</th><th class=\"num\">Middle</th><th class=\"num\">Top 25%</th><th class=\"num\">All PEOs, middle</th><th class=\"num\">n</th></tr>";
     (j.benchmarks || []).forEach(function (b) {
       h += "<tr><td>" + esc(plainLabel(b.metric, b.label)) + "</td><td class=\"num\">" + unitFmt(b.p25, b.unit) + "</td><td class=\"num\"><b>" + unitFmt(b.median, b.unit) +
         "</b></td><td class=\"num\">" + unitFmt(b.p75, b.unit) + "</td><td class=\"num\">" + unitFmt(b.all_median, b.unit) + "</td><td class=\"num muted\">" + (b.n == null ? "—" : b.n) + "</td></tr>";
     });
-    h += '</table><p class="source">Industry verified stats · FY2024 · ' + esc(j.size_group_label || "") + "</p></section>";
-
-    /* estimate method */
-    if (e.method) {
-      h += "<section><h3>How the size figure was built</h3><p>" + esc(e.method) + "</p>" +
-        (e.carried_forward ? '<p class="muted">' + esc(e.carried_forward) + "</p>" : "") + "</section>";
-    }
+    h += '</table><p class="source">Industry verified stats · FY2024 · ' + esc(grp) + "</p></section>";
 
     $("tab-intel").innerHTML = h;
   }
