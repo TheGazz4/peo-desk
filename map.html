@@ -438,7 +438,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.63 · 2026-09-23</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.68 · 2026-09-24</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -760,7 +760,11 @@ function commitDetail(st,r){
   d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,rm:r.rm,rmb:r.rmb,
             hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null,
             osc:fOk?r.osc:null, os:fOk?r.os:null, z5:zOk?r.z5:null,
-            hg:gOk?r.hg:null, ws:sOk?r.ws:null, ld:(r.ld&&r.ld.length===n)?r.ld:null, ec:(r.ec&&r.ec.length===n)?r.ec:null, sv:(r.sv&&r.sv.length===n)?r.sv:null};
+            hg:gOk?r.hg:null, ws:sOk?r.ws:null, ld:(r.ld&&r.ld.length===n)?r.ld:null, ec:(r.ec&&r.ec.length===n)?r.ec:null, sv:(r.sv&&r.sv.length===n)?r.sv:null,
+            // v3.68 (audit 2026-09-24): the Employee Count Brain fields were baked but never kept here, so the
+            // Employees chips, the card and the table always read Counting. Keep them.
+            hc:(r.hc&&r.hc.length===n)?r.hc:null, hct:(r.hct&&r.hct.length===n)?r.hct:null, hcl:(r.hcl&&r.hcl.length===n)?r.hcl:null,
+            lie:(r.lie&&r.lie.length===n)?r.lie:null, pcs:(r.pcs&&r.pcs.length===n)?r.pcs:null, pcsb:(r.pcsb&&r.pcsb.length===n)?r.pcsb:null};
   try{ renderSvcChips(); }catch(_){}
   d.lat0=null; d.lng0=null;
 }
