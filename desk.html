@@ -318,6 +318,29 @@
     <p class="age" id="chAsOf" style="margin-top:8px"></p>
   </section>
 
+  <section class="wide" id="sourceSchedule">
+    <h2>Data source schedule: how often each source updates <small>— owner only · re-measured every hour</small></h2>
+    <p class="blurb">Every data source and brain on the platform, with how often it gets new data, whether that happens on its own (automated) or needs someone to fetch it (manual), when it last <b>really</b> updated (measured from the data, not claimed), and when the next update is scheduled. Since 2026-09-24 this list is also a door: no new source can go live, open a raw lane, or write a single fact until it has a row here, and every fact must carry the date the source says it was true — a fact dated in the future is turned away. Rows that need you are listed first.</p>
+    <div class="sc-tiles" id="ssTiles"></div>
+    <div style="display:flex;gap:10px;align-items:center;margin:6px 0 8px;flex-wrap:wrap">
+      <label style="font-size:13px">Show
+        <select id="ssFilter" style="margin-left:4px">
+          <option value="ext">External sources</option>
+          <option value="need">Needs you or has a problem</option>
+          <option value="manual">Manual only</option>
+          <option value="auto">Automated only</option>
+          <option value="all">Everything, incl. internal brains</option>
+        </select>
+      </label>
+    </div>
+    <div style="overflow-x:auto">
+    <table id="tblSourceSchedule"><thead><tr><th>source</th><th>how often it updates</th><th>automated or manual</th><th>last real update</th><th>next update scheduled</th><th>status</th></tr></thead><tbody><tr><td colspan="6" class="age cold">loading…</td></tr></tbody></table>
+    </div>
+    <h3 style="margin:14px 0 6px;font-size:13px">Turned away at the door for a bad date (last 7 days)</h3>
+    <table id="tblSourceRefusals"><thead><tr><th>source</th><th>why</th><th class="num">rows</th></tr></thead><tbody></tbody></table>
+    <p class="age" id="ssAsOf" style="margin-top:8px"></p>
+  </section>
+
 <section class="wide" id="carrierSup">
     <h2>Health-carrier supervisor <small>— who carried each client, for exactly which dates</small></h2>
     <p class="blurb">Nightly agent (04:53 UTC, after the carrier layer rebuilds). A client carrier fact is written only for the overlap of the client's dated PEO window and that PEO's dated Schedule A policy term — never guessed, never open-ended. Unmapped carrier names are held back and researched by the AI lane; judgment calls go to the decision desk.</p>
@@ -385,16 +408,6 @@
     <p class="blurb">Every fact logged on a PEO profile (sales, mergers, name changes, carrier or pricing changes) is checked against each client's own dated history with that PEO. Only clients proven to be with the PEO on the date get it in their story, key moments and timeline. Carve-out clients, clients who joined later or left earlier, and clients whose dates can't prove it are kept out. The PEO itself is always named as it was at the time.</p>
     <div class="sc-tiles" id="ppTiles"></div>
     <div class="tw" style="max-height:520px;overflow:auto"><table id="tblPp"><thead><tr><th>When</th><th>What happened</th><th>Who it affects</th><th>What it meant for clients</th><th class="num">In story</th><th class="num">Likely</th><th class="num">Can't prove</th><th class="num">Left within 12 mo</th></tr></thead><tbody><tr><td colspan="8" class="age cold">loading&hellip;</td></tr></tbody></table></div>
-  </section>
-
-  <section class="wide" id="researchLedger">
-    <h2>Research ledger <small>— every paid search is kept, and nothing is paid for twice</small></h2>
-    <p class="blurb">Owner rule (2026-09-24): every Serper or Firecrawl result is saved and used, and nothing is researched twice. Every paid search now goes through one door: it first checks whether we already know the answer or already paid for the exact same search, and only pays when we don't. Whatever it pays for is saved. Any day where credits were spent without a saved result shows below as a leak, and raises an alert.</p>
-    <div class="sc-tiles" id="rlTiles"></div>
-    <h3 style="margin:14px 0 6px">Leak days <small>— credits paid, result not kept</small></h3>
-    <table id="tblRlLeak"><thead><tr><th>Day</th><th class="num">Credits paid</th><th class="num">Paid but not kept</th></tr></thead><tbody></tbody></table>
-    <h3 style="margin:14px 0 6px">Research lanes not yet through the one door</h3>
-    <table id="tblRlLane"><thead><tr><th>Lane</th><th>What it keeps / how it avoids repeats</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="wide" id="dataCal">
@@ -513,7 +526,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_research_ledger","desk_peo_intel_pushdown"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -1160,24 +1173,6 @@ function fmtDetail(d) {
   return Object.entries(o).filter(([k, v]) => v != null && v !== "" && k !== "detected_at")
     .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" \u00b7 ").slice(0, 160);
 }
-function renderResearchLedger(d) {
-  const rows = d.desk_research_ledger?.rows || [];
-  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
-  const tiles = rows.filter((r) => r.kind === "tile").sort((a, b) => a.ord - b.ord);
-  const t = $("#rlTiles");
-  if (t) t.innerHTML = tiles.map((r) => {
-    const pct = r.v2 ? Math.round((100 * r.v1) / r.v2) : null;
-    const tone = r.ord === 2 ? (pct >= 95 ? "good" : "warn") : r.ord === 3 ? (Number(r.v1) > 0 ? "warn" : "good") : null;
-    const v = pct != null ? `${fmtN(r.v1)} <small>/ ${fmtN(r.v2)} · ${pct}%</small>` : fmtN(r.v1);
-    return `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(r.label)}</div><div class="v">${v}</div><div class="d">${esc(r.detail || "")}</div></div>`;
-  }).join("");
-  const lk = rows.filter((r) => r.kind === "leak");
-  const tl = $("#tblRlLeak tbody");
-  if (tl) tl.innerHTML = lk.map((r) => `<tr><td>${esc(r.label)}</td><td class="num">${fmtN(r.v1)}</td><td class="num"><span class="chip warn">${fmtN(r.v2)}</span></td></tr>`).join("") || `<tr><td colspan="3">no leaks in the last 14 days</td></tr>`;
-  const ln = rows.filter((r) => r.kind === "lane");
-  const tn = $("#tblRlLane tbody");
-  if (tn) tn.innerHTML = ln.map((r) => `<tr><td>${esc(r.label)}</td><td class="mut">${esc(r.detail || "")}</td></tr>`).join("") || `<tr><td colspan="2">every lane goes through the door</td></tr>`;
-}
 function renderDataCalendar(d) {
   const rows = d.desk_data_calendar?.rows || [];
   const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
@@ -1202,7 +1197,6 @@ function renderAll(d) {
   renderCarrierSupervisor(d);
   renderPeoNetworks(d);
   renderPeoIdentity(d);
-  renderResearchLedger(d);
   renderPeoPushdown(d);
   renderDecisions(d);
   renderStrip(d);
@@ -1529,6 +1523,86 @@ setInterval(poll, POLL_MS);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
 })();
 </script>
+<script id="sourceScheduleJs">
+/* Data source schedule panel (instanceA 1300-1303, 2026-09-24). Reads source_schedule_desk_json() through dash-ai (desk key), own 10-minute clock. */
+(function () {
+  "use strict";
+  var FN = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/dash-ai";
+  var ANONK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+  var tiles = document.getElementById("ssTiles"), tb = document.querySelector("#tblSourceSchedule tbody"),
+      tr = document.querySelector("#tblSourceRefusals tbody"), asof = document.getElementById("ssAsOf"), sel = document.getElementById("ssFilter");
+  if (!tiles || !tb) return;
+  var DATA = null;
+  function e(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function n0(v) { return v == null || v === "" ? "—" : Number(v).toLocaleString(); }
+  var MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function d(v) { if (!v) return "—"; var s = String(v).slice(0, 10).split("-"); if (s.length < 3) return e(v); return MON[+s[1] - 1] + " " + (+s[2]) + ", " + s[0]; }
+  function daysFrom(v) { if (!v) return null; var t = new Date(String(v).slice(0, 10) + "T00:00:00Z").getTime(); var n = new Date(); var today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); return Math.round((t - today) / 86400000); }
+  var ST = { needs_you: ["Needs you", "#d03b3b"], stale: ["Stale — check the pull", "#d03b3b"], unproven: ["Not run yet", "#9a6a00"],
+             due_soon: ["Due this week", "#9a6a00"], on_track: ["On schedule", "#0ca30c"], final: ["No more updates", "#898781"],
+             watch_only: ["Watched, no set date", "#898781"], planned: ["Not built", "#898781"] };
+  var IN = { automated: "Automated", manual: "Manual", manual_fetch_auto_load: "Manual download, then loads itself", watch_only: "Watch only (manual re-pull)",
+             one_time: "One-time load", internal: "Internal — recalculates itself", planned: "Planned" };
+  var BASIS = { published: "the source publishes this schedule", observed: "measured from its past updates", declared: "per our source registry",
+                estimated: "our estimate", final: "no further updates", "n/a": "" };
+  function isInternal(r) { return r.group === "internal" || r.intake === "internal"; }
+  function keep(r) {
+    var f = sel ? sel.value : "ext";
+    if (f === "all") return true;
+    if (f === "need") return ["needs_you", "stale", "unproven"].indexOf(r.status) >= 0;
+    if (f === "manual") return ["manual", "manual_fetch_auto_load", "watch_only"].indexOf(r.intake) >= 0;
+    if (f === "auto") return r.intake === "automated";
+    return !isInternal(r);
+  }
+  function paint() {
+    if (!DATA) return;
+    var rows = (DATA.rows || []).filter(keep);
+    tb.innerHTML = rows.length ? rows.map(function (r) {
+      var st = ST[r.status] || [r.status || "—", "#898781"];
+      var basis = BASIS[r.basis] || "";
+      var cad = e(r.updates) + (basis ? '<div class="age">' + (r.cite ? '<a href="' + e(r.cite) + '" target="_blank" rel="noopener">' + e(basis) + "</a>" : e(basis)) + "</div>" : "");
+      var dn = daysFrom(r.next), nx = r.next ? d(r.next) + (dn != null ? '<div class="age">' + (dn < 0 ? (-dn) + " days overdue" : dn === 0 ? "today" : "in " + dn + " days") + "</div>" : "") : "—";
+      var dl = daysFrom(r.last), ls = r.last ? d(r.last) + (dl != null ? '<div class="age">' + (dl === 0 ? "today" : (-dl) + " days ago") + "</div>" : "") : '<span class="age cold">not measured yet</span>';
+      var note = r.status === "needs_you" || r.status === "stale" || r.status === "unproven" ? (r.action || r.note) : r.note;
+      return "<tr><td><b>" + e(r.name) + '</b><div class="age">' + e(r.gives) + "</div></td><td>" + cad + "</td><td>" + e(IN[r.intake] || r.intake) +
+             '<div class="age">' + e(r.how) + "</div></td><td>" + ls + "</td><td>" + nx + '</td><td style="font-weight:600;color:' + st[1] + '">' + e(st[0]) +
+             (note ? '<div class="age" style="font-weight:400">' + e(note) + "</div>" : "") + "</td></tr>";
+    }).join("") : '<tr><td colspan="6" class="age">nothing in this view</td></tr>';
+  }
+  function load() {
+    var k = null; try { k = localStorage.getItem("desk_key") || localStorage.getItem("peo_dash_key"); } catch (x) {}
+    if (!k || document.hidden) return;
+    fetch(FN, { method: "POST", headers: { "Content-Type": "application/json", "apikey": ANONK, "Authorization": "Bearer " + ANONK, "x-desk-key": k },
+      body: JSON.stringify({ mode: "sql", sql: "select source_schedule_desk_json() as j", label: "desk source schedule panel", quiet: true }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        var j = res && res.rows && res.rows[0] && res.rows[0].j;
+        if (typeof j === "string") j = JSON.parse(j);
+        if (!j || !j.rows) throw new Error((res && (res.detail || res.error)) || "no reply");
+        DATA = j;
+        var c = j.counts || {};
+        var ext = (j.rows || []).filter(function (r) { return !isInternal(r); });
+        var soon = ext.filter(function (r) { var x = daysFrom(r.next); return x != null && x >= 0 && x <= 30 && r.status !== "final"; }).length;
+        var tl = [["Sources tracked", n0(ext.length), n0((j.rows || []).length - ext.length) + " internal brains too"],
+                  ["Automated vs manual", n0(j.automated) + " / " + n0(j.manual), "manual = someone has to fetch the file"],
+                  ["Need you now", n0((c.needs_you || 0) + (c.stale || 0)), n0(c.unproven || 0) + " automated feeds not run yet"],
+                  ["Updates in next 30 days", n0(soon), "external sources with a scheduled date"],
+                  ["Bad dates turned away (24h)", n0(j.refusals_24h), n0(j.time_corrections) + " old rows re-dated so far"]];
+        tiles.innerHTML = tl.map(function (x) { return '<div class="tile"><div class="k">' + e(x[0]) + '</div><div class="v">' + x[1] + '</div><div class="d">' + e(x[2]) + "</div></div>"; }).join("");
+        paint();
+        var rf = j.refusals_by_source_7d || [];
+        if (tr) tr.innerHTML = rf.length ? rf.map(function (r) { return "<tr><td>" + e(r.source) + "</td><td>" + e(r.reason) + '</td><td class="num">' + n0(r.n) + "</td></tr>"; }).join("")
+                                         : '<tr><td colspan="3" class="age">none — every fact that came in carried a sound date</td></tr>';
+        if (asof) asof.textContent = "as of " + new Date(j.generated_at).toLocaleString();
+      })
+      .catch(function (err) { tb.innerHTML = '<tr><td colspan="6" class="age cold">could not load: ' + e(err.message) + "</td></tr>"; });
+  }
+  if (sel) sel.addEventListener("change", paint);
+  load();
+  setInterval(load, 10 * 60 * 1000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+})();
+</script>
 <script id="deskTightenJs">
 /* ---- desk v2 layout (cowork 2026-09-24): one tab at a time instead of a 38,000px scroll.
    Panels are assigned by section id (or by their title when a panel has no id). A panel added later that is not
@@ -1537,6 +1611,7 @@ setInterval(poll, POLL_MS);
   "use strict";
   var TABS = [
     { key: "overview", label: "Overview",          ids: ["scorecard", "decisionDesk", "readyPlays", "intelTicker"] },
+    { key: "sources",  label: "Data sources",      ids: ["sourceSchedule"] },
     { key: "book",     label: "Book & mesh",       ids: ["lineagePanel", "charterPanel", "enrichmentProgress", "dataPurification", "meshMail", "moduleUtilization"] },
     { key: "health",   label: "Health & carriers", ids: ["carrierSup", "peoNet", "dataCal"] },
     { key: "peos",     label: "PEO profiles",      ids: ["peoIdentity", "peoPushdown", "peoPrecision", "nonPeo"] },
