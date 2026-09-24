@@ -387,6 +387,16 @@
     <div class="tw" style="max-height:520px;overflow:auto"><table id="tblPp"><thead><tr><th>When</th><th>What happened</th><th>Who it affects</th><th>What it meant for clients</th><th class="num">In story</th><th class="num">Likely</th><th class="num">Can't prove</th><th class="num">Left within 12 mo</th></tr></thead><tbody><tr><td colspan="8" class="age cold">loading&hellip;</td></tr></tbody></table></div>
   </section>
 
+  <section class="wide" id="researchLedger">
+    <h2>Research ledger <small>— every paid search is kept, and nothing is paid for twice</small></h2>
+    <p class="blurb">Owner rule (2026-09-24): every Serper or Firecrawl result is saved and used, and nothing is researched twice. Every paid search now goes through one door: it first checks whether we already know the answer or already paid for the exact same search, and only pays when we don't. Whatever it pays for is saved. Any day where credits were spent without a saved result shows below as a leak, and raises an alert.</p>
+    <div class="sc-tiles" id="rlTiles"></div>
+    <h3 style="margin:14px 0 6px">Leak days <small>— credits paid, result not kept</small></h3>
+    <table id="tblRlLeak"><thead><tr><th>Day</th><th class="num">Credits paid</th><th class="num">Paid but not kept</th></tr></thead><tbody></tbody></table>
+    <h3 style="margin:14px 0 6px">Research lanes not yet through the one door</h3>
+    <table id="tblRlLane"><thead><tr><th>Lane</th><th>What it keeps / how it avoids repeats</th></tr></thead><tbody></tbody></table>
+  </section>
+
   <section class="wide" id="dataCal">
     <h2>Health data calendar <small>— when each PEO's new data is due, and when it arrived</small></h2>
     <p class="blurb">Checked every hour. <b>Form 5500</b> (carriers and people covered) is due the last day of the 7th month after the plan year ends, or the 15th day of the 10th month with an extension (<a href="https://www.irs.gov/retirement-plans/form-5500-corner" target="_blank" rel="noopener">IRS</a>); every DOL dataset file is under an hourly change check, so a new filing is picked up the hour DOL publishes it. <b>SBCs</b> must go out at least 30 days before an auto-renewing plan year (<a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-147/section-147.200" target="_blank" rel="noopener">45 CFR 147.200</a>), so network research runs 60 days before renewal. <b>Carrier network files</b> refresh monthly and are checked daily. <b>Form M-1</b> (MEWAs) is due March 1 (<a href="https://www.askebsa.dol.gov/mewa/" target="_blank" rel="noopener">DOL</a>) — dated here, not yet loaded.</p>
@@ -503,7 +513,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_research_ledger","desk_peo_intel_pushdown"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -1150,6 +1160,24 @@ function fmtDetail(d) {
   return Object.entries(o).filter(([k, v]) => v != null && v !== "" && k !== "detected_at")
     .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" \u00b7 ").slice(0, 160);
 }
+function renderResearchLedger(d) {
+  const rows = d.desk_research_ledger?.rows || [];
+  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
+  const tiles = rows.filter((r) => r.kind === "tile").sort((a, b) => a.ord - b.ord);
+  const t = $("#rlTiles");
+  if (t) t.innerHTML = tiles.map((r) => {
+    const pct = r.v2 ? Math.round((100 * r.v1) / r.v2) : null;
+    const tone = r.ord === 2 ? (pct >= 95 ? "good" : "warn") : r.ord === 3 ? (Number(r.v1) > 0 ? "warn" : "good") : null;
+    const v = pct != null ? `${fmtN(r.v1)} <small>/ ${fmtN(r.v2)} · ${pct}%</small>` : fmtN(r.v1);
+    return `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(r.label)}</div><div class="v">${v}</div><div class="d">${esc(r.detail || "")}</div></div>`;
+  }).join("");
+  const lk = rows.filter((r) => r.kind === "leak");
+  const tl = $("#tblRlLeak tbody");
+  if (tl) tl.innerHTML = lk.map((r) => `<tr><td>${esc(r.label)}</td><td class="num">${fmtN(r.v1)}</td><td class="num"><span class="chip warn">${fmtN(r.v2)}</span></td></tr>`).join("") || `<tr><td colspan="3">no leaks in the last 14 days</td></tr>`;
+  const ln = rows.filter((r) => r.kind === "lane");
+  const tn = $("#tblRlLane tbody");
+  if (tn) tn.innerHTML = ln.map((r) => `<tr><td>${esc(r.label)}</td><td class="mut">${esc(r.detail || "")}</td></tr>`).join("") || `<tr><td colspan="2">every lane goes through the door</td></tr>`;
+}
 function renderDataCalendar(d) {
   const rows = d.desk_data_calendar?.rows || [];
   const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
@@ -1174,6 +1202,7 @@ function renderAll(d) {
   renderCarrierSupervisor(d);
   renderPeoNetworks(d);
   renderPeoIdentity(d);
+  renderResearchLedger(d);
   renderPeoPushdown(d);
   renderDecisions(d);
   renderStrip(d);
