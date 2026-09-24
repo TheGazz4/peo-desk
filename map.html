@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.64 (2026-09-23, owner: "I only want the top 25 logos displayed as a default when the map loads - otherwise you
+            can't see the map at all because it's clustered PEO logos"): Headquarters control is now Off / Top 25 / All,
+            default Top 25 = the 25 largest PEOs on the map (by clients) that have a verified HQ + logo. URL hl=all|0.
+            Upstream same day: HQ pins now come from VERIFIED PEO-profile HQs too (47 -> ~95), absorbed brands show as
+            their buyer (Harbor America -> Vensure, Axios HR -> Engage, PBS of America -> Paychex PEO).
      v3.63 (2026-09-23, owner): Historical legend reads just "Former PEO user" with a coloured sample ring (the exact
             departure-ring pin). PEO HQ logo pins now OFF by default (owner view, for the time being); URL hl=1 turns them on.
      v3.62 (2026-09-23, owner): market share opens instantly from the loaded pins (and matches the map); the blank grey
@@ -441,7 +446,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <h2 style="margin-top:10px" title="Colors every pin by how soon its renewal month comes up — health/benefits is the trigger event that matters; WC is secondary. Off = each PEO's brand color.">Renewal heat</h2>
         <div class="seg"><button id="lens-peo" class="on">Off</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC</button></div>
         <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">Headquarters</h2>
-        <label class="chk"><input type="checkbox" id="hqlogo-on"> PEO HQ pins (logos)</label>
+        <div class="seg" id="hql-seg" title="Top 25 = the 25 largest PEOs on the map (by clients) show their HQ logo; All = every PEO HQ logo; Off = none"><button id="hql-off">Off</button><button id="hql-top" class="on">Top 25</button><button id="hql-all">All</button></div><input type="checkbox" id="hqlogo-on" checked style="display:none">
         <label class="chk" title="A PEO's own administrative offices ◆ and unverified HQ candidates ✩ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
         <label class="chk" title="Unverified guesses at a PEO's headquarters — a candidate, not a confirmed address. Off by default; never mistake one for a verified HQ."><input type="checkbox" id="hqcand-on"> Unverified HQ candidates <span style="color:var(--muted)">✩</span></label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
@@ -524,7 +529,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'brand', placement:'address', msOnly:false, minSrc:0, svcOff:{}, panelOpen:true, hqLogos:false, logoImgs:{}, logoLil:{},
+  grain:'brand', placement:'address', msOnly:false, minSrc:0, svcOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -1042,7 +1047,7 @@ function draw(){
       var isHq=b.kind==='hq';
       if(!isHq && b.state && S.states[b.state]===false) continue;   // v3.18: States culls pins+admin beacons, never HQ chips (owner: None wiped the logos)
       if(!b.family_slug||!famOn[b.family_slug]) continue;
-      if(isHq){ if(!S.hqLogos) continue; }                       // "PEO HQ pins (logos)" governs headquarters
+      if(isHq){ if(!S.hqLogos) continue; if(S.hqLogos==='top'&&!hqTopSet()[b.family_slug]) continue; }   // v3.64: Top 25 by default (owner) / All / Off
       else if(b.kind==='administrative'){ if(!S.beaconsOn||z<6) continue; }   // ◆ verified admin office
       else if(b.kind==='hq_candidate'){ if(!S.hqCand||z<6) continue; }       // ✩ UNVERIFIED hq guess — own toggle
       else { continue; }                                                     // zip_beacon / po_box: not a display class
@@ -1502,7 +1507,22 @@ $('peo-az').onclick=function(){ PEO_SORT=(PEO_SORT==='az')?'count':'az'; try{ lo
 syncAzBtn();
 $('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
 $('hqcand-on').onchange=function(){ S.hqCand=$('hqcand-on').checked; scheduleDraw(); writeUrl(); };
-$('hqlogo-on').onchange=function(){ S.hqLogos=$('hqlogo-on').checked; scheduleDraw(); writeUrl(); };
+// v3.64 (owner 2026-09-23): "only the top 25 logos displayed as a default when the map loads" - Off / Top 25 / All.
+function hqTopSet(){
+  var key=(S.beacons||[]).length+':'+((S.catalog&&S.catalog.families)||[]).length;
+  if(S._hqTopKey===key&&S._hqTop) return S._hqTop;
+  var hasHq={}; (S.beacons||[]).forEach(function(b){ if(b.kind==='hq'&&b.has_logo&&b.family_slug) hasHq[b.family_slug]=true; });
+  var rows=((S.catalog&&S.catalog.families)||[]).slice().sort(function(a,b){ return (Number(b.n_clients||b.n||0))-(Number(a.n_clients||a.n||0)); });
+  var out={}, k=0; for(var i=0;i<rows.length&&k<25;i++){ if(hasHq[rows[i].slug]){ out[rows[i].slug]=true; k++; } }
+  S._hqTop=out; S._hqTopKey=key; return out;
+}
+function syncHqSeg(){
+  var m=S.hqLogos==='all'?'all':(S.hqLogos?'top':'off');
+  ['off','top','all'].forEach(function(k){ var el=$('hql-'+k); if(el) el.className=(k===m?'on':''); });
+  var cb=$('hqlogo-on'); if(cb) cb.checked=!!S.hqLogos;
+}
+['off','top','all'].forEach(function(k){ var el=$('hql-'+k); if(!el) return;
+  el.onclick=function(){ S.hqLogos=(k==='off'?false:k); syncHqSeg(); scheduleDraw(); writeUrl(); }; });
 // HISTORICAL VIEW (Gazz 2026-09-14): current / both / former only. Current-only is the default —
 // former PEO users never show unless asked for. "Former only" hides the current pins entirely so the
 // departure book can be read on its own.
@@ -1771,7 +1791,7 @@ function buildUrl(){
     if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
     if(S.beaconsOn) p.set('b','1');
     if(S.placement==='zip') p.set('pm','zip');
-    if(S.hqLogos) p.set('hl','1');   // v3.63: HQ logos default OFF (owner 2026-09-23); hl=1 turns them on
+    if(S.hqLogos==='all') p.set('hl','all'); else if(!S.hqLogos) p.set('hl','0');   // v3.64: default = Top 25 HQ logos (owner 2026-09-23)
     if(S.msOnly) p.set('ms','1');
     if(S.minSrc) p.set('src',String(S.minSrc));
     var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }); if(svo.length) p.set('svoff',svo.join(','));
@@ -1790,7 +1810,7 @@ function readUrl(){
     else if(p.get('off')){ p.get('off').split(',').forEach(function(s){ sel[s]=false; }); }
     if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
-    if(p.get('hl')==='1'){ S.hqLogos=true; $('hqlogo-on').checked=true; }
+    if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
     if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
