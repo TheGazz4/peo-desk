@@ -767,7 +767,9 @@ function commitDetail(st,r){
             // v3.68 (audit 2026-09-24): the Employee Count Brain fields were baked but never kept here, so the
             // Employees chips, the card and the table always read Counting. Keep them.
             hc:(r.hc&&r.hc.length===n)?r.hc:null, hct:(r.hct&&r.hct.length===n)?r.hct:null, hcl:(r.hcl&&r.hcl.length===n)?r.hcl:null,
-            lie:(r.lie&&r.lie.length===n)?r.lie:null, pcs:(r.pcs&&r.pcs.length===n)?r.pcs:null, pcsb:(r.pcsb&&r.pcsb.length===n)?r.pcsb:null};
+            lie:(r.lie&&r.lie.length===n)?r.lie:null, pcs:(r.pcs&&r.pcs.length===n)?r.pcs:null, pcsb:(r.pcsb&&r.pcsb.length===n)?r.pcsb:null,
+            // v3.68b (1278h): Workers Comp Carve Out / Benefits Carve Out flags
+            wco:(r.wco&&r.wco.length===n)?r.wco:null, bco:(r.bco&&r.bco.length===n)?r.bco:null};
   try{ renderSvcChips(); }catch(_){}
   d.lat0=null; d.lng0=null;
 }
