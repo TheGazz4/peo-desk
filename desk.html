@@ -210,6 +210,18 @@
   .sc-tiles .tile { padding: 7px 11px; min-width: 110px; }
   .sc-tiles .tile .v { font-size: 18px; }
   .sc-tiles .tile .d { max-width: 42ch; }
+  /* ---- desk v3 (cowork 2026-09-24): legend in the header, 2 panels per row, even tile grids, 2-line cells ---- */
+  header { align-items: center; }
+  header #legend { padding: 0; margin: 0 0 0 6px; max-width: none; gap: 4px 8px; }
+  #tabs .hint { display: none; }
+  main { grid-template-columns: repeat(auto-fit, minmax(640px, 1fr)); }
+  .sc-narr ul.scb { grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); column-gap: 22px; }
+  .sc-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .sc-tiles .tile { min-width: 0; }
+  .sc-tiles .tile .d, #strip .tile .d { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: none; }
+  .sc-grid { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+  td .cl { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+  td .cl.open { display: block; overflow: visible; }
   @media (max-width: 700px) { main { grid-template-columns: 1fr; padding: 0 10px 30px; } #tabs, #strip, header, #legend { padding-left: 10px; padding-right: 10px; } }
 </style>
 </head>
@@ -1165,7 +1177,13 @@ function renderAll(d) {
 }
 
 /* ================= polling ================= */
+/* desk v3: one request at a time - a slow answer used to stack a new request on top every 5 s */
 async function poll() {
+  if (poll._busy) return;
+  poll._busy = true;
+  try { await pollOnce(); } finally { poll._busy = false; }
+}
+async function pollOnce() {
   if (DEMO) { renderAll(demoData()); setConn("demo data", true); lastPollAt = Date.now(); return; }
   if (!deskKey) return;
   try {
@@ -1477,7 +1495,7 @@ setInterval(poll, POLL_MS);
     { key: "overview", label: "Overview",          ids: ["scorecard", "decisionDesk", "readyPlays", "intelTicker"] },
     { key: "book",     label: "Book & mesh",       ids: ["lineagePanel", "enrichmentProgress", "dataPurification", "meshMail", "moduleUtilization"] },
     { key: "health",   label: "Health & carriers", ids: ["carrierSup", "peoNet", "dataCal"] },
-    { key: "peos",     label: "PEO profiles",      ids: ["peoIdentity", "peoPushdown", "nonPeo"] },
+    { key: "peos",     label: "PEO profiles",      ids: ["peoIdentity", "peoPushdown", "peoPrecision", "nonPeo"] },
     { key: "system",   label: "System",            ids: ["systemHealth", "rateLimits", "apiUsage", "appendThroughput", "freshness"] },
     { key: "more",     label: "More",              ids: [] },
     { key: "all",      label: "All",               ids: [] }
@@ -1554,6 +1572,35 @@ setInterval(poll, POLL_MS);
       el.textContent = v ? String(v) : "";
     });
   }
+  /* v3: legend sits in the header; long cells show 2 lines (click to open - stays open across refreshes);
+     tile notes show 2 lines with the full text on hover. Runs whenever a panel re-renders. */
+  var legend = document.getElementById("legend"), hdr = document.querySelector("header"), themeBtn = document.getElementById("themeBtn");
+  if (legend && hdr && themeBtn) hdr.insertBefore(legend, themeBtn);
+  var openCells = new Set();
+  function clampCells() {
+    Array.prototype.forEach.call(main.querySelectorAll("td:not(.num)"), function (td) {
+      if (td.dataset.cl) return;
+      td.dataset.cl = "1";
+      var txt = td.textContent.trim();
+      if (txt.length < 150 || td.querySelector("table, svg, input, select, button")) return;
+      var d = document.createElement("div");
+      d.className = "cl" + (openCells.has(txt) ? " open" : ""); d.title = "Click to show all / less";
+      while (td.firstChild) d.appendChild(td.firstChild);
+      td.appendChild(d);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".tile .d"), function (el) { if (el.title !== el.textContent) el.title = el.textContent; });
+  }
+  main.addEventListener("click", function (e) {
+    var c = e.target.closest(".cl"); if (!c || e.target.closest("a")) return;
+    c.classList.toggle("open");
+    var t = c.textContent.trim();
+    if (c.classList.contains("open")) openCells.add(t); else openCells.delete(t);
+  });
+  var pend = false;
+  new MutationObserver(function () {
+    if (pend) return; pend = true;
+    requestAnimationFrame(function () { pend = false; clampCells(); capTables(); badges(); });
+  }).observe(main, { childList: true, subtree: true });
   show(cur);
   /* deep link to a panel: desk.html#decisionDesk opens that panel's tab and scrolls to it */
   (function () {
