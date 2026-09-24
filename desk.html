@@ -266,6 +266,54 @@
   #scorecard details.s4-more > summary::before { content: "\25B8  "; }
   #scorecard details.s4-more[open] > summary::before { content: "\25BE  "; }
   #scorecard details.s4-more[open] > summary { margin-bottom: 10px; }
+  /* ---- decision desk v2 (cowork 2026-09-24): what needs you, with a suggestion, the reason, and buttons ---- */
+  #ddV2 { display: grid; gap: 12px; }
+  #ddV2 .dd-sum { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  #ddV2 .dd-sum button { font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 999px; padding: 4px 11px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--ink-1); display: inline-flex; gap: 6px; align-items: center; }
+  #ddV2 .dd-sum button i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-muted); display: inline-block; }
+  #ddV2 .dd-sum button.needs { border-color: var(--critical); background: color-mix(in srgb, var(--critical) 18%, transparent); } #ddV2 .dd-sum button.needs i { background: var(--critical); }
+  #ddV2 .dd-sum button.blocked { border-color: var(--serious); background: color-mix(in srgb, var(--serious) 16%, transparent); } #ddV2 .dd-sum button.blocked i { background: var(--serious); }
+  #ddV2 .dd-sum button.window, #ddV2 .dd-sum button.judge { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); } #ddV2 .dd-sum button.window i, #ddV2 .dd-sum button.judge i { background: var(--warning); }
+  #ddV2 .dd-sum button.quiet i { background: var(--good); }
+  #ddV2 .dd-sum button:disabled { opacity: .45; cursor: default; }
+  #ddV2 .dd-sum .meta { font-size: 11.5px; color: var(--ink-muted); margin-left: 6px; }
+  #ddV2 h5 { margin: 6px 0 0; font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); display: flex; gap: 8px; align-items: baseline; }
+  #ddV2 h5 small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--ink-muted); }
+  .dd-card { border: 1px solid var(--grid); border-left: 4px solid var(--ink-muted); border-radius: 10px; padding: 11px 14px; display: grid; gap: 8px; scroll-margin-top: 70px; }
+  .dd-card.needs_you { border-left-color: var(--critical); } .dd-card.blocked { border-left-color: var(--serious); }
+  .dd-card.window, .dd-card.awaiting_judge { border-left-color: var(--warning); }
+  .dd-card.flash { box-shadow: 0 0 0 2px var(--series-1); transition: box-shadow .2s; }
+  .dd-card .hd { font-size: 11.5px; color: var(--ink-muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .dd-card .hd b { color: var(--ink-1); }
+  .dd-card .tt { font-size: 14px; font-weight: 600; line-height: 1.4; }
+  .dd-card .sg { font-size: 13.5px; line-height: 1.45; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--series-1) 9%, transparent); }
+  .dd-card .sg b { color: var(--series-1); margin-right: 4px; }
+  .dd-card .wy { font-size: 12.5px; line-height: 1.5; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+  .dd-card .wy.open { display: block; }
+  .dd-card .wy b { color: var(--ink-1); }
+  .dd-card .opts { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-2); }
+  .dd-card .opts div { display: flex; gap: 8px; } .dd-card .opts div b { flex: none; min-width: 22px; color: var(--ink-1); }
+  .dd-card .opts div.rec b::after { content: " \2605"; color: var(--series-1); }
+  .dd-card .act { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .dd-card .act button { font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 6px 12px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--ink-1); }
+  .dd-card .act button.pri { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  .dd-card .act button.danger { border-color: var(--critical); color: var(--critical); }
+  .dd-card .act button.arm { outline: 2px solid var(--warning); outline-offset: 1px; }
+  .dd-card .act button:disabled { opacity: .5; cursor: progress; }
+  .dd-card .act input { font: inherit; font-size: 12px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--page); color: var(--ink-1); min-width: 220px; flex: 1; }
+  .dd-card .res { font-size: 12.5px; }
+  .dd-card .res.ok { color: var(--good); } .dd-card .res.err { color: var(--critical); }
+  .dd-card details { font-size: 12px; color: var(--ink-2); }
+  .dd-card details summary { cursor: pointer; color: var(--ink-muted); }
+  .dd-card details p { white-space: pre-wrap; margin: 6px 0; }
+  .dd-list { border: 1px solid var(--grid); border-radius: 10px; padding: 4px 12px; }
+  .dd-list > summary { cursor: pointer; font-size: 12.5px; padding: 6px 0; color: var(--ink-2); }
+  .dd-row { display: grid; grid-template-columns: 46px 1fr auto; gap: 10px; font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--grid); align-items: baseline; scroll-margin-top: 70px; }
+  .dd-row .n { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .dd-row .w { color: var(--ink-muted); white-space: nowrap; font-size: 11.5px; }
+  .dd-row.flash { background: color-mix(in srgb, var(--series-1) 14%, transparent); }
   @media (max-width: 700px) { main { grid-template-columns: 1fr; padding: 0 10px 30px; } #tabs, #strip, header, #legend { padding-left: 10px; padding-right: 10px; } }
 </style>
 </head>
@@ -571,7 +619,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_actions","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -1765,6 +1813,7 @@ setInterval(poll, POLL_MS);
     if (pend) return; pend = true;
     requestAnimationFrame(function () { pend = false; clampCells(); capTables(); badges(); });
   }).observe(main, { childList: true, subtree: true });
+  window.__deskShowTab = show;
   show(cur);
   /* deep link to a panel: desk.html#decisionDesk opens that panel's tab and scrolls to it */
   (function () {
@@ -1995,6 +2044,160 @@ setInterval(poll, POLL_MS);
   var orig = renderScorecard;
   window.renderScorecard = function (d) { orig(d); try { scV4(d); } catch (e) { if (window.console) console.error("scorecard v4", e); } };
   try { if (typeof latest !== "undefined" && latest && Object.keys(latest).length) scV4(latest); } catch (e) {}
+})();
+</script>
+<script id="decisionDeskV2">
+/* ---- decision desk v2 (cowork 2026-09-24, migration 3080 + edge fn desk-act).
+   Reads desk_decision_actions (one row per unfinished ruling, with suggestion + why + allowed actions).
+   Chips jump to the exact record. Buttons rule from the desk through desk-act -> desk_owner_act (logged, executor still tests). ---- */
+(function () {
+  "use strict";
+  if (typeof renderDecisions !== "function") return;
+  var ACT_URL = (typeof API === "string" ? API : "").replace(/desk-api$/, "desk-act");
+  var E = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var ago = function (iso) {
+    if (!iso) return "";
+    var h = (Date.now() - new Date(iso).getTime()) / 3600000;
+    return h < 1 ? Math.max(1, Math.round(h * 60)) + " min ago" : h < 48 ? h.toFixed(1) + " h ago" : (h / 24).toFixed(1) + " days ago";
+  };
+  var GROUPS = [
+    ["needs_you", "Needs your decision", "needs", "the platform will not act on these without you"],
+    ["blocked", "Blocked", "blocked", "the executor stopped and says why"],
+    ["window", "Applies by itself soon", "window", "judge-ruled; veto before the time shown if you disagree"],
+    ["awaiting_judge", "Waiting on the judge", "judge", "you can rule these yourself"],
+    ["snoozed", "Snoozed", "quiet", "back on your list when the snooze ends"],
+    ["queued", "Approved - waiting on the executor", "quiet", "no action needed"],
+    ["applied", "Applied in the last 3 days", "quiet", "done and tested"]
+  ];
+  var LABEL = { approve: "Approve", apply_now: "Apply now", veto: "Veto", snooze: "Snooze 7 days", close: "Close" };
+  var lastSig = null, deepDone = false, rowsById = {};
+
+  function card(r) {
+    var acts = r.actions || [], opts = r.options || [], rec = r.recommended_key;
+    var hd = '<div class="hd"><b>#' + E(r.id) + "</b><span>tier " + E(r.tier) + "</span><span>" + E(r.subsystem || "") + "</span>" +
+      (r.blast_radius ? "<span>impact " + E(String(r.blast_radius).toLowerCase()) + "</span>" : "") + "<span>open " + E(r.age_days) + " days</span></div>";
+    var optsHtml = opts.length && (acts.indexOf("choose") >= 0 || acts.indexOf("approve") >= 0)
+      ? '<div class="opts">' + opts.map(function (o) { return '<div class="' + (o.key === rec ? "rec" : "") + '"><b>' + E(o.key) + "</b><span>" + E(o.text) + "</span></div>"; }).join("") + "</div>" : "";
+    var btns = [];
+    if (acts.indexOf("approve") >= 0 && rec) btns.push('<button class="pri" data-act="choose" data-choice="' + E(rec) + '">Approve ' + E(rec) + " (recommended)</button>");
+    else if (acts.indexOf("approve") >= 0) btns.push('<button class="pri" data-act="approve">Approve recommendation</button>');
+    if (acts.indexOf("close") >= 0 && r.bucket === "blocked" && r.successor_id) btns.push('<button class="pri" data-act="close">Close (replaced by #' + E(r.successor_id) + ")</button>");
+    if (acts.indexOf("choose") >= 0) opts.forEach(function (o) { if (o.key !== rec) btns.push('<button data-act="choose" data-choice="' + E(o.key) + '" title="' + E(o.text) + '">Choose ' + E(o.key) + "</button>"); });
+    ["apply_now", "veto", "snooze"].forEach(function (a) { if (acts.indexOf(a) >= 0) btns.push('<button data-act="' + a + '"' + (a === "veto" ? ' class="danger"' : a === "apply_now" ? ' class="pri"' : "") + ">" + LABEL[a] + "</button>"); });
+    if (acts.indexOf("close") >= 0 && !(r.bucket === "blocked" && r.successor_id)) btns.push('<button data-act="close">Close</button>');
+    var actHtml = btns.length ? '<div class="act">' + btns.join("") + '<input type="text" placeholder="Note (optional)" maxlength="500"></div><div class="res"></div>' : "";
+    var when = r.bucket === "window" && r.effective_at ? " · applies " + new Date(r.effective_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+    return '<div class="dd-card ' + E(r.bucket) + '" id="dec-' + E(r.id) + '" data-id="' + E(r.id) + '">' + hd +
+      '<div class="tt">' + E(r.title) + E(when) + "</div>" +
+      '<div class="sg"><b>Suggested:</b>' + E(r.suggestion) + "</div>" +
+      (r.why ? '<div class="wy" title="Click to read all"><b>Why: </b>' + E(r.why) + "</div>" : "") +
+      optsHtml + actHtml +
+      '<details><summary>Full question' + (r.judge_opinion ? " and the judge's opinion" : "") + "</summary><p>" + E(r.question) + "</p>" +
+      (r.judge_opinion ? "<p><b>Judge:</b> " + E(r.judge_opinion) + "</p>" : "") + (r.ruling ? "<p><b>Ruling:</b> " + E(r.ruling) + "</p>" : "") + "</details></div>";
+  }
+  function row(r) {
+    var w = r.bucket === "queued" ? "waiting " + (r.waiting_hours != null ? r.waiting_hours + " h" : "") : r.bucket === "applied" ? "applied " + ago(r.applied_at) : r.bucket === "snoozed" ? r.suggestion : "";
+    return '<div class="dd-row" id="dec-' + E(r.id) + '"><span class="n">#' + E(r.id) + '</span><span title="' + E(r.question) + '">' + E(r.title) + '</span><span class="w">' + E(w) + "</span></div>";
+  }
+
+  function render(d) {
+    var sec = document.getElementById("decisionDesk") || (document.getElementById("tblDecisions") || {}).closest && document.getElementById("tblDecisions").closest("section");
+    if (!sec) return;
+    var rows = (d && d.desk_decision_actions && d.desk_decision_actions.rows) || null;
+    if (!rows) return;
+    var box = document.getElementById("ddV2");
+    if (!box) {
+      box = document.createElement("div"); box.id = "ddV2";
+      var tbl = document.getElementById("tblDecisions"); var anchor = tbl ? (tbl.closest(".tw-scroll") || tbl) : null;
+      if (anchor) anchor.parentNode.insertBefore(box, anchor); else sec.appendChild(box);
+      box.addEventListener("click", onClick);
+    }
+    var tbl2 = document.getElementById("tblDecisions"); if (tbl2) (tbl2.closest(".tw-scroll") || tbl2).style.display = "none";
+    var sum = document.getElementById("decSummary"); if (sum) sum.style.display = "none";
+    var sig = JSON.stringify(rows.map(function (r) { return [r.id, r.bucket, r.suggestion, r.effective_at, r.waiting_hours]; }));
+    if (sig === lastSig) return;
+    if (box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;   /* never wipe a note being typed */
+    lastSig = sig;
+    rowsById = {}; rows.forEach(function (r) { rowsById[r.id] = r; });
+    var by = {}; GROUPS.forEach(function (g) { by[g[0]] = []; });
+    rows.forEach(function (r) { (by[r.bucket] = by[r.bucket] || []).push(r); });
+    var b = ((d.desk_status_board && d.desk_status_board.rows) || [])[0] || {};
+    var chips = GROUPS.map(function (g) {
+      var n = by[g[0]].length;
+      if (!n && g[0] !== "needs_you") return "";
+      var lab = { needs_you: n + " need your decision", blocked: n + " blocked", window: n + " apply by themselves soon", awaiting_judge: n + " waiting on the judge",
+                  snoozed: n + " snoozed", queued: n + " approved, waiting on executor", applied: n + " applied (3 days)" }[g[0]];
+      return '<button class="' + (n ? g[2] : "quiet") + '" data-jump="' + g[0] + '"' + (n ? "" : " disabled") + "><i></i>" + E(lab) + "</button>";
+    }).join("");
+    var marks = by.needs_you.map(function () { return '<span class="chip critical" style="display:none"></span>'; }).join("") +
+                by.blocked.map(function () { return '<span class="chip serious" style="display:none"></span>'; }).join("");
+    var html = '<div class="dd-sum">' + chips + '<span class="meta">' + E((b.decided_without_gazz_pct != null ? b.decided_without_gazz_pct + "% decided without you · " : "") +
+      "judge " + (ago(b.judge_last_at) || "never") + " · executor " + (ago(b.executor_last_at) || "never")) + "</span>" + marks + "</div>";
+    GROUPS.forEach(function (g) {
+      var list = by[g[0]]; if (!list.length) return;
+      if (g[0] === "queued" || g[0] === "applied" || g[0] === "snoozed") {
+        html += '<details class="dd-list" id="grp-' + g[0] + '"><summary>' + E(g[1]) + " · " + list.length + " — " + E(g[3]) +
+          (g[0] === "queued" ? ". Longest wait " + Math.max.apply(null, list.map(function (r) { return Number(r.waiting_hours) || 0; })).toFixed(1) + " h" : "") + "</summary>" + list.map(row).join("") + "</details>";
+      } else {
+        html += '<h5 id="grp-' + g[0] + '">' + E(g[1]) + " · " + list.length + " <small>" + E(g[3]) + "</small></h5>" + list.map(card).join("");
+      }
+    });
+    if (!by.needs_you.length && !by.blocked.length && !by.window.length && !by.awaiting_judge.length) html += '<div class="dd-card"><div class="tt">Nothing needs you right now.</div></div>';
+    box.innerHTML = html;
+    if (!deepDone) {
+      deepDone = true;
+      var m = location.hash.match(/dec-(\d+)/);
+      if (m) setTimeout(function () { jumpTo([document.getElementById("dec-" + m[1])]); }, 300);
+    }
+  }
+
+  function jumpTo(els) {
+    els = els.filter(Boolean); if (!els.length) return;
+    var det = els[0].closest("details"); if (det) det.open = true;
+    if (typeof window.__deskShowTab === "function") window.__deskShowTab("overview");
+    els[0].scrollIntoView({ behavior: "smooth", block: "start" });
+    els.forEach(function (el) { el.classList.add("flash"); setTimeout(function () { el.classList.remove("flash"); }, 2200); });
+  }
+
+  function onClick(e) {
+    var j = e.target.closest("button[data-jump]");
+    if (j) {
+      var bucket = j.dataset.jump, ids = Object.keys(rowsById).filter(function (k) { return rowsById[k].bucket === bucket; });
+      jumpTo(ids.map(function (k) { return document.getElementById("dec-" + k); }));
+      return;
+    }
+    var wy = e.target.closest(".wy"); if (wy) { wy.classList.toggle("open"); return; }
+    var btn = e.target.closest(".act button[data-act]"); if (!btn) return;
+    if (!btn.classList.contains("arm")) {                    /* two clicks: nothing fires by accident */
+      Array.prototype.forEach.call(document.querySelectorAll("#ddV2 button.arm"), function (x) { x.classList.remove("arm"); x.textContent = x.dataset.lab; });
+      btn.dataset.lab = btn.textContent; btn.classList.add("arm"); btn.textContent = "Click again to confirm";
+      setTimeout(function () { if (btn.classList.contains("arm")) { btn.classList.remove("arm"); btn.textContent = btn.dataset.lab; } }, 5000);
+      return;
+    }
+    var cardEl = btn.closest(".dd-card"), res = cardEl.querySelector(".res"), note = (cardEl.querySelector(".act input") || {}).value || null;
+    var id = Number(cardEl.dataset.id), action = btn.dataset.act, choice = btn.dataset.choice || null;
+    Array.prototype.forEach.call(cardEl.querySelectorAll(".act button"), function (x) { x.disabled = true; });
+    res.className = "res"; res.textContent = "Working…";
+    fetch(ACT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (typeof ANON === "string" ? ANON : ""), "x-desk-key": (typeof deskKey === "string" ? deskKey : "") },
+      body: JSON.stringify({ id: id, action: action, choice: choice, note: note })
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
+      if (!x.ok) throw new Error((x.j && (x.j.detail || x.j.error)) || "refused");
+      res.className = "res ok";
+      res.textContent = { approve: "Approved. The executor applies and tests it on its next run.", choose: "Ruled option " + choice + ". The executor applies and tests it on its next run.",
+        apply_now: "Objection window waived - it goes to the executor now.", veto: "Vetoed. It is back on your list with the judge's opinion attached.",
+        snooze: "Snoozed for 7 days.", close: "Closed." }[action] || "Done.";
+      lastSig = null; if (typeof poll === "function") setTimeout(poll, 800);
+    }).catch(function (err) {
+      res.className = "res err"; res.textContent = "Not done: " + (err.message || err);
+      Array.prototype.forEach.call(cardEl.querySelectorAll(".act button"), function (x) { x.disabled = false; if (x.classList.contains("arm")) { x.classList.remove("arm"); x.textContent = x.dataset.lab; } });
+    });
+  }
+
+  var orig = renderDecisions;
+  window.renderDecisions = function (d) { orig(d); try { render(d); } catch (e) { if (window.console) console.error("decision desk v2", e); } };
+  try { if (typeof latest !== "undefined" && latest) render(latest); } catch (e) {}
 })();
 </script>
 </body>
