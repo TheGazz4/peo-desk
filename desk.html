@@ -273,10 +273,10 @@
   </section>
 
   <section class="wide" id="nonPeo">
-    <h2>PEO list cleanup: profiles classed as PEOs with no clients <small>— owner only · where each one came from · 2026-09-23</small></h2>
-    <p class="blurb">These are classed as PEOs but have no current clients and no website. Most entered from the federal Form 5500 plan data: the sponsor filed a multiple-employer retirement plan and ticked the plan-type box our loader reads as "maintained by a PEO" (Schedule MEP type code 2), and automatic loads took that box at face value. Some are real PEOs we simply have no clients for. Nothing has been removed; each needs a keep / move-out decision.</p>
+    <h2>PEO list cleanup: the no-client "PEOs" and what they really are <small>— owner only · researched 2026-09-23</small></h2>
+    <p class="blurb">101 profiles were classed as PEOs but had no current clients. Most came in from the federal Form 5500 plan data: the sponsor ticked the plan-type box our loader read as "maintained by a PEO" (Schedule MEP type code 2), and automatic loads believed it. Each one was researched. Real PEOs now have a full profile; filing entities of PEOs we already track were folded into that PEO; non-PEOs are held here until you OK retiring them. Nothing was deleted.</p>
     <div class="sc-tiles" id="npTiles"></div>
-    <div class="tw" style="max-height:560px;overflow:auto"><style>#tblNonPeo td{white-space:normal;vertical-align:top}#tblNonPeo td.num{white-space:nowrap}#tblNonPeo th.num,#tblNonPeo td.num{text-align:right}</style><table id="tblNonPeo"><thead><tr><th>Shown as</th><th>Why it was called a PEO</th><th>How it entered our list</th><th>Filer on the federal filing</th><th class="num">Plan participants</th><th class="num">Latest filing</th><th class="num">Clients ever attached</th></tr></thead><tbody><tr><td colspan="7" class="age cold">loading…</td></tr></tbody></table></div>
+    <div class="tw" style="max-height:620px;overflow:auto"><style>#tblNonPeo td{white-space:normal;vertical-align:top}#tblNonPeo td.num{white-space:nowrap}#tblNonPeo th.num,#tblNonPeo td.num{text-align:right}#tblNonPeo .oc{font-weight:600;white-space:nowrap}</style><table id="tblNonPeo"><thead><tr><th>Outcome</th><th>Company</th><th>What we found</th><th>Profile now</th><th>How it entered our list</th><th>Filer on the federal filing</th><th class="num">Plan participants</th></tr></thead><tbody><tr><td colspan="7" class="age cold">loading…</td></tr></tbody></table></div>
   </section>
 
   <section class="wide" id="dataCal">
@@ -284,17 +284,6 @@
     <p class="blurb">Checked every hour. <b>Form 5500</b> (carriers and people covered) is due the last day of the 7th month after the plan year ends, or the 15th day of the 10th month with an extension (<a href="https://www.irs.gov/retirement-plans/form-5500-corner" target="_blank" rel="noopener">IRS</a>); every DOL dataset file is under an hourly change check, so a new filing is picked up the hour DOL publishes it. <b>SBCs</b> must go out at least 30 days before an auto-renewing plan year (<a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-147/section-147.200" target="_blank" rel="noopener">45 CFR 147.200</a>), so network research runs 60 days before renewal. <b>Carrier network files</b> refresh monthly and are checked daily. <b>Form M-1</b> (MEWAs) is due March 1 (<a href="https://www.askebsa.dol.gov/mewa/" target="_blank" rel="noopener">DOL</a>) — dated here, not yet loaded.</p>
     <div class="sc-tiles" id="dcTiles"></div>
     <table id="tblDataCal"><thead><tr><th>when</th><th>PEO</th><th>what</th><th>detail</th><th class="num">people</th><th>renewal</th><th>5500 due</th><th>extended due</th></tr></thead><tbody></tbody></table>
-  </section>
-
-  <section class="wide" id="relAudit">
-    <h2>Relationship audit <small>— what service each map client buys, the rule that decided it, carve-outs vs exits, and the non-PEO vendor book</small></h2>
-    <p class="blurb">Every map client runs down one fixed checklist (first match wins): not an HR vendor or owner-retired → <b>Staffing / other</b>; vendor holds a state PEO licence / IRS CPEO / ESAC → <b>PEO</b>; the client itself is on a PEO filing → <b>PEO</b>; PEO-only vendor → <b>PEO</b>; PEO + ASO vendor recorded as PEO → <b>PEO</b>; HR outsourcing / HR only / payroll vendor → that bucket; vendor name says PEO or employee leasing → <b>PEO</b>; otherwise <b>Unconfirmed</b> with the reason. Refreshed nightly.</p>
-    <div class="sc-tiles" id="raTiles"></div>
-    <table id="tblRelAudit"><thead><tr><th>relationship</th><th>deciding rule</th><th class="num">map clients</th><th class="num">% of map</th></tr></thead><tbody></tbody></table>
-    <h3 style="margin:14px 0 6px;font-size:13px">Workers' comp carve-out vs PEO exit <small class="mut">— PEO clients holding their own current FL comp policy, resolved on a policy timeline (proposals until approved)</small></h3>
-    <table id="tblCarve"><thead><tr><th>verdict</th><th>confidence</th><th class="num">clients</th><th class="num">claim from a filing</th><th class="num">own comp via payroll vendor</th></tr></thead><tbody></tbody></table>
-    <h3 style="margin:14px 0 6px;font-size:13px">Non-PEO vendor book <small class="mut">— payroll/401(k) clients of PEO-selling vendors; never counted as PEO; ASO possible but not provable</small></h3>
-    <table id="tblVendorBook"><thead><tr><th>vendor</th><th>how we know</th><th class="num">companies</th><th class="num">also a current PEO client</th><th class="num">non-PEO</th><th class="num">with a location</th><th>newest evidence</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section>
@@ -406,7 +395,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_service_relationship","desk_vendor_client_universe","desk_wc_carveout_verdicts"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -1031,30 +1020,10 @@ function renderDataCalendar(d) {
   }).join("") || `<tr><td colspan="8">nothing due in the next 45 days</td></tr>`;
 }
 
-function renderRelAudit(d) {
-  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
-  const rel = d.desk_service_relationship?.rows || [];
-  const tot = (name) => rel.filter((r) => r.relationship === name).reduce((a, r) => a + Number(r.pins || 0), 0);
-  const all = rel.reduce((a, r) => a + Number(r.pins || 0), 0);
-  const t = $("#raTiles");
-  if (t) t.innerHTML = [["PEO", tot("PEO"), null], ["HRO/ASO", tot("HRO/ASO"), null], ["HR Only", tot("HR Only"), null], ["Payroll Only", tot("Payroll Only"), null], ["Staffing / other", tot("Staffing / other"), null], ["Unconfirmed", tot("Unconfirmed"), tot("Unconfirmed") > all * 0.01 ? "warn" : "good"]]
-    .map(([k, v, tone]) => `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(k)}</div><div class="v">${fmtN(v)}</div><div class="d">${all ? (100 * v / all).toFixed(2) + "% of map" : ""}</div></div>`).join("");
-  const tb = $("#tblRelAudit tbody");
-  if (tb) tb.innerHTML = rel.map((r) => `<tr><td>${esc(r.relationship)}</td><td>${esc(r.rule)}</td><td class="num">${fmtN(r.pins)}</td><td class="num">${esc(String(r.pct_of_map ?? ""))}</td></tr>`).join("") || `<tr><td colspan="4">no snapshot yet</td></tr>`;
-  const cv = d.desk_wc_carveout_verdicts?.rows || [];
-  const tc = $("#tblCarve tbody");
-  if (tc) tc.innerHTML = cv.map((r) => `<tr><td>${esc(r.verdict)}</td><td>${esc(r.confidence)}</td><td class="num">${fmtN(r.pins)}</td><td class="num">${fmtN(r.claim_from_filing)}</td><td class="num">${fmtN(r.own_policy_via_payroll_vendor)}</td></tr>`).join("") || `<tr><td colspan="5">no verdicts yet</td></tr>`;
-  const vb = d.desk_vendor_client_universe?.rows || [];
-  const how = { retirement_pep_payroll: "Paychex pooled 401(k) plan (federal filing)", payroll_integrated_wc: "own FL comp policy via the vendor's insurance agency" };
-  const tv = $("#tblVendorBook tbody");
-  if (tv) tv.innerHTML = vb.map((r) => `<tr><td>${esc(r.vendor)}</td><td>${esc(how[r.relationship] || r.relationship)}</td><td class="num">${fmtN(r.companies)}</td><td class="num">${fmtN(r.also_current_peo_client)}</td><td class="num">${fmtN(r.non_peo_clients)}</td><td class="num">${fmtN(r.with_location)}</td><td>${esc(r.newest_evidence || "")}</td></tr>`).join("") || `<tr><td colspan="7">no rows yet</td></tr>`;
-}
-
 function renderAll(d) {
   renderScorecard(d);
   renderCarrierSupervisor(d);
   renderPeoNetworks(d);
-  renderRelAudit(d);
   renderDecisions(d);
   renderStrip(d);
   renderPlays(d);
@@ -1249,8 +1218,9 @@ setInterval(poll, POLL_MS);
 })();
 </script>
 <script>
-/* PEO list cleanup panel (instanceB_industry_intel 2026-09-23, migration 2155). Owner: "show these to me - I want to know where this
-   data originated." Reads peo_nonpeo_origin_json() through dash-ai (desk key), on its own 10-minute clock. */
+/* PEO list cleanup panel (instanceB_industry_intel; 2155, outcomes 2159). Owner: "show these to me - I want to know where this
+   data originated" then "establish PEO profiles for each of the legit PEOs that don't have clients yet".
+   Reads peo_nonpeo_origin_json() through dash-ai (desk key), on its own 10-minute clock. */
 (function () {
   "use strict";
   var FN = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/dash-ai";
@@ -1259,10 +1229,11 @@ setInterval(poll, POLL_MS);
   if (!tb) return;
   function e(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
   function n0(v) { return v == null || v === "" ? "—" : Number(v).toLocaleString(); }
-  function shortHow(h) { h = String(h || ""); if (/^Auto-registered 2026-09-15/.test(h)) return "Auto-added 2026-09-15 during a gate outage (quarantined)";
-    if (/^Legacy name list/.test(h)) return "Legacy name list (before 2026-08-19)"; if (/^Profile only/.test(h)) return "Profile created by the plan-filing load (no name-registry row)";
-    if (/^Owner ruling/.test(h)) return "Owner ruling 92 (2026-09-15)"; return h.length > 80 ? h.slice(0, 80) + "…" : h; }
-  function shortWhy(w) { return /Schedule MEP/.test(w) ? "Federal 5500 filing: plan-type box read as PEO" : /Website/.test(w) ? "Website read by an earlier research pass" : /IRS/.test(w) ? "IRS certified-PEO list" : w; }
+  function shortHow(h) { h = String(h || ""); if (/^Auto-registered 2026-09-15/.test(h)) return "Auto-added 2026-09-15 during a gate outage";
+    if (/^Legacy name list/.test(h)) return "Legacy name list (before 2026-08-19)"; if (/^Profile only/.test(h)) return "Created by the plan-filing load";
+    if (/^Owner ruling/.test(h)) return "Owner ruling 92 (2026-09-15)"; return h.length > 70 ? h.slice(0, 70) + "…" : h; }
+  var OC = { established: ["Established as a PEO", "#1b7f3b"], folded: ["Folded into the PEO it belongs to", "#1f5fa8"],
+             unclear: ["Still unclear", "#9a6a00"], not_peo: ["Not a PEO: waiting for your OK", "#a33"] };
   function load() {
     var k = null; try { k = localStorage.getItem("desk_key") || localStorage.getItem("peo_dash_key"); } catch (x) {}
     if (!k || document.hidden) return;
@@ -1272,19 +1243,21 @@ setInterval(poll, POLL_MS);
       .then(function (res) {
         var j = res && res.rows && res.rows[0] && res.rows[0].j;
         if (!j) throw new Error((res && (res.detail || res.error)) || "no reply");
-        var byWhy = {}, byHow = {};
-        (j.rows || []).forEach(function (r) { var w = shortWhy(r.why), h = shortHow(r.how); byWhy[w] = (byWhy[w] || 0) + 1; byHow[h] = (byHow[h] || 0) + 1; });
-        var t = [["Profiles to review", n0(j.total), "classed PEO · no clients · no website"]];
-        Object.keys(byWhy).sort(function (a, b) { return byWhy[b] - byWhy[a]; }).forEach(function (w) { t.push([w, n0(byWhy[w]), "why it was called a PEO"]); });
-        var of = j.other_flags || {}, other = Object.keys(of).reduce(function (s, x) { return s + of[x]; }, 0);
-        t.push(["Other records flagged", n0(other), "duplicates " + (of.duplicate_profile || 0) + " · wrong website " + (of.wrong_website || 0) + " · not a PEO " + (of.not_a_peo || 0) + " · wrong HQ " + (of.wrong_hq || 0)]);
+        var o = j.outcomes || {};
+        var t = [["Established as PEOs", n0(o.established || 0), "real PEOs; full profile now built"],
+                 ["Folded into the right PEO", n0(o.folded || 0), "a legal entity of a PEO we already track"],
+                 ["Not a PEO", n0(o.not_peo || 0), "hospitals, unions, dealers…; your OK retires them"],
+                 ["Still unclear", n0(o.unclear || 0), "no public trace yet; kept for review"]];
         if (tiles) tiles.innerHTML = t.map(function (x) { return '<div class="tile"><div class="k">' + e(x[0]) + '</div><div class="v">' + x[1] + '</div><div class="d">' + e(x[2]) + "</div></div>"; }).join("");
         tb.innerHTML = (j.rows || []).map(function (r) {
           var f = (r.filers || [])[0] || {};
-          var filer = f.name ? e(f.name) + ' <span class="age cold">EIN ' + e(f.ein) + " · plan-type code " + e(f.mep_codes || "—") + " · " + e(f.years || "") + " · loaded by " + e(f.loaded_by || "—") + "</span>" : '<span class="age cold">no filer entity linked</span>';
-          var shown = (r.name === r.slug && f.name) ? f.name : r.name;
-          return "<tr><td>" + e(shown) + (shown !== r.slug ? ' <span class="age cold">' + e(r.slug) + "</span>" : "") + "</td><td>" + e(shortWhy(r.why)) + "</td><td>" + e(shortHow(r.how)) + "</td><td>" + filer + "</td><td class=\"num\">" + n0(r.participants) +
-            "</td><td class=\"num\">" + e(r.latest_filing_year || "—") + "</td><td class=\"num\">" + n0(r.ever_clients) + "</td></tr>";
+          var filer = f.name ? e(f.name) + ' <span class="age cold">EIN ' + e(f.ein) + " · " + e(f.years || "") + "</span>" : '<span class="age cold">none linked</span>';
+          var oc = OC[r.outcome] || [r.outcome || "", "inherit"];
+          var found = e(r.found || "") + (r.source ? ' <a href="' + e(r.source) + '" target="_blank" rel="noopener">source</a>' : "") +
+                      (r.confidence === "weak" && r.outcome === "established" ? ' <span class="age cold">(not confirmed in the company’s own words)</span>' : "");
+          var prof = r.profile_slug ? '<a href="intel.html#peo=' + encodeURIComponent(r.profile_slug) + '">' + e(r.profile_name || r.profile_slug) + "</a>" : '<span class="age cold">—</span>';
+          return "<tr><td class=\"oc\" style=\"color:" + oc[1] + "\">" + e(oc[0]) + "</td><td>" + e(r.name) + (r.filed_name && r.filed_name !== r.name ? ' <span class="age cold">' + e(r.filed_name) + "</span>" : "") +
+            "</td><td>" + found + "</td><td>" + prof + "</td><td>" + e(shortHow(r.how)) + "</td><td>" + filer + "</td><td class=\"num\">" + n0(r.participants || f.participants) + "</td></tr>";
         }).join("") || "<tr><td colspan=\"7\" class=\"age cold\">nothing to review</td></tr>";
       })
       .catch(function (err) { tb.innerHTML = "<tr><td colspan=\"7\" class=\"age cold\">could not load: " + e(err.message) + "</td></tr>"; });
