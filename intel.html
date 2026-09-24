@@ -52,6 +52,11 @@
   .plogo .nologo { font-size: 11px; color: var(--ink-muted); border: 1px dashed var(--line, #d8d4cc); border-radius: 9px; padding: 6px 9px; }
   .title h2 { margin: 0; font-size: 22px; }
   .title .meta { color: var(--ink-2); font-size: 13px; }
+  .dirlinks { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: -6px 0 12px; font-size: 13px; }
+  .dirlinks .maplink { font-weight: 600; }
+  .dirlinks .mut { color: var(--ink-muted); font-size: 12px; }
+  .dirlinks .also { flex-basis: 100%; color: var(--ink-2); line-height: 1.6; }
+  .dirlinks .also.notlisted { border-left: 3px solid var(--warning); padding: 4px 10px; background: color-mix(in srgb, var(--warning) 8%, transparent); border-radius: 0 8px 8px 0; }
 
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; }
   .tabs button { background: none; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
@@ -264,7 +269,10 @@
   /* ---------- dropdown ---------- */
   function loadList() {
     setStatus("loading PEOs…");
-    var base = "select family_slug, peo_name, sold_as, entity_class, wse_low, wse_high, wse_status, size_group from dash_industry_intel_peo_list order by lower(peo_name), family_slug";
+    // 1283 (owner 2026-09-24): this list IS the map's left-hand PEO filter - same entries, same names, same count.
+    // dash_peo_directory reads pub.map_filter_catalog (brand grain); older entities and acquired brands ride inside
+    // their parent as "Also filed as". Parity guard: v_peo_directory_parity must stay empty.
+    var base = "select family_slug, peo_name, legal_name, entity_class, n_clients, n_placed, wse_low, wse_high, wse_status, size_group, also_filed_as, members from dash_peo_directory order by lower(peo_name), family_slug";
     var pages = [0, 450];
     Promise.all(pages.map(function (off) { return sql(base + " limit 450 offset " + off, "industry intel list", 30000); }))
       .then(function (res) {
@@ -274,9 +282,9 @@
         ALL = ALL.filter(function (r) { if (seen[r.family_slug]) return false; seen[r.family_slug] = 1; return true; });
         ALL.sort(function (a, b) { return String(a.peo_name).toLowerCase().localeCompare(String(b.peo_name).toLowerCase()) || String(a.family_slug).localeCompare(String(b.family_slug)); });
         drawOptions();
-        setStatus(ALL.length.toLocaleString() + " PEOs");
+        setStatus(ALL.length.toLocaleString() + " PEOs · same list as the map filter");
         var want = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1] || sget("intel_last_peo");
-        if (want && ALL.some(function (r) { return r.family_slug === want; })) { $("peo").value = want; open(want); }
+        if (want) { if (ALL.some(function (r) { return r.family_slug === want; })) $("peo").value = want; open(want); }
       })
       .catch(function (e) { if (String(e.message) !== "unauthorized") setStatus("could not load PEOs: " + e.message, true); });
   }
@@ -288,13 +296,12 @@
     var rows = ALL.filter(function (r) {
       if (only && r.wse_high == null) return false;
       if (!q) return true;
-      return (String(r.peo_name) + " " + (r.sold_as || "") + " " + r.family_slug).toLowerCase().indexOf(q) >= 0;
+      return (String(r.peo_name) + " " + (r.legal_name || "") + " " + (r.also_filed_as || "") + " " + r.family_slug).toLowerCase().indexOf(q) >= 0;
     });
     var html = '<option value="">' + (rows.length ? "Choose a PEO (" + rows.length.toLocaleString() + ")" : "No PEOs match") + "</option>";
     html += rows.map(function (r) {
       var size = r.wse_high != null ? " — " + range(r.wse_low, r.wse_high) + " WSEs" : "";
-      var sold = r.sold_as && r.sold_as !== r.peo_name ? " (sold as " + r.sold_as + ")" : "";
-      return '<option value="' + esc(r.family_slug) + '">' + esc(r.peo_name + sold + size) + "</option>";
+      return '<option value="' + esc(r.family_slug) + '">' + esc(r.peo_name + size) + "</option>";
     }).join("");
     sel.innerHTML = html;
     if (keep && rows.some(function (r) { return r.family_slug === keep; })) sel.value = keep;
@@ -302,6 +309,11 @@
   $("q").addEventListener("input", drawOptions);
   $("onlyEst").addEventListener("change", drawOptions);
   $("peo").addEventListener("change", function () { if (this.value) open(this.value); });
+  // 1283: in-page links (#peo=slug) - "Also filed as" members and "shown on the map as" parents
+  window.addEventListener("hashchange", function () {
+    var s = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1];
+    if (s && s !== current) { if (ALL.some(function (r) { return r.family_slug === s; })) $("peo").value = s; open(s); }
+  });
 
   /* ---------- open one PEO ---------- */
   function open(slug) {
@@ -313,6 +325,7 @@
     var row = ALL.filter(function (r) { return r.family_slug === slug; })[0] || { peo_name: slug };
     $("main").innerHTML =
       '<div class="title"><span class="plogo" id="pLogo"></span><h2>' + esc(row.peo_name) + '</h2><span class="meta" id="titleMeta"></span></div>' +
+      '<div class="dirlinks" id="dirLinks"></div>' +
       '<div class="tabs" role="tablist">' +
         '<button type="button" role="tab" data-tab="profile" aria-selected="true">PEO PROFILE</button>' +
         '<button type="button" role="tab" data-tab="intel" aria-selected="false">INDUSTRY INTEL</button>' +
@@ -325,6 +338,7 @@
     });
     setStatus("loading " + row.peo_name + "…");
     drawLogo(slug, row.peo_name, tok);
+    drawDirLinks(slug, row, tok);
 
     sql("select industry_intel_for_peo('" + slug + "') as j", "industry intel panel", 45000)
       .then(function (res) { if (tok !== loadToken) return; renderIntel((res.rows && res.rows[0] && res.rows[0].j) || {}); setStatus(""); })
@@ -338,6 +352,36 @@
         $("profText").innerHTML = text ? '<div class="md">' + md(text) + "</div>" : '<div class="empty">No profile text for this PEO yet.</div>';
       })
       .catch(function (e) { if (tok !== loadToken) return; $("profText").innerHTML = '<div class="empty">Could not load the profile: ' + esc(e.message) + "</div>"; });
+  }
+
+  /* ---------- 1283: one list, two doors - links between this profile and the map ---------- */
+  function mapHref(slug) { return "map.html?on=" + encodeURIComponent(slug); }
+  function drawDirLinks(slug, row, tok) {
+    var box = $("dirLinks"); if (!box) return;
+    if (row && row.family_slug === slug) {   // a PEO on the map filter
+      var h = '<a class="maplink" href="' + mapHref(slug) + '" target="_blank" rel="noopener">See ' + esc(row.peo_name) + ' on the map →</a>';
+      if (row.legal_name && row.legal_name !== row.peo_name) h += '<span class="mut">Legal name: ' + esc(row.legal_name) + '</span>';
+      var ms = row.members || [];
+      if (ms.length) {
+        h += '<div class="also"><b>Also filed as</b> ' + ms.map(function (m) {
+          return '<a href="#peo=' + esc(m.slug) + '" title="' + esc(m.relation) + ' · ' + n0(m.clients) + ' current clients in our records">' + esc(m.name) + '</a>';
+        }).join(" · ") + '<span class="mut"> — these clients are counted under ' + esc(row.peo_name) + ' on the map</span></div>';
+      }
+      box.innerHTML = h;
+      return;
+    }
+    // not on the map filter: an older entity / acquired brand, or not a listed PEO
+    sql("select directory_slug, directory_display, relation, current_clients from mv_peo_directory_members where member_slug = '" + slug + "'", "directory parent", 20000)
+      .then(function (res) {
+        if (tok !== loadToken) return;
+        var m = (res.rows || [])[0];
+        if (m && m.directory_slug) {
+          box.innerHTML = '<div class="also notlisted">Not listed on its own on the map: ' + esc(m.relation) + '. Its clients show under ' +
+            '<a href="#peo=' + esc(m.directory_slug) + '">' + esc(m.directory_display) + '</a> · <a class="maplink" href="' + mapHref(m.directory_slug) + '" target="_blank" rel="noopener">see on the map →</a></div>';
+        } else {
+          box.innerHTML = '<div class="also notlisted">Not on the map filter (no current clients, or not a PEO). Kept here for history only.</div>';
+        }
+      }).catch(function () { box.innerHTML = ""; });
   }
 
   function showTab(t) {
