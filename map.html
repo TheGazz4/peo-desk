@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.72 (2026-09-24, owner: "we deliberately decipher between current PEO users and former PEO users"): the Quick Card's
+            "in our records" count is clients SEEN WITH THE PEO IN THE LAST 24 MONTHS (client_currency, 2172/2173); clients last
+            seen longer ago are shown separately as unconfirmed. Data: map-data v2.19.
      v3.71 (2026-09-24, owner: "this is a precision database not a collection of ranges"): the Quick Card shows what the PEO
             itself states for clients and worksite employees (with month/year), or "Not stated" plus the exact counts we hold
             (clients in our records; people enrolled in its benefit plans). No estimate ranges; rank/share only on exact figures.
@@ -1473,7 +1476,7 @@ function peoCardHtml(b,pc){
     var said=function(qual,v,d){ return (qual==='approximately'?'about ':'')+n(v)+(qual==='more_than'?'+':'')+
       ' <span class="mut">(stated by the PEO'+(d?', '+PEO_MONTHS[+String(d).slice(5,7)-1].slice(0,3)+' '+String(d).slice(0,4):'')+')</span>'; };
     var cl=pc.clients_stated!=null?said(pc.clients_stated_qual,pc.clients_stated,pc.clients_stated_as_of):'<span class="mut">Not stated</span>';
-    if(pc.clients_ours!=null) cl+='<br><span class="mut">'+n(pc.clients_ours)+' in our records</span>';
+    if(pc.clients_ours!=null) cl+='<br><span class="mut">'+n(pc.clients_ours)+' in our records (seen with it in the last 24 months)'+(pc.clients_unconfirmed?' · '+n(pc.clients_unconfirmed)+' unconfirmed':'')+'</span>';   // v3.72 (2173): current vs unconfirmed
     rows+=kv('Clients',cl);
     var wse=pc.wse_stated!=null?said(pc.wse_stated_qual,pc.wse_stated,pc.wse_stated_as_of):'<span class="mut">Not stated</span>';
     if(pc.wse_stated==null&&pc.plan_participants!=null) wse+='<br><span class="mut">'+n(pc.plan_participants)+' enrolled in its benefit plans'+(pc.plan_year?' ('+pc.plan_year+')':'')+'</span>';
@@ -1494,7 +1497,7 @@ function openPeoCard(b){
   var slug=b.family_slug; S.peoCardSlug=slug; S.peoCard=S.peoCard||{};
   var pc=S.peoCard[slug];
   c.innerHTML=peoCardHtml(b,pc); c.style.display='block';
-  if(pc===undefined||pc===null||(pc&&pc.clients_ours===undefined)){   // not fetched yet, or fetched by an older payload (v3.71 fields)
+  if(pc===undefined||pc===null||(pc&&pc.clients_unconfirmed===undefined)){   // not fetched yet, or fetched by an older payload (v3.72 fields)
     api({mode:'peo_card',slug:slug}).then(function(r){
       S.peoCard[slug]=(r&&r.card)?r.card:false;
       if(S.peoCardSlug===slug&&c.dataset.kind==='peo') c.innerHTML=peoCardHtml(b,S.peoCard[slug]);
