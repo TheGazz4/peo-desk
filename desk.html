@@ -2147,7 +2147,7 @@ setInterval(poll, POLL_MS);
     if (!deepDone) {
       deepDone = true;
       var m = location.hash.match(/dec-(\d+)/);
-      if (m) setTimeout(function () { jumpTo([document.getElementById("dec-" + m[1])]); }, 300);
+      if (m) { setTimeout(function () { jumpTo([document.getElementById("dec-" + m[1])]); }, 300); setTimeout(function () { var t = document.getElementById("dec-" + m[1]); if (t && Math.abs(t.getBoundingClientRect().top - 70) > 40) t.scrollIntoView({ block: "start" }); }, 2500); }
     }
   }
 
@@ -2155,7 +2155,7 @@ setInterval(poll, POLL_MS);
     els = els.filter(Boolean); if (!els.length) return;
     var det = els[0].closest("details"); if (det) det.open = true;
     if (typeof window.__deskShowTab === "function") window.__deskShowTab("overview");
-    els[0].scrollIntoView({ behavior: "smooth", block: "start" });
+    var tgt = els[0]; tgt.scrollIntoView({ block: "start" });\n    setTimeout(function () { if (Math.abs(tgt.getBoundingClientRect().top - 70) > 40) tgt.scrollIntoView({ block: "start" }); }, 900);
     els.forEach(function (el) { el.classList.add("flash"); setTimeout(function () { el.classList.remove("flash"); }, 2200); });
   }
 
