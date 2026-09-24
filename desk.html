@@ -2155,7 +2155,8 @@ setInterval(poll, POLL_MS);
     els = els.filter(Boolean); if (!els.length) return;
     var det = els[0].closest("details"); if (det) det.open = true;
     if (typeof window.__deskShowTab === "function") window.__deskShowTab("overview");
-    var tgt = els[0]; tgt.scrollIntoView({ block: "start" });\n    setTimeout(function () { if (Math.abs(tgt.getBoundingClientRect().top - 70) > 40) tgt.scrollIntoView({ block: "start" }); }, 900);
+    var tgt = els[0]; tgt.scrollIntoView({ block: "start" });
+    setTimeout(function () { if (Math.abs(tgt.getBoundingClientRect().top - 70) > 40) tgt.scrollIntoView({ block: "start" }); }, 900);
     els.forEach(function (el) { el.classList.add("flash"); setTimeout(function () { el.classList.remove("flash"); }, 2200); });
   }
 
