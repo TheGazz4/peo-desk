@@ -572,6 +572,8 @@ var NP_LABEL={nonpeo_paychex:'Paychex (non-PEO client)',nonpeo_adp:'ADP (non-PEO
 var NP_COLOR={nonpeo_paychex:'#9aa7b1',nonpeo_adp:'#b8a58c',nonpeo_paycor:'#a59cba'};
 function isNP(s){ return !!s && String(s).slice(0,7)==='nonpeo_'; }
 function npVis(s){ return S.showNP!==false; }
+// v3.67 (1278f): vendor-client pins arrive in national PART 5 keyed '<ST>~v' (FL had outgrown one bake). rs() = the real state.
+function rs(k){ return String(k||'').slice(0,2); }
 var UNCONF='PEO not confirmed';   // v3.62: clients whose PEO name is set aside until their company identity is settled (never a blank row)
 function dispOf(slug){ if(isNP(slug)) return NP_LABEL[slug]||('Non-PEO client of '+String(slug).slice(7)); if(!slug||slug==='unattributed') return UNCONF; return S.displays[S.grain][slug]||slug; }
 function mercX(lng){ return (lng+180)/360; }
@@ -652,9 +654,9 @@ var liteQ=[], detQ=[];
 // details_all in the background), atomic pair by shared bake_key with one cache-busted retry.
 // The old 110-request per-state loader remains below as the fallback path.
 function startPinLoads(){
-  S.toLoad=4; S.liteLoaded=0; S.detLoaded=0; progress();
+  S.toLoad=5; S.liteLoaded=0; S.detLoaded=0; progress();
   var fellBack=false;
-  [1,2,3,4].forEach(function(part){
+  [1,2,3,4,5].forEach(function(part){
     apiGet('mode=pins_all&part='+part).then(function(r){
       if(!r||!r.states) throw new Error('no bundle');
       (r.states||[]).forEach(function(sd){ commitLiteState(sd, r.bake_key); });
@@ -674,6 +676,7 @@ function startPinLoads(){
       apiGet('mode=details_all&part='+part).then(function(d){ takeDetail(d, r.bake_key, false); })
         .catch(function(){ S.detLoaded++; progress(); });
     }).catch(function(){
+      if(part===5){ S.liteLoaded++; S.detLoaded++; progress(); return; }   // vendor-client layer is optional: never trigger the legacy loader
       if(!fellBack){ fellBack=true; startPinLoadsLegacy(); }
       else { S.liteLoaded++; S.detLoaded++; progress(); }
     });
@@ -996,7 +999,7 @@ function draw(){
   var buckets = dsz ? {} : null;
   for(var st2 in S.pinData){
     if(S.histOnly) break;                      // former-only view: current pins are hidden
-    if(S.states[st2]===false) continue;
+    if(S.states[rs(st2)]===false) continue;
     var d2=S.pinData[st2];
     var MX2=(S.placement==='zip')?d2.mxZ:d2.mxA, MY2=(S.placement==='zip')?d2.myZ:d2.myA;
     var slugArr2=(S.grain==='brand')?d2.brds:d2.fams; var IDX2=(S.grain==='brand')?d2.bis:d2.fis;
@@ -1238,6 +1241,7 @@ function onDrawUp(){
 // produce the same panel. S.terr carries either a radius or a named area.
 function inArea(a, st, d, i){
   if(!a) return true;
+  st=rs(st);
   if(a.kind==='state') return st===a.state;
   if(a.kind==='city')  return (!a.state||st===a.state) && d.detail && String(d.detail.cities[i]||'').toUpperCase()===a.city.toUpperCase();
   if(a.kind==='zip')   return !!(d.detail && d.detail.z5 && d.detail.z5[i]===a.zip);
@@ -1256,7 +1260,7 @@ function terrResults(){
   var sel=selMap(); var byKey={}; var members=[]; var total=0;
   for(var st in S.pinData){
     if(S.histOnly) break;
-    if(S.states[st]===false) continue;
+    if(S.states[rs(st)]===false) continue;
     var d=S.pinData[st];
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
@@ -1371,7 +1375,7 @@ function onMove(e){
     }
     tipShow('<b>'+esc(nm)+'</b><br>'+
       '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
-      esc(city+(city?', ':'')+h.st)+'<br>'+renLine+
+      esc(city+(city?', ':'')+rs(h.st))+'<br>'+renLine+
       '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
   });
 }
@@ -1810,7 +1814,7 @@ function openSharePanel(st){
   var d=S.pinData[st];
   if(!d||!d.n){ return openSharePanelServer(st); }
   var slugArr=(S.grain==='brand')?d.brds:d.fams, IDX=(S.grain==='brand')?d.bis:d.fis, cnt={}, tot=0;
-  var npN=0; for(var i=0;i<d.n;i++){ var sl=slugArr[IDX[i]]||'unattributed'; if(isNP(sl)){ npN++; continue; } cnt[sl]=(cnt[sl]||0)+1; tot++; }
+  var npN=((S.pinData[st+'~v']||{}).n)||0; for(var i=0;i<d.n;i++){ var sl=slugArr[IDX[i]]||'unattributed'; if(isNP(sl)){ npN++; continue; } cnt[sl]=(cnt[sl]||0)+1; tot++; }
   var all=Object.keys(cnt).map(function(k){return [k,cnt[k]]}).sort(function(a,b){ if(a[0]==='unattributed') return 1; if(b[0]==='unattributed') return -1; return b[1]-a[1]; });
   var named=all.filter(function(x){return x[0]!=='unattributed'}), unc=cnt.unattributed||0;
   function row(x){ var un=x[0]==='unattributed', pct=tot?Math.round(1000*x[1]/tot)/10:0;
@@ -1904,7 +1908,7 @@ function computeViewLegend(){
   var sel=selMap(); var counts={}; var total=0; var npView=0;
   for(var st in S.pinData){
     if(S.histOnly) break;
-    if(S.states[st]===false) continue;
+    if(S.states[rs(st)]===false) continue;
     var d=S.pinData[st];
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
@@ -2053,8 +2057,8 @@ function stStats(st){
   var sel=selMap(), counts={}, o={total:0,nat:0,ms:0,ren4:0,hist:0};
   for(var s in S.pinData){
     if(S.histOnly) break;
-    if(S.states[s]===false&&s!==st) continue;
-    var d=S.pinData[s], mine=(s===st), dd=d.detail;
+    if(S.states[rs(s)]===false&&rs(s)!==st) continue;
+    var d=S.pinData[s], mine=(rs(s)===st), dd=d.detail;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
     var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
@@ -2259,7 +2263,7 @@ function tblSelect(){
   var cov={hc:0,hrm:0,rm:0,pcs:0,zip:0,street:0,cross:0,disputed:0,nodetail:0};
   for(var st in S.pinData){
     if(S.histOnly) break;
-    if(S.states[st]===false) continue;
+    if(S.states[rs(st)]===false) continue;
     var d=S.pinData[st], dd=d.detail;
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
@@ -2297,7 +2301,7 @@ function tblSelect(){
 function tblKey(h,key){
   var d=S.pinData[h[0]], dd=d?d.detail:null, i=h[1];
   if(key==='nm')  return dd?String(dd.names[i]||''):'';
-  if(key==='loc') return (dd?String(dd.cities[i]||''):'')+' '+h[0];
+  if(key==='loc') return (dd?String(dd.cities[i]||''):'')+' '+rs(h[0]);
   if(key==='peo') return String(dispOf(h[2])||'');
   if(key==='hc')  return (dd&&dd.hc)?(dd.hc[i]||0):0;
   if(key==='hrm') return tblMU((dd&&dd.hrm)?dd.hrm[i]:0);
@@ -2476,7 +2480,7 @@ function tblPaintInner(){
     var nm=dd?String(dd.names[i]||'—'):'loading…';
     var city=dd?String(dd.cities[i]||''):'';
     var zip=(dd&&dd.z5)?String(dd.z5[i]||''):'';
-    var loc=(city?city+', ':'')+st+(zip?' '+zip:'');
+    var loc=(city?city+', ':'')+rs(st)+(zip?' '+zip:'');
     var hc=(dd&&dd.hct&&dd.hct[i])?esc(dd.hct[i])+((dd.hcl&&dd.hcl[i]>1)?' <span class="mut">'+(['','','Likely','Indicated','','','Estimated'][dd.hcl[i]]||'')+'</span>':''):'<span class="mut">'+((dd&&dd.hcl&&dd.hcl[i]===5)?'Under review':'Counting…')+'</span>';
     var since=(dd&&dd.pcs&&dd.pcs[i])?(esc(String(dd.pcs[i]))+'<span class="tier">'+esc(RMB_LABELS[(dd.pcsb?dd.pcsb[i]:0)]||'unverified')+'</span>'):'<span class="mut">—</span>';
     out.push('<tr data-st="'+esc(st)+'" data-i="'+i+'" data-slug="'+esc(slug)+'" title="Open this company">'+
