@@ -1773,6 +1773,10 @@ setInterval(poll, POLL_MS);
                   ["Registry changes (24h)", n0(j.changes_24h), n0(j.status_flips_24h) + " status changes"],
                   ["Companies waiting for review", n0(j.research_waiting), "close matches a person should confirm"],
                   ["House rules", n0(c.pass) + " passing", (c.fail ? n0(c.fail) + " broken, " : "") + n0(c.warn) + " need a look"]];
+        var f = j.feeds || {}, tx = f.tx || {}, fe = f.fl_events || {};
+        if (tx.status) tl.push(["Texas registry pass", tx.status === "done" ? "complete" : n0(tx.pages) + " pages", n0(tx.rows_seen) + " Texas records read, " + n0(tx.rows_kept) + " are ours"]);
+        if (fe.status) tl.push(["Florida filings history", fe.status === "done" ? "complete" : n0(fe.lines_read) + " read", n0(fe.kept) + " filings on our companies"]);
+        if (f.de_formation_companies != null) tl.push(["Formed in Delaware", n0(f.de_formation_companies), "companies other states list as Delaware-formed"]);
         tiles.innerHTML = tl.map(function (x) { return "<div class=\"tile\"><div class=\"k\">" + e(x[0]) + "</div><div class=\"v\">" + x[1] + "</div><div class=\"d\">" + e(x[2]) + "</div></div>"; }).join("");
         rows(tR, j.regs, function (r) { return "<tr><td>" + e(r.state) + "</td><td class=\"num\">" + n0(r.n) + "</td><td class=\"num\">" + n0(r.active) + "</td><td class=\"num\">" + n0(r.with_tax_id) + "</td></tr>"; }, 4);
         rows(tL, j.links, function (r) { return "<tr><td>" + e(r.state) + "</td><td class=\"num\">" + n0(r.confirmed) + "</td><td class=\"num\">" + n0(r.checking) + "</td><td class=\"num\">" + n0(r.waiting) + "</td><td class=\"num\">" + n0(r.ruled_out) + "</td></tr>"; }, 5);
