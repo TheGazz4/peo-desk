@@ -159,6 +159,59 @@
     border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink-1); z-index: 20;
     box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
 </style>
+<style id="deskTighten">
+  /* ---- desk v2 layout (cowork 2026-09-24): tabs, capped panels, tighter tables ---- */
+  header, #legend, #strip, #tabs, main { max-width: 1680px; margin-left: auto; margin-right: auto; }
+  header { padding: 12px 20px 8px; }
+  #legend { padding: 6px 20px 0; font-size: 11px; }
+  #legend .chip { font-size: 11px; }
+  #strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 10px 20px 12px; }
+  #strip .tile { min-width: 0; padding: 8px 12px; }
+  #strip .tile .v { font-size: 20px; }
+
+  #tabs { position: sticky; top: 0; z-index: 6; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+    padding: 8px 20px; background: var(--page); border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  #tabs button { font: inherit; font-size: 12.5px; font-weight: 550; color: var(--ink-2); background: none;
+    border: 1px solid transparent; border-radius: 8px; padding: 5px 12px; cursor: pointer; display: inline-flex; gap: 7px; align-items: center; }
+  #tabs button:hover { background: var(--surface-1); color: var(--ink-1); }
+  #tabs button.on { background: var(--surface-1); border-color: var(--border); color: var(--ink-1); }
+  #tabs button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  #tabs .n { font-size: 10.5px; font-weight: 700; min-width: 18px; padding: 0 5px; border-radius: 999px; line-height: 17px; text-align: center; }
+  #tabs .n.critical { background: var(--critical); color: #fff; }
+  #tabs .n.serious { background: var(--serious); color: #111; }
+  #tabs .hint { margin-left: auto; font-size: 11px; color: var(--ink-muted); }
+
+  main { grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 12px; align-items: start; padding: 0 20px 40px; }
+  section { padding: 12px 14px; border-radius: 10px; }
+  section h2 { font-size: 12px; margin: 0 0 8px; }
+  section h2 small { display: block; margin-top: 2px; font-size: 11.5px; }
+  section h3 { font-size: 11px !important; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 550; margin: 12px 0 6px !important; }
+
+  .blurb { font-style: normal; color: var(--ink-muted); font-size: 12px; margin: 0 0 10px; max-width: 110ch;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+  .blurb.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .sc-narr { max-width: none; }
+  #decisionDesk { grid-column: 1 / -1; }   /* 9-column table needs the full width */
+
+  table { font-size: 12.5px; }
+  th { padding: 4px 10px 5px 0; white-space: nowrap; }
+  td { padding: 4px 10px 4px 0; white-space: normal; overflow-wrap: break-word; max-width: 64ch; }
+  td.num, th.num, td .age, td.nw, td .chip { white-space: nowrap; overflow-wrap: normal; }
+  td.num { font-variant-numeric: tabular-nums; }
+  tbody tr:hover td { background: color-mix(in srgb, var(--series-1) 5%, transparent); }
+
+  .tw-scroll, .tw { max-height: 460px; overflow: auto; border: 1px solid var(--grid); border-radius: 8px; padding: 0 8px; }
+  section.wide .tw-scroll { max-height: 560px; }
+  .tw-scroll thead th, .tw thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-1); }
+  .tw-scroll table, .tw table { margin: 0; }
+  .tw-more { font-size: 11px; color: var(--ink-muted); margin: 4px 2px 0; }
+
+  .sc-tiles { gap: 6px; }
+  .sc-tiles .tile { padding: 7px 11px; min-width: 110px; }
+  .sc-tiles .tile .v { font-size: 18px; }
+  .sc-tiles .tile .d { max-width: 42ch; }
+  @media (max-width: 700px) { main { grid-template-columns: 1fr; padding: 0 10px 30px; } #tabs, #strip, header, #legend { padding-left: 10px; padding-right: 10px; } }
+</style>
 </head>
 <body>
 
@@ -190,6 +243,7 @@
 
 <div id="strip"></div>
 
+<nav id="tabs" aria-label="Desk sections"></nav>
 <main>
   <section class="wide" id="scorecard">
     <h2>Mesh scorecard <small>— what changed since the last run, in plain English</small></h2>
@@ -1047,6 +1101,15 @@ function renderPeoPushdown(d) {
   const tb = $("#tblPp tbody");
   if (tb) tb.innerHTML = f.map((r) => `<tr><td>${esc(r.on_date || "undated")}</td><td>${esc(r.what || r.label || "")}${r.detail ? ` <span class="chip warn">held</span>` : ""}</td><td>${esc(who[r.affects] || r.affects || "")}</td><td class="mut">${esc(r.how_clients || "")}</td><td class="num">${fmtN(r.certain)}</td><td class="num">${fmtN(r.likely)}</td><td class="num">${fmtN(r.possible)}</td><td class="num">${fmtN(r.left_12m)}</td></tr>`).join("") || `<tr><td colspan="8">no PEO news has reached a client yet</td></tr>`;
 }
+/* desk v2: readable "what changed" instead of raw JSON in the data calendar */
+function fmtDetail(d) {
+  let o = d;
+  if (typeof o === "string") { try { o = JSON.parse(o); } catch (e) { return o.slice(0, 160); } }
+  if (o == null || typeof o !== "object") return String(o == null ? "" : o);
+  if ("was" in o || "now" in o) return `${o.was == null ? "\u2014" : o.was} \u2192 ${o.now == null ? "\u2014" : o.now}`;
+  return Object.entries(o).filter(([k, v]) => v != null && v !== "" && k !== "detected_at")
+    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" \u00b7 ").slice(0, 160);
+}
 function renderDataCalendar(d) {
   const rows = d.desk_data_calendar?.rows || [];
   const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
@@ -1062,7 +1125,7 @@ function renderDataCalendar(d) {
   let last = null;
   tb.innerHTML = rows.map((r) => {
     const head = r.bucket !== last ? `<tr class="grp"><td colspan="8"><b>${esc(r.bucket)}</b></td></tr>` : ""; last = r.bucket;
-    return head + `<tr><td>${esc(r.on_date || "")}</td><td>${esc(r.peo || "")}</td><td>${esc(r.event || "")}</td><td class="mut">${esc(String(r.detail || "").slice(0, 120))}</td><td class="num">${fmtN(r.lives)}</td><td>${esc(r.next_renewal_on || "")}</td><td>${esc(r.f5500_due_on || "")}</td><td>${esc(r.f5500_ext_due_on || "")}</td></tr>`;
+    return head + `<tr><td>${esc(r.on_date || "")}</td><td>${esc(r.peo || "")}</td><td>${esc(r.event || "")}</td><td class="mut">${esc(fmtDetail(r.detail))}</td><td class="num">${fmtN(r.lives)}</td><td>${esc(r.next_renewal_on || "")}</td><td>${esc(r.f5500_due_on || "")}</td><td>${esc(r.f5500_ext_due_on || "")}</td></tr>`;
   }).join("") || `<tr><td colspan="8">nothing due in the next 45 days</td></tr>`;
 }
 
@@ -1313,6 +1376,98 @@ setInterval(poll, POLL_MS);
   load();
   setInterval(load, 10 * 60 * 1000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+})();
+</script>
+<script id="deskTightenJs">
+/* ---- desk v2 layout (cowork 2026-09-24): one tab at a time instead of a 38,000px scroll.
+   Panels are assigned by section id (or by their title when a panel has no id). A panel added later that is not
+   in the map lands in "More" automatically, so nothing ever disappears. ---- */
+(function () {
+  "use strict";
+  var TABS = [
+    { key: "overview", label: "Overview",          ids: ["scorecard", "decisionDesk", "readyPlays", "intelTicker"] },
+    { key: "book",     label: "Book & mesh",       ids: ["lineagePanel", "enrichmentProgress", "dataPurification", "meshMail", "moduleUtilization"] },
+    { key: "health",   label: "Health & carriers", ids: ["carrierSup", "peoNet", "dataCal"] },
+    { key: "peos",     label: "PEO profiles",      ids: ["peoIdentity", "peoPushdown", "nonPeo"] },
+    { key: "system",   label: "System",            ids: ["systemHealth", "rateLimits", "apiUsage", "appendThroughput", "freshness"] },
+    { key: "more",     label: "More",              ids: [] },
+    { key: "all",      label: "All",               ids: [] }
+  ];
+  var main = document.querySelector("main"), nav = document.getElementById("tabs");
+  if (!main || !nav) return;
+  var camel = function (t) {
+    return String(t || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").trim().split(/\s+/).slice(0, 2)
+      .map(function (w, i) { return i ? w.charAt(0).toUpperCase() + w.slice(1) : w; }).join("");
+  };
+  var sections = Array.prototype.slice.call(main.querySelectorAll(":scope > section"));
+  sections.forEach(function (s) {
+    if (!s.id) { var h = s.querySelector("h2"); var t = h ? h.childNodes[0].textContent : ""; s.id = camel(t); }
+  });
+  var known = {};
+  TABS.forEach(function (t) { t.ids.forEach(function (id) { known[id] = t.key; }); });
+  sections.forEach(function (s) { s.dataset.tab = known[s.id] || "more"; });
+  var more = TABS.filter(function (t) { return t.key === "more"; })[0];
+  if (!sections.some(function (s) { return s.dataset.tab === "more"; })) TABS.splice(TABS.indexOf(more), 1);
+
+  var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  var fromHash = (location.hash.match(/tab=(\w+)/) || [])[1];
+  var cur = fromHash || store.get("desk_tab") || "overview";
+  if (!TABS.some(function (t) { return t.key === cur; })) cur = "overview";
+
+  nav.innerHTML = TABS.map(function (t) {
+    return '<button type="button" data-tab="' + t.key + '">' + t.label + '<span class="n hidden"></span></button>';
+  }).join("") + '<span class="hint">red / orange counts = items that need a look</span>';
+
+  function show(key) {
+    cur = key;
+    sections.forEach(function (s) { s.classList.toggle("hidden", key !== "all" && s.dataset.tab !== key); });
+    Array.prototype.forEach.call(nav.querySelectorAll("button"), function (b) {
+      var on = b.dataset.tab === key; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    store.set("desk_tab", key);
+    if (history.replaceState) history.replaceState(null, "", "#tab=" + key);
+  }
+  nav.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-tab]"); if (!b) return;
+    show(b.dataset.tab); window.scrollTo({ top: 0 });
+  });
+
+  /* long explanations: two lines, click to read all */
+  main.addEventListener("click", function (e) {
+    var p = e.target.closest(".blurb"); if (p && !e.target.closest("a")) p.classList.toggle("open");
+  });
+  Array.prototype.forEach.call(main.querySelectorAll(".blurb"), function (p) { p.title = "Click to read more / less"; });
+
+  /* long tables scroll inside their panel with a sticky header instead of stretching the page */
+  function capTables() {
+    Array.prototype.forEach.call(main.querySelectorAll("table"), function (t) {
+      if (t.closest(".tw, .tw-scroll")) return;
+      var n = t.tBodies[0] ? t.tBodies[0].rows.length : 0;
+      if (n <= 14) return;
+      var w = document.createElement("div"); w.className = "tw-scroll";
+      t.parentNode.insertBefore(w, t); w.appendChild(t);
+    });
+  }
+  /* tab badges: red / orange chips inside each tab's panels */
+  function badges() {
+    TABS.forEach(function (t) {
+      if (t.key === "all") return;
+      var crit = 0, ser = 0;
+      sections.forEach(function (s) {
+        if (s.dataset.tab !== t.key) return;
+        crit += s.querySelectorAll(".chip.critical").length;
+        ser += s.querySelectorAll(".chip.serious").length;
+      });
+      var el = nav.querySelector('button[data-tab="' + t.key + '"] .n'); if (!el) return;
+      var v = crit || ser;
+      el.className = "n " + (crit ? "critical" : ser ? "serious" : "") + (v ? "" : " hidden");
+      el.textContent = v ? String(v) : "";
+    });
+  }
+  show(cur);
+  setInterval(function () { capTables(); badges(); }, 2000);
+  setTimeout(function () { capTables(); badges(); }, 300);
 })();
 </script>
 </body>
