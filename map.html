@@ -10,6 +10,8 @@
             default Top 25 = the 25 largest PEOs on the map (by clients) that have a verified HQ + logo. URL hl=all|0.
             Upstream same day: HQ pins now come from VERIFIED PEO-profile HQs too (47 -> ~95), absorbed brands show as
             their buyer (Harbor America -> Vensure, Axios HR -> Engage, PBS of America -> Paychex PEO).
+            HQ hover card = the PEO card: name customers know today, "Formerly X - now part of Y" / owner line,
+            verified-HQ check mark and client count (map-data v2.13 mode=peo_card).
      v3.63 (2026-09-23, owner): Historical legend reads just "Former PEO user" with a coloured sample ring (the exact
             departure-ring pin). PEO HQ logo pins now OFF by default (owner view, for the time being); URL hl=1 turns them on.
      v3.62 (2026-09-23, owner): market share opens instantly from the loaded pins (and matches the map); the blank grey
@@ -1386,16 +1388,32 @@ function onClick(e){
   if(id) api({mode:'company',id:id}).then(function(r){ if(r.company) openCard(r.company,slug,r.history); });
 }
 function tipBeacon(b,ev){
+  // v3.64 (owner 2026-09-23: "this intel should also live on each PEO profile's card"): the HQ card now carries
+  // the name customers know today, former name / owner line, verified HQ and client count (map-data mode=peo_card,
+  // published profile shelf only - never sources).
   var kinds={hq:'Headquarters',administrative:'Administrative beacon',hq_candidate:'HQ (candidate)'};
   var logoHtml='';
   var cached=S.logoCache[b.family_slug];
   if(cached){ logoHtml='<span class="logo"><img src="'+cached+'" alt=""></span><br>'; }
-  tipShow(logoHtml+'<b>'+esc(b.peo_display||b.family_slug)+'</b><br>'+esc(kinds[b.kind]||b.kind)+'<br>'+
-    esc((b.city||'')+', '+(b.state||'')),ev);
+  S.peoCard=S.peoCard||{};
+  var pc=S.peoCard[b.family_slug];
+  var name=(pc&&pc.display_name)||b.peo_display||b.family_slug;
+  var lines=[];
+  if(pc&&pc.owner_line) lines.push('<span style="color:var(--muted)">'+esc(pc.owner_line)+'</span>');
+  lines.push(esc(kinds[b.kind]||b.kind)+': '+esc((b.city||'')+', '+(b.state||''))+(b.kind==='hq'&&pc&&pc.hq_confirmed?' &#10003;':''));
+  if(pc&&pc.client_count) lines.push(esc(Number(pc.client_count).toLocaleString())+' clients');
+  tipShow(logoHtml+'<b>'+esc(name)+'</b><br>'+lines.join('<br>'),ev);
   if(!cached && b.has_logo && S.logoCache[b.family_slug]!==''){
     S.logoCache[b.family_slug]='';
     api({mode:'logo',slug:b.family_slug}).then(function(r){
       if(r&&r.data_uri){ S.logoCache[b.family_slug]=r.data_uri;
+        if(S.hover&&S.hover.kind==='beacon'&&S.hover.b===b) tipBeacon(b,ev); }
+    }).catch(function(){});
+  }
+  if(pc===undefined && b.family_slug){
+    S.peoCard[b.family_slug]=null;
+    api({mode:'peo_card',slug:b.family_slug}).then(function(r){
+      if(r&&r.card){ S.peoCard[b.family_slug]=r.card;
         if(S.hover&&S.hover.kind==='beacon'&&S.hover.b===b) tipBeacon(b,ev); }
     }).catch(function(){});
   }
