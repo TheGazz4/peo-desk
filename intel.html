@@ -47,7 +47,9 @@
   main { max-width: 1180px; margin: 0 auto; padding: 16px 20px 40px; }
   .empty { color: var(--ink-muted); padding: 40px 0; text-align: center; }
 
-  .title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin: 4px 0 12px; }
+  .title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 4px 0 12px; }
+  .plogo img { display: block; height: 44px; max-width: 200px; object-fit: contain; background: #fff; border: 1px solid var(--line, #d8d4cc); border-radius: 9px; padding: 5px 9px; }
+  .plogo .nologo { font-size: 11px; color: var(--ink-muted); border: 1px dashed var(--line, #d8d4cc); border-radius: 9px; padding: 6px 9px; }
   .title h2 { margin: 0; font-size: 22px; }
   .title .meta { color: var(--ink-2); font-size: 13px; }
 
@@ -171,6 +173,29 @@
   var current = null;
   var loadToken = 0;
 
+  /* ---------- PEO logos (owner 2026-09-24: see each PEO's logo on its profile) ----------
+     Same source as the Coverage Map chips: map-data mode=logos_all = every saved logo (pub.map_logos <- peo_logo_registry,
+     published the moment a logo is harvested, migration 1274). One request per page load. */
+  var LOGOS_P = null;
+  function logos() {
+    if (LOGOS_P) return LOGOS_P;
+    var h = { "apikey": ANON, "Authorization": "Bearer " + ANON };
+    if (KEY) h["x-desk-key"] = KEY;
+    LOGOS_P = fetch(SB + "/functions/v1/map-data?mode=logos_all&d=intel-" + new Date().toISOString().slice(0, 13), { headers: h })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (j) { return (j && j.logos) || {}; })
+      .catch(function () { LOGOS_P = null; return {}; });
+    return LOGOS_P;
+  }
+  function drawLogo(slug, name, tok) {
+    logos().then(function (L) {
+      if (tok !== loadToken) return;
+      var box = $("pLogo"); if (!box) return;
+      var d = L[slug];
+      box.innerHTML = d ? '<img alt="' + esc(name) + ' logo" src="' + esc(d) + '">' : '<span class="nologo" title="No logo saved for this PEO yet">no logo on file</span>';
+    });
+  }
+
   function setStatus(msg, err) { var s = $("status"); s.textContent = msg || ""; s.className = err ? "err" : ""; }
 
   /* ---------- data: dash-ai read-only SQL ---------- */
@@ -275,7 +300,7 @@
     var tok = ++loadToken;
     var row = ALL.filter(function (r) { return r.family_slug === slug; })[0] || { peo_name: slug };
     $("main").innerHTML =
-      '<div class="title"><h2>' + esc(row.peo_name) + '</h2><span class="meta" id="titleMeta"></span></div>' +
+      '<div class="title"><span class="plogo" id="pLogo"></span><h2>' + esc(row.peo_name) + '</h2><span class="meta" id="titleMeta"></span></div>' +
       '<div class="tabs" role="tablist">' +
         '<button type="button" role="tab" data-tab="intel" aria-selected="true">Industry Intel</button>' +
         '<button type="button" role="tab" data-tab="profile" aria-selected="false">PEO profile</button>' +
@@ -286,6 +311,7 @@
       b.onclick = function () { showTab(b.dataset.tab); };
     });
     setStatus("loading " + row.peo_name + "…");
+    drawLogo(slug, row.peo_name, tok);
 
     sql("select industry_intel_for_peo('" + slug + "') as j", "industry intel panel", 45000)
       .then(function (res) { if (tok !== loadToken) return; renderIntel((res.rows && res.rows[0] && res.rows[0].j) || {}); setStatus(""); })
