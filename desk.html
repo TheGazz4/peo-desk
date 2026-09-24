@@ -303,7 +303,22 @@
     <table id="tblLineage"><thead><tr><th>when (AZ)</th><th>record</th><th class="num">new</th><th>what was added</th><th>from</th></tr></thead><tbody><tr><td colspan="5" class="age cold">loading…</td></tr></tbody></table>
   </section>
 
-  <section class="wide" id="carrierSup">
+  <section class="wide" id="charterPanel">
+    <h2>State registry engine: what the state records told us <small>— owner only · refreshes every 10 minutes</small></h2>
+    <p class="blurb">Every company we track is checked against official state business registries (who registered it, when, whether it is still in good standing, its officers and its tax ID where the state publishes one). This panel shows what came in over the last 24 hours, how many of our companies each state has confirmed, and whether every data feed followed the house rules (one intake door, standard formatting, dates stamped correctly). Anything marked "needs a look" is listed at the bottom in plain words.</p>
+    <div class="sc-tiles" id="chTiles"></div>
+    <div class="sc-grid">
+      <div><h3>Registrations on file, by state</h3><table id="tblChRegs"><thead><tr><th>state</th><th class="num">on file</th><th class="num">active</th><th class="num">with tax ID</th></tr></thead><tbody></tbody></table></div>
+      <div><h3>Our companies matched to a state record</h3><table id="tblChLinks"><thead><tr><th>state</th><th class="num">confirmed</th><th class="num">being checked</th><th class="num">waiting</th><th class="num">ruled out</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <h3 style="margin:14px 0 6px;font-size:13px">State filings on our companies, last 30 days</h3>
+    <table id="tblChEvents"><thead><tr><th>state</th><th>what was filed</th><th class="num">companies</th></tr></thead><tbody></tbody></table>
+    <h3 style="margin:14px 0 6px;font-size:13px">Needs a look</h3>
+    <table id="tblChAttn"><thead><tr><th>area</th><th>rule</th><th>status</th><th>what it means</th></tr></thead><tbody></tbody></table>
+    <p class="age" id="chAsOf" style="margin-top:8px"></p>
+  </section>
+
+<section class="wide" id="carrierSup">
     <h2>Health-carrier supervisor <small>— who carried each client, for exactly which dates</small></h2>
     <p class="blurb">Nightly agent (04:53 UTC, after the carrier layer rebuilds). A client carrier fact is written only for the overlap of the client's dated PEO window and that PEO's dated Schedule A policy term — never guessed, never open-ended. Unmapped carrier names are held back and researched by the AI lane; judgment calls go to the decision desk.</p>
     <div class="sc-head" id="csHead"></div>
@@ -1493,7 +1508,7 @@ setInterval(poll, POLL_MS);
   "use strict";
   var TABS = [
     { key: "overview", label: "Overview",          ids: ["scorecard", "decisionDesk", "readyPlays", "intelTicker"] },
-    { key: "book",     label: "Book & mesh",       ids: ["lineagePanel", "enrichmentProgress", "dataPurification", "meshMail", "moduleUtilization"] },
+    { key: "book",     label: "Book & mesh",       ids: ["lineagePanel", "charterPanel", "enrichmentProgress", "dataPurification", "meshMail", "moduleUtilization"] },
     { key: "health",   label: "Health & carriers", ids: ["carrierSup", "peoNet", "dataCal"] },
     { key: "peos",     label: "PEO profiles",      ids: ["peoIdentity", "peoPushdown", "peoPrecision", "nonPeo"] },
     { key: "system",   label: "System",            ids: ["systemHealth", "rateLimits", "apiUsage", "appendThroughput", "freshness"] },
@@ -1616,6 +1631,56 @@ setInterval(poll, POLL_MS);
   })();
   setInterval(function () { capTables(); badges(); }, 2000);
   setTimeout(function () { capTables(); badges(); }, 300);
+})();
+</script>
+<script>
+/* State registry engine panel (charter, 2026-09-24). Reads charter_desk_json() through dash-ai (desk key), own 10-minute clock. */
+(function () {
+  "use strict";
+  var FN = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/dash-ai";
+  var ANONK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
+  var tiles = document.getElementById("chTiles");
+  var tR = document.querySelector("#tblChRegs tbody"), tL = document.querySelector("#tblChLinks tbody"),
+      tE = document.querySelector("#tblChEvents tbody"), tA = document.querySelector("#tblChAttn tbody"), asof = document.getElementById("chAsOf");
+  if (!tiles || !tR) return;
+  function e(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
+  function n0(v) { return v == null || v === "" ? "—" : Number(v).toLocaleString(); }
+  var AREA = { charter: "State registry engine", one_door: "Intake door", ca_sos: "California registry", fl_sos: "Florida registry", ny_sos: "New York registry", tx_sos: "Texas registry" };
+  var RULE = { door_violations_24h: "Everything enters through one door", doors_enforced: "Every feed is locked to the door", matching_standard: "Company matching standard",
+               as_of_law: "Dates stamped correctly", crosswalk_gate: "Status words translated", ein_canon: "Tax IDs in one format", format_check: "Standard formatting" };
+  var EV = { status_change: "Status changed", name_change: "Name changed", merger: "Merged", conversion: "Converted", dissolution: "Dissolved or withdrawn",
+             reinstatement: "Reinstated", annual_report: "Annual report filed", amendment: "Amendment filed", agent_change: "Registered agent changed",
+             officer_change: "Officers changed", address_change: "Address changed", other: "Other filing" };
+  function rows(tb, list, fn, cols) { tb.innerHTML = list.length ? list.map(fn).join("") : "<tr><td colspan=\"" + cols + "\" class=\"age\">nothing yet</td></tr>"; }
+  function load() {
+    var k = null; try { k = localStorage.getItem("desk_key") || localStorage.getItem("peo_dash_key"); } catch (x) {}
+    if (!k || document.hidden) return;
+    fetch(FN, { method: "POST", headers: { "Content-Type": "application/json", "apikey": ANONK, "Authorization": "Bearer " + ANONK, "x-desk-key": k },
+      body: JSON.stringify({ mode: "sql", sql: "select charter_desk_json() as j", label: "desk state registry panel", quiet: true }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        var j = res && res.rows && res.rows[0] && res.rows[0].j;
+        if (typeof j === "string") j = JSON.parse(j);
+        if (!j || !j.regs) throw new Error((res && (res.detail || res.error)) || "no reply");
+        var c = j.checks || {};
+        var tl = [["State records received (24h)", n0(j.landed_24h), n0(j.loads_24h) + " batches"],
+                  ["Batches held back (24h)", n0(j.blocked_24h), "held when a status word is not yet translated"],
+                  ["Registry changes (24h)", n0(j.changes_24h), n0(j.status_flips_24h) + " status changes"],
+                  ["Companies waiting for review", n0(j.research_waiting), "close matches a person should confirm"],
+                  ["House rules", n0(c.pass) + " passing", (c.fail ? n0(c.fail) + " broken, " : "") + n0(c.warn) + " need a look"]];
+        tiles.innerHTML = tl.map(function (x) { return "<div class=\"tile\"><div class=\"k\">" + e(x[0]) + "</div><div class=\"v\">" + x[1] + "</div><div class=\"d\">" + e(x[2]) + "</div></div>"; }).join("");
+        rows(tR, j.regs, function (r) { return "<tr><td>" + e(r.state) + "</td><td class=\"num\">" + n0(r.n) + "</td><td class=\"num\">" + n0(r.active) + "</td><td class=\"num\">" + n0(r.with_tax_id) + "</td></tr>"; }, 4);
+        rows(tL, j.links, function (r) { return "<tr><td>" + e(r.state) + "</td><td class=\"num\">" + n0(r.confirmed) + "</td><td class=\"num\">" + n0(r.checking) + "</td><td class=\"num\">" + n0(r.waiting) + "</td><td class=\"num\">" + n0(r.ruled_out) + "</td></tr>"; }, 5);
+        rows(tE, j.events_30d || [], function (r) { return "<tr><td>" + e(r.state) + "</td><td>" + e(EV[r.type] || r.type) + "</td><td class=\"num\">" + n0(r.n) + "</td></tr>"; }, 3);
+        rows(tA, j.attention || [], function (r) { var bad = r.status === "fail";
+          return "<tr><td>" + e(AREA[r.area] || r.area) + "</td><td>" + e(RULE[r.check] || r.check) + "</td><td style=\"font-weight:600;color:" + (bad ? "#a33" : "#9a6a00") + "\">" + (bad ? "broken" : "needs a look") + "</td><td>" + e(r.detail) + "</td></tr>"; }, 4);
+        if (asof) asof.textContent = "as of " + new Date(j.generated_at).toLocaleString();
+      })
+      .catch(function (err) { tR.innerHTML = "<tr><td colspan=\"4\" class=\"age cold\">could not load: " + e(err.message) + "</td></tr>"; });
+  }
+  load();
+  setInterval(load, 10 * 60 * 1000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
 })();
 </script>
 </body>
