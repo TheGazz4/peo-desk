@@ -279,6 +279,16 @@
     <div class="tw" style="max-height:620px;overflow:auto"><style>#tblNonPeo td{white-space:normal;vertical-align:top}#tblNonPeo td.num{white-space:nowrap}#tblNonPeo th.num,#tblNonPeo td.num{text-align:right}#tblNonPeo .oc{font-weight:600;white-space:nowrap}</style><table id="tblNonPeo"><thead><tr><th>Outcome</th><th>Company</th><th>What we found</th><th>Profile now</th><th>How it entered our list</th><th>Filer on the federal filing</th><th class="num">Plan participants</th></tr></thead><tbody><tr><td colspan="7" class="age cold">loading…</td></tr></tbody></table></div>
   </section>
 
+  <section class="wide" id="peoIdentity">
+    <h2>PEO identity coverage <small>— logo, head office and today's name on every PEO on the map</small></h2>
+    <p class="blurb">Every PEO profile should carry its logo, a confirmed head office, and the name customers know it by today. Robots check each PEO's own website around the clock: logos every 3 minutes, head offices every 2, names every 2, and the map refreshes every 3 hours. When a brand has been bought and retired, the map shows the buyer's name with "Formerly …" on the card; the PEO keeps its own family.</p>
+    <div class="sc-tiles" id="piTiles"></div>
+    <h3 style="margin:14px 0 6px">Brands shown under a new name</h3>
+    <table id="tblPiChange"><thead><tr><th>Old name</th><th>Why it changed</th><th class="num">Clients</th></tr></thead><tbody></tbody></table>
+    <h3 style="margin:14px 0 6px">Biggest PEOs still missing something</h3>
+    <table id="tblPiGap"><thead><tr><th>PEO</th><th class="num">Clients</th><th>Missing</th></tr></thead><tbody></tbody></table>
+  </section>
+
   <section class="wide" id="dataCal">
     <h2>Health data calendar <small>— when each PEO's new data is due, and when it arrived</small></h2>
     <p class="blurb">Checked every hour. <b>Form 5500</b> (carriers and people covered) is due the last day of the 7th month after the plan year ends, or the 15th day of the 10th month with an extension (<a href="https://www.irs.gov/retirement-plans/form-5500-corner" target="_blank" rel="noopener">IRS</a>); every DOL dataset file is under an hourly change check, so a new filing is picked up the hour DOL publishes it. <b>SBCs</b> must go out at least 30 days before an auto-renewing plan year (<a href="https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-B/part-147/section-147.200" target="_blank" rel="noopener">45 CFR 147.200</a>), so network research runs 60 days before renewal. <b>Carrier network files</b> refresh monthly and are checked daily. <b>Form M-1</b> (MEWAs) is due March 1 (<a href="https://www.askebsa.dol.gov/mewa/" target="_blank" rel="noopener">DOL</a>) — dated here, not yet loaded.</p>
@@ -395,7 +405,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_desk","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -1001,6 +1011,24 @@ function renderPeoNetworks(d) {
   }).join("") || `<tr><td colspan="10">no rows yet</td></tr>`;
   renderDataCalendar(d);
 }
+function renderPeoIdentity(d) {
+  const rows = d.desk_peo_identity?.rows || [];
+  const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
+  const tiles = rows.filter((r) => r.kind === "tile").sort((a, b) => a.ord - b.ord);
+  const t = $("#piTiles");
+  if (t) t.innerHTML = tiles.map((r) => {
+    const pct = r.n_total ? Math.round((100 * r.n_have) / r.n_total) : 0;
+    const tone = r.ord === 1 ? null : pct >= 90 ? "good" : pct >= 60 ? null : "warn";
+    const v = r.ord === 1 ? fmtN(r.n_total) : `${fmtN(r.n_have)} <small>/ ${fmtN(r.n_total)} · ${pct}%</small>`;
+    return `<div class="tile ${tone ? "t-" + tone : ""}"><div class="k">${esc(r.label)}</div><div class="v">${v}</div><div class="d">${esc(r.detail || "")}</div></div>`;
+  }).join("");
+  const ch = rows.filter((r) => r.kind === "change").sort((a, b) => (b.clients || 0) - (a.clients || 0));
+  const tc = $("#tblPiChange tbody");
+  if (tc) tc.innerHTML = ch.map((r) => `<tr><td>${esc(r.label)}</td><td>${esc(r.detail || "")}</td><td class="num">${fmtN(r.clients)}</td></tr>`).join("") || `<tr><td colspan="3">none</td></tr>`;
+  const gp = rows.filter((r) => r.kind === "gap").sort((a, b) => (b.clients || 0) - (a.clients || 0));
+  const tg = $("#tblPiGap tbody");
+  if (tg) tg.innerHTML = gp.map((r) => `<tr><td>${esc(r.label)}</td><td class="num">${fmtN(r.clients)}</td><td>${(r.missing || []).map((m) => `<span class="chip warn">${esc(m)}</span>`).join(" ")}</td></tr>`).join("") || `<tr><td colspan="3">nothing missing</td></tr>`;
+}
 function renderDataCalendar(d) {
   const rows = d.desk_data_calendar?.rows || [];
   const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
@@ -1024,6 +1052,7 @@ function renderAll(d) {
   renderScorecard(d);
   renderCarrierSupervisor(d);
   renderPeoNetworks(d);
+  renderPeoIdentity(d);
   renderDecisions(d);
   renderStrip(d);
   renderPlays(d);
