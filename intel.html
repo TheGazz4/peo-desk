@@ -52,34 +52,6 @@
   .plogo .nologo { font-size: 11px; color: var(--ink-muted); border: 1px dashed var(--line, #d8d4cc); border-radius: 9px; padding: 6px 9px; }
   .title h2 { margin: 0; font-size: 22px; }
   .title .meta { color: var(--ink-2); font-size: 13px; }
-  .dirlinks { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: -6px 0 12px; font-size: 13px; }
-  .dirlinks .maplink { font-weight: 600; }
-  .dirlinks .mut { color: var(--ink-muted); font-size: 12px; }
-  .dirlinks .also { flex-basis: 100%; color: var(--ink-2); line-height: 1.6; }
-  .acqbanner { margin: -4px 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 14px; background: color-mix(in srgb, var(--series-1) 14%, transparent); border: 1px solid color-mix(in srgb, var(--series-1) 45%, transparent); }
-  .evsec { margin: 16px 0 18px; }
-  .linesec { margin: 14px 0 6px; }
-  .linesec h3 { font-size: 15px; margin: 0 0 8px; }
-  .lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
-  .lines .ln { border: 1px solid var(--line, #d8d4cc); border-radius: 10px; padding: 8px 11px; font-size: 13px; }
-  .lines .ln b { display: block; font-size: 14px; margin-bottom: 2px; }
-  .lines .ln .k { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-muted); }
-  .lines .ln.st-yes { border-left: 5px solid #2e8b57; } .lines .ln.st-no { border-left: 5px solid #c0392b; }
-  .lines .ln.st-some { border-left: 5px solid #d9822b; } .lines .ln.st-unk { border-left: 5px solid var(--line, #d8d4cc); }
-  .lines .ln .mut { color: var(--ink-muted); font-size: 12px; }
-  .evsec h3 { font-size: 15px; margin: 0 0 8px; }
-  .evsec .mut, .evtl .mut { color: var(--ink-muted); font-weight: 400; font-size: 12px; }
-  .evtl { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line, #d8d4cc); }
-  .evtl li { position: relative; display: grid; grid-template-columns: 118px 1fr; gap: 10px; padding: 7px 0; }
-  .evtl li::before { content: ""; position: absolute; left: -20px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--ink-muted); }
-  .evtl li.ev-acquisition::before { background: #2e8b57; } .evtl li.ev-acquired::before, .evtl li.ev-merger::before { background: #d9822b; }
-  .evtl li.ev-rebrand::before { background: #6c7fd8; } .evtl li.ev-ownership::before { background: #9b4fd0; }
-  .evtl li.ev-certification::before { background: #3a9ad9; } .evtl li.ev-certification-lost::before { background: #c0392b; }
-  .evtl .evd { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-  .evtl .evk { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 1px 7px; border-radius: 8px; border: 1px solid var(--line, #d8d4cc); margin-right: 4px; }
-  .evtl .evs { font-size: 12px; margin-top: 2px; }
-  @media (max-width: 640px) { .evtl li { grid-template-columns: 1fr; gap: 2px; } }
-  .dirlinks .also.notlisted { border-left: 3px solid var(--warning); padding: 4px 10px; background: color-mix(in srgb, var(--warning) 8%, transparent); border-radius: 0 8px 8px 0; }
 
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 14px; }
   .tabs button { background: none; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
@@ -292,10 +264,7 @@
   /* ---------- dropdown ---------- */
   function loadList() {
     setStatus("loading PEOs…");
-    // 1283 (owner 2026-09-24): this list IS the map's left-hand PEO filter - same entries, same names, same count.
-    // dash_peo_directory reads pub.map_filter_catalog (brand grain); older entities and acquired brands ride inside
-    // their parent as "Also filed as". Parity guard: v_peo_directory_parity must stay empty.
-    var base = "select family_slug, peo_name, legal_name, entity_class, n_clients, n_placed, wse_low, wse_high, wse_status, size_group, also_filed_as, members from dash_peo_directory order by lower(peo_name), family_slug";
+    var base = "select family_slug, peo_name, sold_as, entity_class, wse_low, wse_high, wse_status, size_group from dash_industry_intel_peo_list order by lower(peo_name), family_slug";
     var pages = [0, 450];
     Promise.all(pages.map(function (off) { return sql(base + " limit 450 offset " + off, "industry intel list", 30000); }))
       .then(function (res) {
@@ -305,9 +274,9 @@
         ALL = ALL.filter(function (r) { if (seen[r.family_slug]) return false; seen[r.family_slug] = 1; return true; });
         ALL.sort(function (a, b) { return String(a.peo_name).toLowerCase().localeCompare(String(b.peo_name).toLowerCase()) || String(a.family_slug).localeCompare(String(b.family_slug)); });
         drawOptions();
-        setStatus(ALL.length.toLocaleString() + " PEOs · same list as the map filter");
+        setStatus(ALL.length.toLocaleString() + " PEOs");
         var want = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1] || sget("intel_last_peo");
-        if (want) { if (ALL.some(function (r) { return r.family_slug === want; })) $("peo").value = want; open(want); }
+        if (want && ALL.some(function (r) { return r.family_slug === want; })) { $("peo").value = want; open(want); }
       })
       .catch(function (e) { if (String(e.message) !== "unauthorized") setStatus("could not load PEOs: " + e.message, true); });
   }
@@ -319,12 +288,13 @@
     var rows = ALL.filter(function (r) {
       if (only && r.wse_high == null) return false;
       if (!q) return true;
-      return (String(r.peo_name) + " " + (r.legal_name || "") + " " + (r.also_filed_as || "") + " " + r.family_slug).toLowerCase().indexOf(q) >= 0;
+      return (String(r.peo_name) + " " + (r.sold_as || "") + " " + r.family_slug).toLowerCase().indexOf(q) >= 0;
     });
     var html = '<option value="">' + (rows.length ? "Choose a PEO (" + rows.length.toLocaleString() + ")" : "No PEOs match") + "</option>";
     html += rows.map(function (r) {
-      var size = r.wse_high != null ? " — " + range(r.wse_low, r.wse_high) + " WSEs" : "";
-      return '<option value="' + esc(r.family_slug) + '">' + esc(r.peo_name + size) + "</option>";
+      var size = r.wse_status === "published" && r.wse_high != null && Number(r.wse_low) === Number(r.wse_high) ? " — " + n0(r.wse_high) + " WSEs" : "";   // 2171: exact published figures only
+      var sold = r.sold_as && r.sold_as !== r.peo_name ? " (sold as " + r.sold_as + ")" : "";
+      return '<option value="' + esc(r.family_slug) + '">' + esc(r.peo_name + sold + size) + "</option>";
     }).join("");
     sel.innerHTML = html;
     if (keep && rows.some(function (r) { return r.family_slug === keep; })) sel.value = keep;
@@ -332,11 +302,6 @@
   $("q").addEventListener("input", drawOptions);
   $("onlyEst").addEventListener("change", drawOptions);
   $("peo").addEventListener("change", function () { if (this.value) open(this.value); });
-  // 1283: in-page links (#peo=slug) - "Also filed as" members and "shown on the map as" parents
-  window.addEventListener("hashchange", function () {
-    var s = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1];
-    if (s && s !== current) { if (ALL.some(function (r) { return r.family_slug === s; })) $("peo").value = s; open(s); }
-  });
 
   /* ---------- open one PEO ---------- */
   function open(slug) {
@@ -348,14 +313,11 @@
     var row = ALL.filter(function (r) { return r.family_slug === slug; })[0] || { peo_name: slug };
     $("main").innerHTML =
       '<div class="title"><span class="plogo" id="pLogo"></span><h2>' + esc(row.peo_name) + '</h2><span class="meta" id="titleMeta"></span></div>' +
-      '<div class="dirlinks" id="dirLinks"></div>' +
       '<div class="tabs" role="tablist">' +
         '<button type="button" role="tab" data-tab="profile" aria-selected="true">PEO PROFILE</button>' +
         '<button type="button" role="tab" data-tab="intel" aria-selected="false">INDUSTRY INTEL</button>' +
       "</div>" +
       '<div id="tab-profile"><div id="profFacts"><div class="empty">Loading…</div></div>' +
-        '<section class="linesec" id="profLines"><h3>What this PEO offers</h3><div class="empty">Loading…</div></section>' +
-        '<section class="evsec" id="profEvents"><h3>Acquisitions &amp; major events</h3><div class="empty">Loading…</div></section>' +
         '<div id="profText"><div class="empty">Loading the full profile… (large PEOs take up to 15 seconds)</div></div></div>' +
       '<div id="tab-intel" class="hidden"><div class="empty">Loading Industry Intel…</div></div>';
     Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
@@ -363,11 +325,8 @@
     });
     setStatus("loading " + row.peo_name + "…");
     drawLogo(slug, row.peo_name, tok);
-    drawDirLinks(slug, row, tok);
-    drawEvents(slug, tok);
-    drawLines(slug, tok);
 
-    sql("select industry_intel_for_peo('" + slug + "') as j", "industry intel panel", 45000)
+    sql("select industry_intel_for_peo('" + slug + "') || jsonb_build_object('precision', peo_precision_for_peo('" + slug + "')) as j", "industry intel panel", 45000)
       .then(function (res) { if (tok !== loadToken) return; renderIntel((res.rows && res.rows[0] && res.rows[0].j) || {}); setStatus(""); })
       .catch(function (e) { if (tok !== loadToken) return; $("tab-intel").innerHTML = '<div class="empty">Could not load Industry Intel: ' + esc(e.message) + "</div>"; $("profFacts").innerHTML = ""; setStatus("error", true); });
 
@@ -379,121 +338,6 @@
         $("profText").innerHTML = text ? '<div class="md">' + md(text) + "</div>" : '<div class="empty">No profile text for this PEO yet.</div>';
       })
       .catch(function (e) { if (tok !== loadToken) return; $("profText").innerHTML = '<div class="empty">Could not load the profile: ' + esc(e.message) + "</div>"; });
-  }
-
-  /* ---------- 3036: acquisitions & major events timeline (every PEO profile) ----------
-     Reads public.peo_events_for_profile(slug): proof-backed peo_corporate_events (both sides of every deal, incl. deals
-     done by this PEO's older entities / acquired brands = "via"), private-equity ownership, IRS CPEO gained / revoked.
-     An acquired / merged / renamed PEO also gets a banner at the top naming the buyer with a link and the proof. */
-  var EV_KIND = { acquisition: "Acquisition", acquired: "Acquired", merger: "Merger", rebrand: "Name change", divestiture: "Sold PEO book",
-                  ownership: "Ownership", certification: "IRS CPEO", "certification lost": "IRS CPEO" };
-  var SRC_WORD = { press_release: "Press release", filing: "Filing", news: "News article", company_website: "Company website", owner_knowledge: "Owner note" };
-  function evDate(d, p) {
-    if (!d) return "Date not published";
-    var t = new Date(String(d).slice(0, 10) + "T00:00:00"); if (isNaN(t)) return String(d);
-    if (p === "year") return String(t.getFullYear());
-    if (p === "month" || p === "quarter") return t.toLocaleDateString(undefined, { year: "numeric", month: "short" });
-    return t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  }
-  function evProof(r) {
-    if (!r.url) return '<span class="mut">no public link on file</span>';
-    return '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(SRC_WORD[r.source_kind] || "Source") + ' ↗</a>';
-  }
-  function evOther(r) {
-    return (r.other_has_profile && r.other_slug) ? ' · <a href="#peo=' + esc(r.other_slug) + '">' + esc(r.other_name) + ' profile →</a>' : "";
-  }
-  function drawEvents(slug, tok) {
-    sql("select happened_on, date_precision, kind, perspective, headline, other_slug, other_name, other_has_profile, url, source_kind, via from peo_events_for_profile('" + slug + "')", "profile events", 30000)
-      .then(function (res) {
-        if (tok !== loadToken) return;
-        var rows = res.rows || [], box = $("profEvents"); if (!box) return;
-        // banner: this PEO itself was bought / merged / renamed / sold its book (not via an older entity, not a PE investment)
-        var mine = rows.filter(function (r) { return !r.via && r.perspective === "acquired" && /^(acquired|merger|rebrand|divestiture)$/.test(r.kind); });
-        if (mine.length) {
-          var b = mine[0], word = { acquired: "Acquired by", merger: "Merged into", rebrand: "Now known as", divestiture: "PEO business sold to" }[b.kind];
-          var who = (b.other_has_profile && b.other_slug) ? '<a href="#peo=' + esc(b.other_slug) + '">' + esc(b.other_name) + '</a>' : esc(b.other_name || "");
-          var ban = document.createElement("div"); ban.className = "acqbanner";
-          ban.innerHTML = '<b>' + word + ' ' + who + '</b> · ' + esc(evDate(b.happened_on, b.date_precision)) + ' · ' + evProof(b);
-          var dl = $("dirLinks"); if (dl && dl.parentNode) dl.parentNode.insertBefore(ban, dl);
-        }
-        if (!rows.length) { box.innerHTML = '<h3>Acquisitions &amp; major events</h3><div class="empty">No acquisitions, mergers, name changes, ownership changes or IRS certification changes on file for this PEO yet.</div>'; return; }
-        box.innerHTML = '<h3>Acquisitions &amp; major events <span class="mut">(' + rows.length + ')</span></h3><ol class="evtl">' + rows.map(function (r) {
-          return '<li class="ev-' + esc(String(r.kind).replace(/\s+/g, "-")) + '"><div class="evd">' + esc(evDate(r.happened_on, r.date_precision)) + '</div>' +
-            '<div class="evb"><span class="evk">' + esc(EV_KIND[r.kind] || r.kind) + '</span> ' + esc(r.headline || "") +
-            (r.via ? ' <span class="mut">(via ' + esc(r.via) + ')</span>' : "") +
-            '<div class="evs">' + evProof(r) + evOther(r) + '</div></div></li>';
-        }).join("") + '</ol>';
-      })
-      .catch(function (e) { if (tok !== loadToken) return; var box = $("profEvents"); if (box) box.innerHTML = '<h3>Acquisitions &amp; major events</h3><div class="empty">Could not load events: ' + esc(e.message) + '</div>'; });
-  }
-
-  /* ---------- 1296: what this PEO offers - group medical and master workers' comp (owner law 2026-09-24) ----------
-     Reads public.peo_lines_for_profile(slug) = v_peo_line_offering. Some real PEOs offer no group medical (clients keep
-     their own plan) and some offer no master WC (clients keep their own policy). That is NOT a mark against the PEO;
-     it tells us the client's renewal date comes from the client's own plan / policy. */
-  var LN_CLASS = { offers: "yes", offers_via_partner: "yes", likely_offers: "yes", offers_some: "some", likely_offers_some: "some",
-                   offered_before: "some", does_not_offer: "no", likely_does_not_offer: "no" };
-  var CONF_WORD = { high: "high confidence", medium: "medium confidence", low: "low confidence - unconfirmed" };
-  function lnProof(r) {
-    var bits = [];
-    if (r.line === "medical" && r.last_medical_filing_year) bits.push("Federal Form 5500 health filing, plan year " + r.last_medical_filing_year);
-    if (r.line === "wc" && (r.fl_lease_now || r.tx_lcf) && /offers/.test(r.state)) {
-      var w = [];
-      if (r.fl_lease_now) w.push(Number(r.fl_lease_now).toLocaleString() + " Florida clients on its leasing WC policy now");
-      if (r.tx_lcf) w.push(Number(r.tx_lcf).toLocaleString() + " Texas clients on its WC policy");
-      bits.push("State WC records: " + w.join(", "));
-    }
-    if (r.source_url) bits.push('<a href="' + esc(r.source_url) + '" target="_blank" rel="noopener">Company source ↗</a>' + (r.quote ? ' <span class="mut">"' + esc(r.quote) + '"</span>' : ""));
-    return bits.length ? bits.map(function (b) { return b.indexOf("<a ") === 0 ? b : esc(b).replace(/&lt;a [\s\S]*$/, ""); }).join(" · ") : '<span class="mut">No proof on file yet</span>';
-  }
-  function drawLines(slug, tok) {
-    sql("select line, state, label, how, partner_slug, confidence, note, source_url, quote, researched_on, last_medical_filing_year, fl_lease_now, tx_lcf, rule from peo_lines_for_profile('" + slug + "')", "what this PEO offers", 30000)
-      .then(function (res) {
-        if (tok !== loadToken) return;
-        var rows = res.rows || [], box = $("profLines"); if (!box) return;
-        if (!rows.length) { box.innerHTML = '<h3>What this PEO offers</h3><div class="empty">Not on the PEO directory list.</div>'; return; }
-        box.innerHTML = '<h3>What this PEO offers</h3><div class="lines">' + rows.map(function (r) {
-          var cls = LN_CLASS[r.state] || "unk";
-          return '<div class="ln st-' + cls + '"><span class="k">' + (r.line === "medical" ? "Group medical" : "Workers' comp") + '</span>' +
-            '<b>' + esc(r.label || "") + '</b>' +
-            (r.rule ? '<div>' + esc(r.rule) + '</div>' : "") +
-            (r.note && !/^Researched 2026-09-24 \(company website/.test(r.note) ? '<div class="mut">' + esc(r.note) + '</div>' : "") +
-            '<div class="mut">' + lnProof(r) + (r.confidence ? ' · ' + esc(CONF_WORD[r.confidence] || r.confidence) : "") + '</div></div>';
-        }).join("") + '</div>';
-      })
-      .catch(function (e) { if (tok !== loadToken) return; var box = $("profLines"); if (box) box.innerHTML = '<h3>What this PEO offers</h3><div class="empty">Could not load: ' + esc(e.message) + '</div>'; });
-  }
-
-  /* ---------- 1283: one list, two doors - links between this profile and the map ---------- */
-  function mapHref(slug) { return "map.html?on=" + encodeURIComponent(slug); }
-  function drawDirLinks(slug, row, tok) {
-    var box = $("dirLinks"); if (!box) return;
-    if (row && row.family_slug === slug) {   // a PEO on the map filter
-      var h = '<a class="maplink" href="' + mapHref(slug) + '" target="_blank" rel="noopener">See ' + esc(row.peo_name) + ' on the map →</a>';
-      if (row.legal_name && row.legal_name !== row.peo_name) h += '<span class="mut">Legal name: ' + esc(row.legal_name) + '</span>';
-      var ms = row.members || [];
-      if (ms.length) {
-        h += '<div class="also"><b>Also filed as</b> ' + ms.map(function (m) {
-          return '<a href="#peo=' + esc(m.slug) + '" title="' + esc(m.relation) + ' · ' + n0(m.clients) + ' current clients in our records">' + esc(m.name) + '</a>';
-        }).join(" · ") + '<span class="mut"> — these clients are counted under ' + esc(row.peo_name) + ' on the map</span></div>';
-      }
-      box.innerHTML = h;
-      return;
-    }
-    // not on the map filter: an older entity / acquired brand, or not a listed PEO
-    sql("select member_legal_name, directory_slug, directory_display, relation, current_clients from mv_peo_directory_members where member_slug = '" + slug + "'", "directory parent", 20000)
-      .then(function (res) {
-        if (tok !== loadToken) return;
-        var m = (res.rows || [])[0];
-        if (m && m.member_legal_name) { var h2 = document.querySelector(".title h2"); if (h2) h2.textContent = m.member_legal_name; }
-        if (m && m.directory_slug) {
-          var pl = '<a href="#peo=' + esc(m.directory_slug) + '">' + esc(m.directory_display) + '</a>';
-          box.innerHTML = '<div class="also notlisted">Not listed on its own on the map — ' + esc(String(m.relation).replace("this PEO", "\u0001")).replace("\u0001", pl) +
-            '. On the map and in the PEO list it is part of ' + pl + ' · <a class="maplink" href="' + mapHref(m.directory_slug) + '" target="_blank" rel="noopener">see ' + esc(m.directory_display) + ' on the map →</a></div>';
-        } else {
-          box.innerHTML = '<div class="also notlisted">Not on the map filter (no current clients, or not a PEO). Kept here for history only.</div>';
-        }
-      }).catch(function () { box.innerHTML = ""; });
   }
 
   function showTab(t) {
@@ -539,29 +383,40 @@
 
     /* ===== PEO PROFILE: fact tiles ===== */
     var p = "";
+    /* 2171 (owner 2026-09-24: "a precision database not a collection of ranges"): what the PEO states, or "Not stated" plus the
+       exact counts we hold. No estimate ranges; rank and market share only when its headcount is an exact published figure. */
+    var pr = j.precision || {}, pk = pr.check || {}, pcd = pr.card || {};
+    var qualTxt = function (qual, v) { return (qual === "approximately" ? "About " : "") + n0(v) + (qual === "more_than" ? "+" : ""); };
+    var exactPub = e.status === "published" && e.low != null && Number(e.low) === Number(e.high);
     var rk = j.size_rank, share = j.market_share_pct;
-    var rankV = "Not ranked", rankD = j.size_contradicted ? "size estimate under review (see flag)" : e.low != null ? "not classed as a PEO for ranking" : "no employee count yet";
-    if (rk) {
-      rankV = rk.rank_best === rk.rank_worst ? "#" + rk.rank_best : "#" + rk.rank_best + "–#" + rk.rank_worst;
-      rankD = (rk.rank_best === rk.rank_worst ? "largest" : "by size") + " of " + n0(rk.of_n) + " PEOs we've sized" +
-        (rk.rank_best === rk.rank_worst ? "" : (rk.size_published ? " (PEOs near it are estimates)" : " (its size is an estimate)"));
-    }
-    var shareV = "—", shareD = j.size_contradicted ? "size estimate under review (see flag)" : "needs an employee count";
-    if (share) {
-      shareV = (share.low === share.high || pctFmt(share.low) === pctFmt(share.high)) ? "About " + pctFmt(share.high) : pctFmt(share.low).replace("%", "") + "–" + pctFmt(share.high);
+    var rankV = "Not ranked", rankD = "ranked only on an exact published headcount";
+    if (rk && exactPub && rk.rank_best === rk.rank_worst) { rankV = "#" + rk.rank_best; rankD = "of " + n0(rk.of_n) + " PEOs we track, by worksite employees"; }
+    var shareV = "—", shareD = "shown only on an exact published headcount";
+    if (share && exactPub) {
+      shareV = "About " + pctFmt(share.high);
       shareD = "of " + bigNum(share.industry_wse_total) + " PEO employees nationwide · industry count, " + monYr(share.industry_published_on) + (share.industry_stale ? " (over 2 years old)" : "");
     }
-    var cliV = n0(j.clients_seen), cliD = "current clients in our records";
-    if (f.clients) { cliV = clientsFiled(f.clients); cliD = "reported by the PEO, " + monYr(f.clients.as_of) + " · " + n0(j.clients_seen) + " in our records"; }
+    var wseV = "Not stated", wseD = pcd.plan_participants != null ? n0(pcd.plan_participants) + " enrolled in its own benefit and retirement plans (" + pcd.plan_year + ") · a floor, not its size" : "no firm count on file";
+    if (pcd.wse_stated != null) {
+      wseV = qualTxt(pcd.wse_stated_qual, pcd.wse_stated);
+      wseD = (pubc && !pubc.peo_only_count_published ? "whole company count · " : "stated by the PEO · ") + monYr(pcd.wse_stated_as_of) + (pk.stated_wse_scope === "unstated" ? " · does not say PEO-only" : "");
+    } else if (exactPub) {
+      wseV = n0(e.high); wseD = (pubc && !pubc.peo_only_count_published ? "whole company count · " : "reported by the PEO · ") + monYr(e.newest_data);
+    }
+    var cliV = n0(j.clients_seen), cliD = "current clients in our records · the PEO states no count";
+    if (pcd.clients_stated != null) { cliV = qualTxt(pcd.clients_stated_qual, pcd.clients_stated); cliD = "stated by the PEO, " + monYr(pcd.clients_stated_as_of) + " · " + n0(j.clients_seen) + " in our records"; }
+    else if (f.clients) { cliV = clientsFiled(f.clients); cliD = "reported by the PEO, " + monYr(f.clients.as_of) + " · " + n0(j.clients_seen) + " in our records"; }
     p += '<div class="tiles">' +
-      tile("Worksite employees", e.low != null ? range(e.low, e.high) : "No count yet",
-           e.low != null ? (j.size_contradicted ? "our estimate · too low for its client count (see flag)" : e.status === "published" ? (pubc && !pubc.peo_only_count_published ? "whole company count · " : "reported by the PEO · ") + monYr(e.newest_data) : "our estimate · data through " + monYr(e.newest_data)) : "no size figure on file yet") +
+      tile("Worksite employees", wseV, wseD) +
       tile("Size rank", rankV, rankD) +
       tile("Market share", shareV, shareD) +
       tile("Clients", cliV, cliD) +
       (pubc && pubc.quote ? tile("Share price", "$" + Number(pubc.quote.close).toFixed(2), pubc.exchange + ": " + pubc.ticker + " · close " + dateFmt(pubc.quote.trade_date) +
         (pubc.quote.change_pct != null ? " · " + (pubc.quote.change_pct >= 0 ? "+" : "") + n1(pubc.quote.change_pct) + "% on the day" : "")) : "") + "</div>";
     if (pubc) p += '<p class="note" style="margin:-6px 0 8px"><b>What the employee count covers:</b> ' + esc(pubc.wse_disclosure) + "</p>";
+    if (pk.headline) {   // 2171: the precision check - what the PEO says vs what we have
+      p += '<p class="note" style="margin:-4px 0 10px"><b>Precision check:</b> ' + esc(pk.headline) + (pk.clients_verdict && pk.clients_verdict !== "not_stated" ? " Clients: " + esc(pk.clients_verdict === "ours_high" ? "we count " + (pk.book_clients / pk.stated_clients).toFixed(1) + "x what the PEO states" : pk.clients_verdict === "ours_low" ? "we see about " + Math.round(100 * pk.book_clients / pk.stated_clients) + "% of the clients it states" : pk.clients_verdict === "consistent" ? "close to what it states" : pk.clients_verdict === "apples_oranges" ? "its figure counts something different" : "its figure is over 2 years old") + "." : "") + " Full detail in section 4 below.</p>";
+    }
 
     if (f.wse && f.wse_yoy_pct != null) {
       p += '<p class="note" style="margin:-6px 0 12px">Last 12 months, from its own filings: ' + (f.wse_yoy_pct >= 0 ? "+" : "") + n1(f.wse_yoy_pct) + "% worksite employees (" +
