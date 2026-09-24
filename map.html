@@ -456,6 +456,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
         <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Relationship" data-tip="What kind of service each client gets from the company on its pin.&#10;&#10;Click a chip to hide or show it. All on shows every pin.">Relationship <i>?</i></span> <span class="svcpv">Preview</span></h2>
         <div class="netchips" id="svc-chips"></div>
+        <label class="chk" style="margin-top:6px" title="Payroll and HR-outsourcing clients of Paychex, ADP and Paycor that are NOT PEO clients (Paychex pooled 401(k) plan = HRO/ASO; Florida comp policies placed through the vendor's own insurance agency = Payroll Only). Grey pins; never counted as PEO market share. Untick to hide them all."><input type="checkbox" id="np-on" checked> Non-PEO vendor clients <span style="color:var(--muted)">(Paychex · ADP · Paycor)</span></label>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
           <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO user departures">Both</button><button id="hist-2" title="Former PEO user departures only — current pins hidden">Former only</button></div>
@@ -555,9 +556,16 @@ function brandOk(d,i){
   return bs[d.brds[d.bis[i]]]!==false;
 }
 function catRows(){ return S.grain==='brand' ? (S.catalog.brands||[]) : (S.catalog.families||[]); }
-function colorOf(slug){ return S.colors[S.grain][slug]||OTHER; }
+function colorOf(slug){ if(isNP(slug)) return NP_COLOR[slug]||'#a0a8b0'; return S.colors[S.grain][slug]||OTHER; }
+// v3.66 (owner 2026-09-24, Owner ruling 192 / 1278e): NON-PEO VENDOR CLIENTS. Payroll / HR-outsourcing clients of vendors that also sell PEO
+// (Paychex pooled 401(k) book = HRO/ASO; FL comp-agency clients of ADP / Paychex / Paycor = Payroll Only). Muted pins, never a PEO:
+// kept out of PEO market share, This view PEO list and the state card; one toggle hides them all; the Relationship chips split them.
+var NP_LABEL={nonpeo_paychex:'Paychex (non-PEO client)',nonpeo_adp:'ADP (non-PEO client)',nonpeo_paycor:'Paycor (non-PEO client)'};
+var NP_COLOR={nonpeo_paychex:'#9aa7b1',nonpeo_adp:'#b8a58c',nonpeo_paycor:'#a59cba'};
+function isNP(s){ return !!s && String(s).slice(0,7)==='nonpeo_'; }
+function npVis(s){ return S.showNP!==false; }
 var UNCONF='PEO not confirmed';   // v3.62: clients whose PEO name is set aside until their company identity is settled (never a blank row)
-function dispOf(slug){ if(!slug||slug==='unattributed') return UNCONF; return S.displays[S.grain][slug]||slug; }
+function dispOf(slug){ if(isNP(slug)) return NP_LABEL[slug]||('Non-PEO client of '+String(slug).slice(7)); if(!slug||slug==='unattributed') return UNCONF; return S.displays[S.grain][slug]||slug; }
 function mercX(lng){ return (lng+180)/360; }
 function mercY(lat){ var s=Math.sin(lat*Math.PI/180); s=Math.max(-0.9999,Math.min(0.9999,s)); return 0.5-Math.log((1+s)/(1-s))/(4*Math.PI); }
 function invLat(my){ return Math.asin(Math.tanh((0.5-my)*2*Math.PI))*180/Math.PI; }
@@ -984,7 +992,7 @@ function draw(){
     var d2=S.pinData[st2];
     var MX2=(S.placement==='zip')?d2.mxZ:d2.mxA, MY2=(S.placement==='zip')?d2.myZ:d2.myA;
     var slugArr2=(S.grain==='brand')?d2.brds:d2.fams; var IDX2=(S.grain==='brand')?d2.bis:d2.fis;
-    var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=sel[slugArr2[k2]]!==false; }
+    var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=isNP(slugArr2[k2])?npVis():sel[slugArr2[k2]]!==false; }
     for(var i2=0;i2<d2.n;i2++){
       if(!vis2[IDX2[i2]]) continue;
       if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue;
@@ -1244,7 +1252,7 @@ function terrResults(){
     var d=S.pinData[st];
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
-    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
@@ -1609,16 +1617,17 @@ function setMinSrc(v){
   S.minSrc=v; syncSrcButtons();
   bump(); scheduleDraw(); updateStats(); writeUrl();
 }
+$('np-on').onchange=function(){ S.showNP=!!this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); };
 $('src-0').onclick=function(){ setMinSrc(0) }; $('src-1').onclick=function(){ setMinSrc(1) }; $('src-2').onclick=function(){ setMinSrc(2) };
 // v3.58 PREVIEW Relationship filter (owner 2026-09-23: "a toggle that said PEO or HRO/ASO", plus HR Only and Payroll Only).
 // Each pin carries sv (1266 client_service_bucket): what service THIS client gets from the company on its pin.
 // Vendor = public.vendor_service_model (falls back to entity_class). A vendor selling both PEO and ASO counts the client as
 // PEO only on filing-grade co-employment evidence; otherwise Unconfirmed. All chips on = the map exactly as before.
 var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares the employer role with the client and runs payroll, benefits and HR under its own plans.'},
-  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer.'},
+  2:{name:'HRO/ASO',card:'HR outsourcing, no co-employment',tip:'HR outsourcing without co-employment. The company runs payroll, HR and benefits admin; the client stays the only employer. Includes Paychex pooled 401(k) plan clients (grey pins).'},
   6:{name:'PEO & ASO',card:'company offers both PEO and ASO',tip:'Clients of companies confirmed to offer both PEO and ASO/HRO. They also show under PEO and under HRO/ASO.'},
   3:{name:'HR Only',card:'HR help, no payroll',tip:'HR help without payroll: HR consulting, benefits administration or a PEO/benefits broker.'},
-  4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software.'},
+  4:{name:'Payroll Only',card:'payroll processing',tip:'Payroll processing only: payroll bureaus and payroll software. Includes Florida clients whose own comp policy runs through ADP, Paychex or Paycor\'s insurance agency (grey pins).'},
   5:{name:'Staffing / other',card:'not an HR vendor for this client',tip:'Not an HR vendor for this client: staffing agencies, insurers and employer-of-record payrolling.'},
   0:{name:'Unconfirmed',card:'only a CRM record links it; company also sells payroll or isn\'t classified yet',tip:'Only our CRM record links this client, and the company mainly sells payroll or HR outsourcing (Paychex, CertiPay, Rippling) or is not classified yet, so we cannot tell which service the client uses.'}};
 var SVC_ORDER=['1','2','3','4','5','0'];   // owner 2026-09-23: no separate PEO & ASO chip
@@ -1773,14 +1782,14 @@ function openSharePanel(st){
   var d=S.pinData[st];
   if(!d||!d.n){ return openSharePanelServer(st); }
   var slugArr=(S.grain==='brand')?d.brds:d.fams, IDX=(S.grain==='brand')?d.bis:d.fis, cnt={}, tot=0;
-  for(var i=0;i<d.n;i++){ var sl=slugArr[IDX[i]]||'unattributed'; cnt[sl]=(cnt[sl]||0)+1; tot++; }
+  var npN=0; for(var i=0;i<d.n;i++){ var sl=slugArr[IDX[i]]||'unattributed'; if(isNP(sl)){ npN++; continue; } cnt[sl]=(cnt[sl]||0)+1; tot++; }
   var all=Object.keys(cnt).map(function(k){return [k,cnt[k]]}).sort(function(a,b){ if(a[0]==='unattributed') return 1; if(b[0]==='unattributed') return -1; return b[1]-a[1]; });
   var named=all.filter(function(x){return x[0]!=='unattributed'}), unc=cnt.unattributed||0;
   function row(x){ var un=x[0]==='unattributed', pct=tot?Math.round(1000*x[1]/tot)/10:0;
     return '<tr'+(un?' title="The PEO name on these clients is set aside until we confirm which company they are (their name matches more than one business)."':'')+'><td><span style="color:'+(un?OTHER:colorOf(x[0]))+'">●</span> '+(un?'<i>'+UNCONF+'</i>':esc(dispOf(x[0])))+'</td><td class="r">'+x[1].toLocaleString()+'</td><td class="r">'+(pct<0.1?'&lt;0.1':pct)+'%</td></tr>'; }
   var rows=named.slice(0,25).map(row).join('')+(named.length>25?'<tr><td colspan="3" class="r" style="text-align:left">+'+(named.length-25)+' more PEOs</td></tr>':'')+(unc?row(['unattributed',unc]):'');
   var p=$('sharepanel');
-  p.innerHTML='<div class="hd"><b>'+esc(STATE_NAMES[st]||st)+'</b> — market share <span style="color:var(--muted)">· '+tot.toLocaleString()+' clients on the map</span>'+
+  p.innerHTML='<div class="hd"><b>'+esc(STATE_NAMES[st]||st)+'</b> — market share <span style="color:var(--muted)">· '+tot.toLocaleString()+' clients on the map'+(npN?' · '+npN.toLocaleString()+' non-PEO vendor clients not counted':'')+'</span>'+
     '<button class="x" style="float:right;background:none;border:0;color:var(--muted);cursor:pointer" onclick="document.getElementById(\'sharepanel\').style.display=\'none\'">×</button></div>'+
     '<table>'+rows+'</table>';
   p.style.display='block';
@@ -1818,6 +1827,7 @@ function buildUrl(){
     if(S.hqLogos==='all') p.set('hl','all'); else if(!S.hqLogos) p.set('hl','0');   // v3.64: default = Top 25 HQ logos (owner 2026-09-23)
     if(S.msOnly) p.set('ms','1');
     if(S.minSrc) p.set('src',String(S.minSrc));
+    if(S.showNP===false) p.set('np','0');
     var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }); if(svo.length) p.set('svoff',svo.join(','));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.hist) p.set('hist', S.histOnly?'2':'1');
@@ -1836,6 +1846,7 @@ function readUrl(){
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
     if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
+    if(p.get('np')==='0'){ S.showNP=false; $('np-on').checked=false; }
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
     if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
     if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
@@ -1860,14 +1871,14 @@ function computeViewLegend(){
   var b=S.map.getBounds(); if(!b) return;
   var ne=b.getNorthEast(), sw=b.getSouthWest();
   var x1=mercX(sw.lng()), x2=mercX(ne.lng()), y1=mercY(ne.lat()), y2=mercY(sw.lat());
-  var sel=selMap(); var counts={}; var total=0;
+  var sel=selMap(); var counts={}; var total=0; var npView=0;
   for(var st in S.pinData){
     if(S.histOnly) break;
     if(S.states[st]===false) continue;
     var d=S.pinData[st];
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
-    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && d.detail && !d.detail.ms[i]) continue;
@@ -1879,7 +1890,7 @@ function computeViewLegend(){
       if(S.terr&&S.terr.area){ if(!inArea(S.terr.area, st, d, i)) continue; }
       else if(S.terr&&S.terr.rMerc>0){ var tdx=MX[i]-S.terr.cmx, tdy=MY[i]-S.terr.cmy;
                   if(tdx*tdx+tdy*tdy > S.terr.rMerc*S.terr.rMerc) continue; }
-      var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1; total++;
+      var sl=slugArr[IDX[i]]; if(isNP(sl)){ npView++; continue; } counts[sl]=(counts[sl]||0)+1; total++;
     }
   }
   var top=Object.keys(counts).map(function(s){return [s,counts[s]]}).sort(function(a,b2){return b2[1]-a[1]}).slice(0,8);
@@ -1902,6 +1913,7 @@ function computeViewLegend(){
     var whereName = S.terr ? (S.terr.area ? S.terr.area.label : 'the circle') : 'this view';
     $('vl-total').textContent=(total?total.toLocaleString()+' clients in ':'no clients in ')+whereName;
   }
+  if(npView>0){ $('vl-total').innerHTML+=' <span style="color:var(--muted);font-weight:500">· '+npView.toLocaleString()+' non-PEO vendor clients</span>'; }
   if(S.hist&&S.histData&&histN>0){ $('vl-total').innerHTML+=' <span style="color:var(--muted);font-weight:500">· '+histN.toLocaleString()+' former (historical)</span>'; }
   var host=$('viewlegend'); host.innerHTML='';
   top.forEach(function(t){
@@ -2014,7 +2026,7 @@ function stStats(st){
     if(S.states[s]===false&&s!==st) continue;
     var d=S.pinData[s], mine=(s===st), dd=d.detail;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
-    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && dd && !dd.ms[i]) continue;
@@ -2022,6 +2034,7 @@ function stStats(st){
       if(!svcOk(dd,i)) continue;
       if(!heatOk(d,i)) continue;
       if(!brandOk(d,i)) continue;
+      if(isNP(slugArr[IDX[i]])){ if(mine) o.np=(o.np||0)+1; continue; }
       if(S.states[s]!==false) o.nat++;
       if(!mine) continue;
       o.total++; var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1;
@@ -2220,7 +2233,7 @@ function tblSelect(){
     var d=S.pinData[st], dd=d.detail;
     var MX=(S.placement==='zip')?d.mxZ:d.mxA, MY=(S.placement==='zip')?d.myZ:d.myA;
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
-    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=sel[slugArr[k]]!==false;
+    var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
       if(S.msOnly && dd && !dd.ms[i]) continue;
