@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.66 (2026-09-24, owner: "users will use the employee count field as the first filter"): Employees filter - chips by the
+     Employee Count Brain's best number (1-9 ... 500+, No count yet); it culls pins, clusters, stats, the state card and the table
+     exactly like Relationship (it rides svcOk). URL eoff=. Card/table read level 6 = Estimated (peer model, 1279).
      v3.64 (2026-09-23, owner: "I only want the top 25 logos displayed as a default when the map loads - otherwise you
             can't see the map at all because it's clustered PEO logos"): Headquarters control is now Off / Top 25 / All,
             default Top 25 = the 25 largest PEOs on the map (by clients) that have a verified HQ + logo. URL hl=all|0.
@@ -456,6 +459,8 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
         <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Relationship" data-tip="What kind of service each client gets from the company on its pin.&#10;&#10;Click a chip to hide or show it. All on shows every pin.">Relationship <i>?</i></span> <span class="svcpv">Preview</span></h2>
         <div class="netchips" id="svc-chips"></div>
+        <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Employees" data-tip="Filter by employee count - the Employee Count Brain's best number for each client (the middle of its range).&#10;&#10;Click a chip to hide or show that size. No count yet = no number we can back up.">Employees <i>?</i></span></h2>
+        <div class="netchips" id="emp-chips"></div>
         <label class="chk" style="margin-top:6px" title="Payroll and HR-outsourcing clients of Paychex, ADP and Paycor that are NOT PEO clients (Paychex pooled 401(k) plan = HRO/ASO; Florida comp policies placed through the vendor's own insurance agency = Payroll Only). Grey pins; never counted as PEO market share. Untick to hide them all."><input type="checkbox" id="np-on" checked> Non-PEO vendor clients <span style="color:var(--muted)">(Paychex · ADP · Paycor)</span></label>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
@@ -532,7 +537,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'brand', placement:'address', msOnly:false, minSrc:0, svcOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
+  grain:'brand', placement:'address', msOnly:false, minSrc:0, svcOff:{}, empOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -1311,6 +1316,7 @@ function resetAll(){
   S.lens='peo'; try{ syncLensButtons(); renderLensLegend(); }catch(_){}
   S.minSrc=0; try{ syncSrcButtons(); }catch(_){}
   S.svcOff={}; try{ renderSvcChips(); }catch(_){}
+  S.empOff={}; try{ renderEmpChips(); }catch(_){}
   S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
   S.placement='address'; try{ syncPlacementButtons(); }catch(_){}
   setHistMode(0);
@@ -1632,7 +1638,14 @@ var SVC={1:{name:'PEO',card:'co-employment',tip:'Co-employment. The PEO shares t
   0:{name:'Unconfirmed',card:'only a CRM record links it; company also sells payroll or isn\'t classified yet',tip:'Only our CRM record links this client, and the company mainly sells payroll or HR outsourcing (Paychex, CertiPay, Rippling) or is not classified yet, so we cannot tell which service the client uses.'}};
 var SVC_ORDER=['1','2','3','4','5','0'];   // owner 2026-09-23: no separate PEO & ASO chip
 // 1269: a PEO & ASO pin (6) shows when PEO, HRO/ASO or PEO & ASO is on
-function svcOk(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) return !(S.svcOff[6]&&S.svcOff[1]&&S.svcOff[2]); return !S.svcOff[v]; }
+// v3.66 Employees filter rides every pass that already calls svcOk (pins, clusters, stats, state card, table)
+var EMP_BANDS=['1–9','10–19','20–49','50–99','100–249','250–499','500+','No count yet'];
+function empBand(v){ v=Number(v)||0; if(v<=0) return 7; if(v<10) return 0; if(v<20) return 1; if(v<50) return 2; if(v<100) return 3; if(v<250) return 4; if(v<500) return 5; return 6; }
+function empOk(dd,i){ for(var k in S.empOff){ if(S.empOff[k]){ if(!dd||!dd.hc) return true; return !S.empOff[empBand(dd.hc[i])]; } } return true; }
+function renderEmpChips(){ var box=$('emp-chips'); if(!box) return;
+  box.innerHTML=EMP_BANDS.map(function(t,k){ return '<span class="netchip'+(S.empOff[k]?'':' on')+'" data-eb="'+k+'" title="'+(k===7?'Clients with no employee number we can back up yet':'Clients whose best employee count is '+t)+'">'+t+'</span>'; }).join(''); }
+function svcOk(dd,i){ if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
+function svcOkRel(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) return !(S.svcOff[6]&&S.svcOff[1]&&S.svcOff[2]); return !S.svcOff[v]; }
 function renderSvcChips(){
   var box=$('svc-chips'); if(!box) return;
   var cnt={0:0,1:0,2:0,3:0,4:0,5:0,6:0}, have=false;
@@ -1660,6 +1673,10 @@ function svcTipBind(root){
 }
 (function(){ var h=document.querySelector('.svctipq'); if(h&&h.parentNode) svcTipBind(h.parentNode); })();
 renderSvcChips();
+(function(){ var qs=document.querySelectorAll('.svctipq'); for(var j=0;j<qs.length;j++) if(qs[j].parentNode) svcTipBind(qs[j].parentNode); })();
+renderEmpChips();
+$('emp-chips').addEventListener('click',function(e){ var el=e.target.closest?e.target.closest('[data-eb]'):null; if(!el) return; var k=el.dataset.eb; S.empOff[k]=!S.empOff[k]; if(!S.empOff[k]) delete S.empOff[k];
+  renderEmpChips(); bump(); scheduleDraw(); updateStats(); writeUrl(); });
 // ---- panel collapse (desktop hide / mobile drawer) ----
 function isMobile(){ return window.matchMedia('(max-width:760px)').matches; }
 function applyPanel(){
@@ -1696,7 +1713,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){retur
 function kv(k,v){ return '<div class="kv"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; }
 // 1215 Employee Count Brain: the card reads the brain's text/level + LinkedIn pass-through from the detail wave (hct/hcl/lie).
 function empOf(p){ try{ var d=S.pinData[p.state], dd=d&&d.detail; if(!dd||!dd.ids) return null; var i=dd.ids.indexOf(String(p.company_id)); if(i<0) return null; return {t:dd.hct?dd.hct[i]:null, l:dd.hcl?dd.hcl[i]:4, li:dd.lie?dd.lie[i]:null}; }catch(e){ return null; } }
-function empCard(p){ var e=empOf(p); if(!e) return '—'; var L=['','Confirmed','Likely','Indicated','Counting…','Under review']; if(e.t) return esc(e.t)+' <span class="mut">'+(L[e.l]||'')+'</span>'; return '<span class="mut">'+(L[e.l]||'—')+'</span>'; }
+function empCard(p){ var e=empOf(p); if(!e) return '—'; var L=['','Confirmed','Likely','Indicated','Counting…','Under review','Estimated']; if(e.t) return esc(e.t)+' <span class="mut">'+(L[e.l]||'')+'</span>'; return '<span class="mut">'+(L[e.l]||'—')+'</span>'; }
 // v3.22 SOURCING LAW (owner 2026-09-06): sourcing is proprietary and is NEVER displayed. The page shows a
 // confidence TIER only (cs = internal corroboration count, cx = internal conflict flag) — never source names,
 // never counts of sources, never raw basis strings. basisWord() reduces any basis text to a tier word.
@@ -1829,6 +1846,7 @@ function buildUrl(){
     if(S.minSrc) p.set('src',String(S.minSrc));
     if(S.showNP===false) p.set('np','0');
     var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }); if(svo.length) p.set('svoff',svo.join(','));
+    var eo=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(eo.length) p.set('eoff',eo.join(','));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
     if(S.hist) p.set('hist', S.histOnly?'2':'1');
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
@@ -1849,6 +1867,7 @@ function readUrl(){
     if(p.get('np')==='0'){ S.showNP=false; $('np-on').checked=false; }
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
     if(p.get('svoff')){ p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }
+    if(p.get('eoff')){ p.get('eoff').split(',').forEach(function(k){ if(/^[0-7]$/.test(k)) S.empOff[k]=true; }); try{ renderEmpChips(); }catch(_){} }
     if(p.get('b')==='1'){ S.beaconsOn=true; $('beacons-on').checked=true; }
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
@@ -2409,6 +2428,7 @@ function tblPaintInner(){
   if(renLens()) bits.push('renewal heat on');
   if(S.minSrc) bits.push(S.minSrc>=2?'cross-verified only':'verified only');
   var svh=SVC_ORDER.filter(function(k){ return S.svcOff[k]; }); if(svh.length) bits.push('hiding '+svh.map(function(k){ return SVC[k].name; }).join(', '));
+  var emh=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(emh.length) bits.push('hiding employees '+emh.map(function(k){ return EMP_BANDS[k]; }).join(', '));
   if(S.msOnly) bits.push('multi-state only');
   if(S.hist) bits.push('current users only (former records are on the map, not here)');
   $('tbl-what').textContent='· '+bits.join(' · ')+' · ignores pan and zoom';
@@ -2446,7 +2466,7 @@ function tblPaintInner(){
     var city=dd?String(dd.cities[i]||''):'';
     var zip=(dd&&dd.z5)?String(dd.z5[i]||''):'';
     var loc=(city?city+', ':'')+st+(zip?' '+zip:'');
-    var hc=(dd&&dd.hct&&dd.hct[i])?esc(dd.hct[i])+((dd.hcl&&dd.hcl[i]>1)?' <span class="mut">'+(['','','Likely','Indicated'][dd.hcl[i]]||'')+'</span>':''):'<span class="mut">'+((dd&&dd.hcl&&dd.hcl[i]===5)?'Under review':'Counting…')+'</span>';
+    var hc=(dd&&dd.hct&&dd.hct[i])?esc(dd.hct[i])+((dd.hcl&&dd.hcl[i]>1)?' <span class="mut">'+(['','','Likely','Indicated','','','Estimated'][dd.hcl[i]]||'')+'</span>':''):'<span class="mut">'+((dd&&dd.hcl&&dd.hcl[i]===5)?'Under review':'Counting…')+'</span>';
     var since=(dd&&dd.pcs&&dd.pcs[i])?(esc(String(dd.pcs[i]))+'<span class="tier">'+esc(RMB_LABELS[(dd.pcsb?dd.pcsb[i]:0)]||'unverified')+'</span>'):'<span class="mut">—</span>';
     out.push('<tr data-st="'+esc(st)+'" data-i="'+i+'" data-slug="'+esc(slug)+'" title="Open this company">'+
       '<td class="nm">'+esc(nm)+'</td>'+
