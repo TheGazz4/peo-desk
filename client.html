@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Client Lifecycle</title>
 <!--
-  CLIENT LIFECYCLE surface v1.1 (3074 PEO news, 2026-09-24: PEO facts pushed down to clients - story paragraph, Key moments
-  'PEO news', diamond markers on the timeline lane; lanes named as of the client's first dated start).
-  v1.0 (Instance A, 2026-09-22). Mounted by the platform shell (index.html) as route
+  CLIENT LIFECYCLE surface v1.0 (Instance A, 2026-09-22). Mounted by the platform shell (index.html) as route
   #/client  (deep link: #/client?id=<company uuid>). Owner ruling Gazz 2026-09-22: the NARRATIVE is the first and
   most important section — the lifecycle story of the group.
   Data: dash-ai mode 'sql' (read-only, desk key) calling
@@ -17,6 +15,9 @@
   server calculation; this page never counts PEOs itself. Sourcing law: no source is ever named.
   Which records link here: DEFERRED by owner until this layout is signed off.
   Publish door: desk_assets('client.html') -> desk_asset_commit('client.html', ...)
+  v1.1 (2026-09-25, instanceA 1313): "The telling" (AI-written from the history ledger only, shown only when verified
+  against the record - ai_writer_locked_ledger_law) and "History" (company_history_ledger: every dated fact with its
+  shape - Event / Stretch / On record - and its MEASURED impact - measured_impact_law).
 -->
 <style>
   :root {
@@ -114,12 +115,14 @@
     padding: 0 10px 8px 0; border-bottom: 1px solid var(--baseline); }
   .moments td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
   .moments td.d { font: 13px var(--mono); color: var(--ink-2); white-space: nowrap; }
+  .cite { font: 11px var(--mono); color: var(--ink-muted); margin-left: 4px; }
+  .kind.observed { opacity: .75; } .kind.period { color: var(--accent); }
+  #tellBtn { font: 500 13px var(--sans); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-1); cursor: pointer; }
   .kind { display: inline-block; font: 500 10px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em;
     padding: 3px 6px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; background: var(--surface-2); color: var(--ink-2); }
   .kind.joined { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
   .kind.left { background: color-mix(in srgb, var(--serious) 18%, transparent); color: var(--serious); }
   .kind.overlap { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
-  .kind.peo_news { background: var(--accent-soft); color: var(--accent); }
   dl.facts { margin: 0; display: grid; grid-template-columns: max-content 1fr; font-size: 14px; }
   .facts dt, .facts dd { padding: 8px 0; border-bottom: 1px solid var(--grid); margin: 0; }
   .facts dt { color: var(--ink-muted); padding-right: 18px; font-size: 13px; }
@@ -178,6 +181,7 @@
   <div id="rec" class="hidden">
     <div class="id" id="id"></div>
     <article class="story" id="story"></article>
+    <article class="story" id="telling"></article>
     <section class="block">
       <h3>Lifecycle timeline <small>Each PEO relationship · shaded where more than one ran at once</small></h3>
       <div class="tl"><svg id="tl" viewBox="0 0 900 200" role="img" aria-label="PEO relationship timeline"></svg>
@@ -187,7 +191,6 @@
           <span><i style="width:18px;height:8px;border:1px dashed var(--ink-2);border-radius:2px"></i>Current term, not yet run</span>
           <span><i style="width:12px;height:10px;background:var(--overlap)"></i>More than one PEO at once</span>
           <span><i style="width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:7px solid var(--ink-2)"></i>Started at least this early</span>
-          <span><i style="width:9px;height:9px;background:var(--accent);transform:rotate(45deg);border-radius:1px"></i>News at the PEO while a client</span>
           <span><i style="width:2px;height:12px;background:var(--accent)"></i>Today</span>
         </div>
       </div>
@@ -198,7 +201,9 @@
         <div style="overflow-x:auto"><table class="moments" id="moments"></table></div>
       </section>
       <section class="block">
-        <h3>Renewal clock</h3>
+        <h3>History <small>Every dated fact, oldest first · Event happened then · Stretch ran then · On record = true when we looked</small></h3>
+        <div style="overflow-x:auto"><table class="moments" id="history"></table></div>
+        <h3 style="margin-top:12px">Renewal clock</h3>
         <dl class="facts" id="renew"></dl>
         <h3 style="margin-top:12px">Company</h3>
         <dl class="facts" id="facts"></dl>
@@ -343,7 +348,6 @@
     return MON[+a[1] - 1] + " " + (+a[2]) + ", " + a[0];
   }
   var PEO_NAMES = {};   /* 1284: record's peo_names map - used when there is no dated relationship to name the PEO */
-  var PEO_LANE = {};    /* 3074: lane label = the PEO's name as of this client's first dated start (e.g. Lyons HR, not Resourcing Edge) */
   function peoName(rels, slug) { for (var i = 0; i < rels.length; i++) if (rels[i].peo === slug) return rels[i].peo_display; return PEO_NAMES[slug] || slug; }
   function heat(m) { return m <= 4 ? "green" : m <= 6 ? "yellow" : "red"; }
 
@@ -352,9 +356,8 @@
     var co = j.company || {}, st = j.status || {}, story = j.story || {}, conc = j.concurrency || {}, colors = j.peo_colors || {};
     var rels = conc.relationships || [];
     PEO_NAMES = j.peo_names || {};
-    PEO_LANE = j.peo_lane_names || {};
     var hold = !!j.hold;   /* story_fact_agreement_law: story and facts disagree -> show neither */
-    ["tl", "moments"].forEach(function (k) { var s = $(k) && $(k).closest("section"); if (s) s.classList.toggle("hidden", hold); });
+    ["tl", "moments", "telling"].forEach(function (k) { var s = $(k) && $(k).closest("section"); if (s) s.classList.toggle("hidden", hold); });
     $("empty").classList.add("hidden"); $("rec").classList.remove("hidden");
     document.title = "PEO Engine — " + (co.name || "Client Lifecycle");
 
@@ -390,11 +393,45 @@
     }
     $("story").innerHTML = sh;
 
-    drawTimeline(conc, colors, hold ? [] : (story.peo_news || []));
+    /* 1313: the telling — AI-written from the history ledger only, shown only when verified against the record */
+    var ai = story.ai_story || {};
+    var th = '<div class="eyebrow">The telling</div>';
+    if (hold) th += '<p class="withheld">Held back with the story until the record agrees with itself.</p>';
+    else if (ai.status === "verified") {
+      th += '<h3>' + esc(ai.headline) + '</h3><div class="prose">' + (ai.paragraphs || []).map(function (p) {
+        return '<p>' + esc(p.text).replace(/\[(f[0-9a-f]+(?:,\s*f[0-9a-f]+)*)\]/g, '<small class="cite">$1</small>') + '</p>'; }).join("") + '</div>' +
+        '<div class="dates"><span>Written from <b>' + esc(ai.facts_used) + ' facts</b> on ' + esc(fmt(ai.written_on)) + '</span></div>';
+    } else if (ai.status === "pending") th += '<p class="withheld">Being written — reload in about a minute.</p>';
+    else if (ai.status === "contested") th += '<p class="withheld">A draft was written but did not match the facts, so it is not shown.</p> <button id="tellBtn" type="button">Write it again</button>';
+    else if (ai.status === "stale") th += '<p class="withheld">The facts changed since the telling was written.</p> <button id="tellBtn" type="button">Write it again</button>';
+    else th += '<p class="withheld">No telling written yet.</p> <button id="tellBtn" type="button">Write it</button>';
+    $("telling").innerHTML = th;
+    var tb = $("tellBtn");
+    if (tb) tb.onclick = function () {
+      tb.disabled = true; setStatus("Requesting the telling…");
+      sql("select public.client_story_ai_request('" + current + "'::uuid) as r", "story telling request", 45000)
+        .then(function (res) { var r = res.rows && res.rows[0] && res.rows[0].r;
+          setStatus(r && r.status === "pending" ? "Being written — reload in about a minute." : ("Not written: " + ((r && r.why) || (r && r.status) || "unknown"))); })
+        .catch(function (e) { setStatus("Could not request: " + e.message, true); tb.disabled = false; });
+    };
+
+    /* 1309/1311: history — the ledger, with measured impact */
+    var hl = hold ? [] : (story.ledger || []);
+    $("history").innerHTML = '<thead><tr><th>When</th><th>What</th><th>Measured</th></tr></thead><tbody>' + (hl.length ? hl.map(function (f) {
+      var im = f.impact || {}, ms = [];
+      if (im.headcount_change_pct != null) ms.push("Headcount " + im.headcount_before + " → " + im.headcount_after + " (" + (im.headcount_change_pct > 0 ? "+" : "") + im.headcount_change_pct + "%)");
+      if (im.tenure_vs_peo) ms.push("Tenure " + im.tenure_vs_peo + (im.tenure_days != null ? " (" + Math.round(im.tenure_days / 30.44) + " months)" : ""));
+      if (im.days_to_leave != null) ms.push("Left " + im.days_to_leave + " days later");
+      if (im.peo_event_verdict) ms.push(im.peo_event_verdict);
+      var sh2 = f.shape === "observed" ? "On record" : f.shape === "period" ? "Stretch" : "Event";
+      return '<tr><td class="d">' + esc(f.when) + '</td><td><span class="kind ' + esc(f.shape) + '">' + sh2 + '</span>' + esc(f.text) + '</td><td>' + esc(ms.join(" · ")) + '</td></tr>';
+    }).join("") : '<tr><td colspan="3" class="gap">No dated facts on the ledger yet.</td></tr>') + '</tbody>';
+
+    drawTimeline(conc, colors);
 
     /* key moments */
     var mm = story.moments || [];
-    var lab = { joined: "Joined", left: "Left", renewed: "Renewed", overlap: "At once", on_record: "On record", last_seen: "Last seen", company: "Company", peo_news: "PEO news" };
+    var lab = { joined: "Joined", left: "Left", renewed: "Renewed", overlap: "At once", on_record: "On record", last_seen: "Last seen", company: "Company" };
     $("moments").innerHTML = '<thead><tr><th>When</th><th>What happened</th></tr></thead><tbody>' + (mm.length ? mm.map(function (m) {
       var g = m.grain === "floor" ? "month" : m.grain;
       return '<tr><td class="d">' + (m.at_least ? "≤ " : "") + (m.by ? "by " : "") + esc(fmt(m.date, g)) + '</td><td><span class="kind ' + esc(m.kind) + '">' +
@@ -452,7 +489,7 @@
 
   /* ---------- timeline: bars from the periods, shading and counts from the server stretches ---------- */
   function el(n, a, txt) { var e = document.createElementNS("http://www.w3.org/2000/svg", n); for (var k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; }
-  function drawTimeline(conc, colors, news) {
+  function drawTimeline(conc, colors) {
     var svg = $("tl"); svg.innerHTML = "";
     var rels = conc.relationships || [], strs = conc.stretches || [];
     var lanes = []; rels.forEach(function (r) { if (lanes.indexOf(r.peo) < 0) lanes.push(r.peo); });
@@ -486,7 +523,7 @@
     });
     lanes.forEach(function (peo, i) {
       var cy = top + i * laneH + laneH / 2, col = colors[peo] || "#8a8a85", bh = 14;
-      var name = PEO_LANE[peo] || peoName(rels, peo);
+      var name = peoName(rels, peo);
       svg.appendChild(el("text", { x: 8, y: cy + 4, fill: ink1, "font-size": 12.5, "font-weight": 600 }, name.length > 19 ? name.slice(0, 18) + "…" : name));
       rels.filter(function (r) { return r.peo === peo; }).forEach(function (r) {
         var a = x(r.from), b = x(r.to), t = x(TODAY);
@@ -499,16 +536,6 @@
         if (b > t) svg.appendChild(el("rect", { x: Math.max(a, t), y: cy - bh / 2 + .5, width: b - Math.max(a, t), height: bh - 1, rx: 3, fill: col, "fill-opacity": 0.16, stroke: col, "stroke-dasharray": "4 3" }));
         if (r.left_censored) svg.appendChild(el("path", { d: "M" + (a - 2) + " " + (cy - 7) + " L" + (a - 10) + " " + cy + " L" + (a - 2) + " " + (cy + 7) + " Z", fill: ink2 }));
       });
-    });
-    /* 3074: PEO news markers - only facts the push-down engine proved reached this client */
-    (news || []).forEach(function (n) {
-      var li = lanes.indexOf(n.peo); if (li < 0 || !n.date) return;
-      var cy = top + li * laneH + laneH / 2, nx = x(n.date);
-      if (nx < L || nx > R) return;
-      var g = el("g", {});
-      g.appendChild(el("path", { d: "M" + nx + " " + (cy - 12) + " L" + (nx + 6) + " " + (cy - 6) + " L" + nx + " " + cy + " L" + (nx - 6) + " " + (cy - 6) + " Z", fill: accent, stroke: surface, "stroke-width": 1.5 }));
-      g.appendChild(el("title", {}, fmt(n.date, n.grain === "year" ? "year" : n.grain === "month" ? "month" : "day") + " - " + n.text));
-      svg.appendChild(g);
     });
     var tx = x(TODAY);
     svg.appendChild(el("line", { x1: tx, x2: tx, y1: 18, y2: h - 20, stroke: accent, "stroke-width": 2 }));
