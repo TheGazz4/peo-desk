@@ -400,7 +400,8 @@
     else if (ai.status === "verified") {
       th += '<h3>' + esc(ai.headline) + '</h3><div class="prose">' + (ai.paragraphs || []).map(function (p) {
         return '<p>' + esc(p.text).replace(/\[(f[0-9a-f]+(?:,\s*f[0-9a-f]+)*)\]/g, '<small class="cite">$1</small>') + '</p>'; }).join("") + '</div>' +
-        '<div class="dates"><span>Written from <b>' + esc(ai.facts_used) + ' facts</b> on ' + esc(fmt(ai.written_on)) + '</span></div>';
+        '<div class="dates"><span>Written from <b>' + esc(ai.facts_used) + ' facts</b> on ' + esc(fmt(ai.written_on)) + (ai.model === "rules" ? " by the rules teller" : "") + '</span></div>' +
+        (ai.model === "rules" && !ai.ai_pending ? ' <button id="tellBtn" type="button">Rewrite with AI</button>' : (ai.ai_pending ? '<p class="withheld">AI rewrite being written — reload in about a minute.</p>' : ''));
     } else if (ai.status === "pending") th += '<p class="withheld">Being written — reload in about a minute.</p>';
     else if (ai.status === "contested") th += '<p class="withheld">A draft was written but did not match the facts, so it is not shown.</p> <button id="tellBtn" type="button">Write it again</button>';
     else if (ai.status === "stale") th += '<p class="withheld">The facts changed since the telling was written.</p> <button id="tellBtn" type="button">Write it again</button>';
