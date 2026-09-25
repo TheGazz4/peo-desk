@@ -619,7 +619,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_actions","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_actions","desk_ruling_recheck","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -2105,6 +2105,7 @@ setInterval(poll, POLL_MS);
     var sec = document.getElementById("decisionDesk") || (document.getElementById("tblDecisions") || {}).closest && document.getElementById("tblDecisions").closest("section");
     if (!sec) return;
     var rows = (d && d.desk_decision_actions && d.desk_decision_actions.rows) || null;
+    var rc = (d && d.desk_ruling_recheck && d.desk_ruling_recheck.rows && d.desk_ruling_recheck.rows[0]) || null;
     if (!rows) return;
     var box = document.getElementById("ddV2");
     if (!box) {
@@ -2115,7 +2116,7 @@ setInterval(poll, POLL_MS);
     }
     var tbl2 = document.getElementById("tblDecisions"); if (tbl2) (tbl2.closest(".tw-scroll") || tbl2).style.display = "none";
     var sum = document.getElementById("decSummary"); if (sum) sum.style.display = "none";
-    var sig = JSON.stringify(rows.map(function (r) { return [r.id, r.bucket, r.suggestion, r.effective_at, r.waiting_hours]; }));
+    var sig = JSON.stringify(rows.map(function (r) { return [r.id, r.bucket, r.suggestion, r.effective_at, r.waiting_hours]; })) + JSON.stringify(rc);
     if (sig === lastSig) return;
     if (box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;   /* never wipe a note being typed */
     lastSig = sig;
@@ -2133,7 +2134,10 @@ setInterval(poll, POLL_MS);
     var marks = by.needs_you.map(function () { return '<span class="chip critical" style="display:none"></span>'; }).join("") +
                 by.blocked.map(function () { return '<span class="chip serious" style="display:none"></span>'; }).join("");
     var html = '<div class="dd-sum">' + chips + '<span class="meta">' + E((b.decided_without_gazz_pct != null ? b.decided_without_gazz_pct + "% decided without you · " : "") +
-      "judge " + (ago(b.judge_last_at) || "never") + " · executor " + (ago(b.executor_last_at) || "never")) + "</span>" + marks + "</div>";
+      "judge " + (ago(b.judge_last_at) || "never") + " · executor " + (ago(b.executor_last_at) || "never")) + "</span>" +
+      (rc ? '<span class="meta" style="flex-basis:100%;margin-left:0' + ((Number(rc.came_undone) || Number(rc.test_broken)) ? ';color:var(--critical)' : '') + '" title="Every applied fix is re-tested against live data every day. A fix that fails twice in a row goes back on this desk as a new item.">' +
+        E("Fixes re-checked daily: " + rc.holding + " of " + rc.fixes_tested + " still holding" + (Number(rc.came_undone) ? " · " + rc.came_undone + " came undone" : "") + (Number(rc.test_broken) ? " · " + rc.test_broken + " test broken" : "") + (Number(rc.not_yet_checked) ? " · " + rc.not_yet_checked + " not checked yet" : "") + (Number(rc.regressions_on_desk) ? " · " + rc.regressions_on_desk + " back on the desk" : "") + " · last check " + (ago(rc.last_check_at) || "never")) + "</span>" : "") +
+      marks + "</div>";
     GROUPS.forEach(function (g) {
       var list = by[g[0]]; if (!list.length) return;
       if (g[0] === "queued" || g[0] === "applied" || g[0] === "snoozed") {
