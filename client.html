@@ -15,6 +15,8 @@
   server calculation; this page never counts PEOs itself. Sourcing law: no source is ever named.
   Which records link here: DEFERRED by owner until this layout is signed off.
   Publish door: desk_assets('client.html') -> desk_asset_commit('client.html', ...)
+  v1.2 (2026-09-25, instanceA 1329): ONE builder - client_lifecycle_story's headline/paragraphs are the narrative engine's
+  output (story.writer = rules | AI model); no separate telling section. Optional "Rewrite with AI" button.
   v1.1 (2026-09-25, instanceA 1313): "The telling" (AI-written from the history ledger only, shown only when verified
   against the record - ai_writer_locked_ledger_law) and "History" (company_history_ledger: every dated fact with its
   shape - Event / Stretch / On record - and its MEASURED impact - measured_impact_law).
@@ -181,7 +183,7 @@
   <div id="rec" class="hidden">
     <div class="id" id="id"></div>
     <article class="story" id="story"></article>
-    <article class="story" id="telling"></article>
+    <div id="telling"></div>
     <section class="block">
       <h3>Lifecycle timeline <small>Each PEO relationship · shaded where more than one ran at once</small></h3>
       <div class="tl"><svg id="tl" viewBox="0 0 900 200" role="img" aria-label="PEO relationship timeline"></svg>
@@ -357,7 +359,7 @@
     var rels = conc.relationships || [];
     PEO_NAMES = j.peo_names || {};
     var hold = !!j.hold;   /* story_fact_agreement_law: story and facts disagree -> show neither */
-    ["tl", "moments", "telling"].forEach(function (k) { var s = $(k) && $(k).closest("section"); if (s) s.classList.toggle("hidden", hold); });
+    ["tl", "moments"].forEach(function (k) { var s = $(k) && $(k).closest("section"); if (s) s.classList.toggle("hidden", hold); });
     $("empty").classList.add("hidden"); $("rec").classList.remove("hidden");
     document.title = "PEO Engine — " + (co.name || "Client Lifecycle");
 
@@ -393,19 +395,14 @@
     }
     $("story").innerHTML = sh;
 
-    /* 1313: the telling — AI-written from the history ledger only, shown only when verified against the record */
+    /* 1329: one builder. The story above IS the narrative engine's output (story.writer = rules | sonnet). AI rewrite is optional. */
     var ai = story.ai_story || {};
-    var th = '<div class="eyebrow">The telling</div>';
-    if (hold) th += '<p class="withheld">Held back with the story until the record agrees with itself.</p>';
-    else if (ai.status === "verified") {
-      th += '<h3>' + esc(ai.headline) + '</h3><div class="prose">' + (ai.paragraphs || []).map(function (p) {
-        return '<p>' + esc(p.text).replace(/\[(f[0-9a-f]+(?:,\s*f[0-9a-f]+)*)\]/g, '<small class="cite">$1</small>') + '</p>'; }).join("") + '</div>' +
-        '<div class="dates"><span>Written from <b>' + esc(ai.facts_used) + ' facts</b> on ' + esc(fmt(ai.written_on)) + (ai.model === "rules" ? " by the rules teller" : "") + '</span></div>' +
-        (ai.model === "rules" && !ai.ai_pending ? ' <button id="tellBtn" type="button">Rewrite with AI</button>' : (ai.ai_pending ? '<p class="withheld">AI rewrite being written — reload in about a minute.</p>' : ''));
-    } else if (ai.status === "pending") th += '<p class="withheld">Being written — reload in about a minute.</p>';
-    else if (ai.status === "contested") th += '<p class="withheld">A draft was written but did not match the facts, so it is not shown.</p> <button id="tellBtn" type="button">Write it again</button>';
-    else if (ai.status === "stale") th += '<p class="withheld">The facts changed since the telling was written.</p> <button id="tellBtn" type="button">Write it again</button>';
-    else th += '<p class="withheld">No telling written yet.</p> <button id="tellBtn" type="button">Write it</button>';
+    var th = '';
+    if (!hold && story.writer && story.writer !== 'legacy') {
+      th = '<div class="dates"><span>Written from <b>' + esc(story.facts_used || 0) + ' facts</b>' + (story.writer === 'rules' ? '' : ' by AI') + '</span>' +
+           (story.writer === 'rules' && !ai.ai_pending ? ' <button id="tellBtn" type="button">Rewrite with AI</button>' : '') +
+           (ai.ai_pending ? ' <span>AI rewrite being written — reload in about a minute.</span>' : '') + '</div>';
+    }
     $("telling").innerHTML = th;
     var tb = $("tellBtn");
     if (tb) tb.onclick = function () {
