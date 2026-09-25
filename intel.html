@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
-  INDUSTRY INTEL surface v1.3 (2026-09-23: employees-per-client card restored with calculation + honest ranks; mig 2153). v1.2 (2026-09-23: column-aligned tables, share-price tile, count-coverage note, contradiction guard; mig 2150/2151). v1.1 (2026-09-23: tabs PEO PROFILE | INDUSTRY INTEL; size rank, market share on the 2026 industry count, book coverage, filed-facts-first outlook; mig 2148/2149). v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
+  INDUSTRY INTEL surface v1.4 (2026-09-24, instanceA mig 1314-1321: 5500 FILING CALENDAR - every Benefits and Retirement 5500 plan year on each PEO profile with a Next expected filing, plus the all-PEO Upcoming 5500 filings panel; data: peo_5500_calendar_for_peo(slug), peo_5500_upcoming(days, kind, staff, overdue)). v1.3 (2026-09-23: employees-per-client card restored with calculation + honest ranks; mig 2153). v1.2 (2026-09-23: column-aligned tables, share-price tile, count-coverage note, contradiction guard; mig 2150/2151). v1.1 (2026-09-23: tabs PEO PROFILE | INDUSTRY INTEL; size rank, market share on the 2026 industry count, book coverage, filed-facts-first outlook; mig 2148/2149). v1.0 (Instance B, 2026-09-16). Mounted by the platform shell (index.html) as route #/intel.
   Pick a PEO from the dropdown -> Industry Intel panel (size, market share, size-group yardsticks, model, checks,
   12-month outlook, open flags) + the full PEO profile (template v1).
   Data: dash-ai mode 'sql' (read-only, desk key) calling
@@ -157,6 +157,28 @@
   #overlay .err { color: var(--critical); font-size: 12px; min-height: 16px; margin-top: 8px; }
   .hidden { display: none !important; }
 
+  /* 1315: 5500 filing calendar */
+  .f55 { margin: 14px 0; }
+  .f55 .kindh { font-size: 13px; font-weight: 700; margin: 12px 0 6px; color: var(--ink-1); text-transform: none; letter-spacing: 0; }
+  .f55 .plan { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 8px 0; background: var(--page); }
+  .f55 .plan.dim { opacity: .75; }
+  .f55 .ph { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+  .f55 .ph b { font-size: 14px; }
+  .f55 .ph .mut, .f55 .mut { color: var(--ink-muted); font-size: 12px; }
+  .f55 .next { margin: 8px 0 6px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--series-1) 9%, transparent); border: 1px solid color-mix(in srgb, var(--series-1) 30%, transparent); font-size: 13px; }
+  .f55 .next .big2 { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .f55 details summary { cursor: pointer; font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  .f55 table td, .f55 table th { font-size: 12.5px; white-space: nowrap; }
+  .chip.muted2 { opacity: .7; }
+  .upbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 4px 0 12px; font-size: 13px; }
+  .upbar select, .upbar input[type=search] { font-size: 13px; }
+  #upTbl td { white-space: nowrap; }
+  #upTbl td.pl { white-space: normal; min-width: 220px; }
+  #upTbl td.pe { white-space: normal; min-width: 150px; max-width: 240px; }
+  #upTbl a { text-decoration: none; }
+  #upTbl a:hover { text-decoration: underline; }
+  button.hdrbtn { font-weight: 600; }
+
   @media (max-width: 720px) {
     header { padding: 10px 12px; }
     main { padding: 12px; }
@@ -182,12 +204,13 @@
     <input id="q" type="search" placeholder="Type to filter PEOs…" autocomplete="off">
     <select id="peo" aria-label="Choose a PEO"><option value="">Loading PEOs…</option></select>
     <label class="chk"><input id="onlyEst" type="checkbox"> only PEOs with a size estimate</label>
+    <button id="upBtn" class="hdrbtn" type="button" title="Every PEO 5500 filing coming up, across the whole database">Upcoming 5500 filings</button>
   </div>
   <span id="status"></span>
 </header>
 
 <main id="main">
-  <div class="empty">Choose a PEO from the dropdown to see its Industry Intel and full profile.</div>
+  <div class="empty">Choose a PEO from the dropdown to see its Industry Intel and full profile, or open Upcoming 5500 filings.</div>
 </main>
 
 <script>
@@ -306,8 +329,10 @@
         ALL.sort(function (a, b) { return String(a.peo_name).toLowerCase().localeCompare(String(b.peo_name).toLowerCase()) || String(a.family_slug).localeCompare(String(b.family_slug)); });
         drawOptions();
         setStatus(ALL.length.toLocaleString() + " PEOs · same list as the map filter");
+        if (location.hash === "#upcoming") { showUpcoming(); return; }
         var want = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1] || sget("intel_last_peo");
         if (want) { if (ALL.some(function (r) { return r.family_slug === want; })) $("peo").value = want; open(want); }
+        else showUpcoming();
       })
       .catch(function (e) { if (String(e.message) !== "unauthorized") setStatus("could not load PEOs: " + e.message, true); });
   }
@@ -334,6 +359,7 @@
   $("peo").addEventListener("change", function () { if (this.value) open(this.value); });
   // 1283: in-page links (#peo=slug) - "Also filed as" members and "shown on the map as" parents
   window.addEventListener("hashchange", function () {
+    if (location.hash === "#upcoming") { showUpcoming(); return; }
     var s = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1];
     if (s && s !== current) { if (ALL.some(function (r) { return r.family_slug === s; })) $("peo").value = s; open(s); }
   });
@@ -355,6 +381,7 @@
       "</div>" +
       '<div id="tab-profile"><div id="profFacts"><div class="empty">Loading…</div></div>' +
         '<section class="linesec" id="profLines"><h3>What this PEO offers</h3><div class="empty">Loading…</div></section>' +
+        '<section class="f55" id="prof5500"><h3>5500 filings</h3><div class="empty">Loading…</div></section>' +
         '<section class="evsec" id="profEvents"><h3>Acquisitions &amp; major events</h3><div class="empty">Loading…</div></section>' +
         '<div id="profText"><div class="empty">Loading the full profile… (large PEOs take up to 15 seconds)</div></div></div>' +
       '<div id="tab-intel" class="hidden"><div class="empty">Loading Industry Intel…</div></div>';
@@ -366,6 +393,7 @@
     drawDirLinks(slug, row, tok);
     drawEvents(slug, tok);
     drawLines(slug, tok);
+    drawF5500(slug, tok);
 
     sql("select industry_intel_for_peo('" + slug + "') || jsonb_build_object('precision', peo_precision_for_peo('" + slug + "')) as j", "industry intel panel", 45000)
       .then(function (res) { if (tok !== loadToken) return; renderIntel((res.rows && res.rows[0] && res.rows[0].j) || {}); setStatus(""); })
@@ -777,6 +805,130 @@
     }
     return out.join("\n");
   }
+
+  /* ---------- 1315: 5500 filing calendar on every PEO profile ----------
+     Reads peo_5500_calendar_for_peo(slug): every Benefits (plan 500+) and Retirement (plan 001-499) Form 5500 plan
+     year on this PEO's sponsor EINs (members included), first-filed date, deadline / extended deadline, filed
+     by-deadline / on-extension / late, and the NEXT expected filing from the PEO's own habit. */
+  var F55_TIMING = { by_deadline: ["By deadline", "strong"], on_extension: ["On extension", "good"], late: ["Late", "weak"],
+                     late_unconfirmed: ["After extended deadline (may be a correction)", "fair"], original_not_seen: ["Only the correction is on file", "fair"] };
+  var F55_STATUS = { upcoming: ["Upcoming", "good"], awaiting_dol_data: ["Deadline passed, waiting on DOL data", "fair"], overdue: ["Overdue", "weak"],
+                     went_quiet: ["Went quiet", "muted2"], plan_ended: ["Plan ended", "muted2"] };
+  var F55_HABIT = { files_by_deadline: "Files by the deadline", files_on_extension: "Files on the extension", mixed: "Mixed", often_late: "Often late", no_history: "No history yet" };
+  var F55_HABIT_SHORT = { files_by_deadline: "By deadline", files_on_extension: "On extension", mixed: "Mixed", often_late: "Often late", no_history: "New" };
+  function f55pred(d) { if (!d) return "—"; var t = new Date(String(d).slice(0, 10) + "T00:00:00"); var today = new Date(); today.setHours(0, 0, 0, 0); return dateFmt(d) + (t < today ? ' <span class="muted" title="The predicted date has passed; nothing in DOL data yet">(passed)</span>' : ""); }
+  var F55_ROLE = { client_plan: "Clients’ plan", peo_own_staff: "PEO’s own staff", peo_own_staff_likely: "Likely the PEO’s own staff" };
+  function f55chip(map, k) { var m = map[k] || [k || "—", ""]; return '<span class="chip ' + esc(m[1]) + '">' + esc(m[0]) + "</span>"; }
+  function f55plan(r) {
+    var dim = r.plan_role !== "client_plan" || r.status === "went_quiet" || r.status === "plan_ended";
+    var h = '<div class="plan' + (dim ? " dim" : "") + '"><div class="ph"><b>' + esc(r.plan_name || "—") + "</b>" +
+      '<span class="mut">' + esc(r.plan_type || "") + " · " + esc(F55_ROLE[r.plan_role] || r.plan_role || "") +
+      (r.participants != null ? " · " + n0(r.participants) + " participants" : "") + (r.filed_as ? " · filed as " + esc(r.filed_as) : "") + "</span></div>";
+    if (r.status === "plan_ended") {
+      h += '<div class="next">' + f55chip(F55_STATUS, r.status) + ' <span class="mut">' + esc(r.status_basis || "") + "</span></div>";
+    } else {
+      h += '<div class="next"><div>Next expected: <span class="big2">' + dateFmt(r.expected_by) + "</span> " + f55chip(F55_STATUS, r.status) + "</div>" +
+        '<div class="mut">Plan year ending ' + dateFmt(r.next_plan_year_end) + " · deadline " + dateFmt(r.due_original) + " · extended (Form 5558) " + dateFmt(r.due_extended) +
+        (r.predicted_filing_date ? " · predicted about " + f55pred(r.predicted_filing_date) : "") + "</div>" +
+        '<div class="mut">Habit: ' + esc(F55_HABIT[r.habit] || r.habit || "—") + (r.habit_detail ? " — " + esc(r.habit_detail) : "") +
+        (r.status !== "upcoming" ? " · " + esc(r.status_basis || "") : "") + "</div></div>";
+    }
+    var hist = r.history || [];
+    if (hist.length) {
+      h += "<details" + (dim ? "" : " open") + "><summary>Plan-year history (" + hist.length + ")</summary>" +
+        '<table class="aligned"><thead><tr><th>Plan year</th><th class="num">Participants</th><th>First filed</th><th>Timing</th><th>Deadline</th><th>Extended</th><th>Notes</th></tr></thead><tbody>' +
+        hist.map(function (y) {
+          var notes = [];
+          if (y.ext_5558) notes.push("Form 5558 filed");
+          if (y.amended) notes.push("corrected" + (y.latest_filed && y.latest_filed !== y.first_filed ? " " + dateFmt(y.latest_filed) : ""));
+          if (y.short_year) notes.push("short plan year");
+          if (y.final) notes.push("FINAL filing");
+          return "<tr><td>" + dateFmt(y.plan_year_begin) + " – " + dateFmt(y.plan_year_end) + '</td><td class="num">' + n0(y.participants) + "</td><td>" +
+            dateFmt(y.first_filed) + "</td><td>" + (y.timing ? f55chip(F55_TIMING, y.timing) : "—") + "</td><td>" + dateFmt(y.due_original) + "</td><td>" +
+            dateFmt(y.due_extended) + '</td><td class="mut">' + esc(notes.join(" · ")) + "</td></tr>";
+        }).join("") + "</tbody></table></details>";
+    }
+    return h + "</div>";
+  }
+  function drawF5500(slug, tok) {
+    sql("select * from peo_5500_calendar_for_peo('" + slug + "')", "5500 calendar", 30000)
+      .then(function (res) {
+        if (tok !== loadToken) return;
+        var box = $("prof5500"); if (!box) return;
+        var rows = res.rows || [];
+        rows.forEach(function (r) { if (typeof r.history === "string") { try { r.history = JSON.parse(r.history); } catch (e) { r.history = []; } } });
+        var thru = rows.length ? rows[0].data_through : null;
+        var h = "<h3>5500 filings</h3><p class=\"blurb\">A Form 5500 is due the last day of the 7th month after the plan year ends. A Form 5558 extension adds 2½ months, and a weekend or federal holiday moves the date to the next business day. “Next expected” follows each plan’s own filing habit." +
+          (thru ? " DOL data runs to " + dateFmt(thru) + "." : "") + ' <a href="#upcoming">All upcoming 5500s →</a></p>';
+        if (!rows.length) { box.innerHTML = h + '<div class="empty">No Form 5500 filings on file for this PEO’s sponsor EINs.</div>'; return; }
+        ["benefits", "retirement"].forEach(function (k) {
+          var list = rows.filter(function (r) { return r.benefit_kind === k; });
+          h += '<div class="kindh">' + (k === "benefits" ? "Benefits 5500s (health and welfare plans)" : "Retirement 5500s (401(k) and pension plans)") + ' <span class="mut">(' + list.length + ")</span></div>";
+          h += list.length ? list.map(f55plan).join("") : '<div class="mut">None on file.</div>';
+        });
+        if (rows.some(function (r) { return (r.history || []).some(function (y) { return y.timing === "late_unconfirmed" || y.basis === "flags_pending"; }); }))
+          h += '<p class="note">Some first-filed dates are still being checked against DOL’s full version history (originals and corrections). A year marked “may be a correction” firms up as that backfill lands.</p>';
+        box.innerHTML = h;
+      })
+      .catch(function (e) { if (tok !== loadToken) return; var box = $("prof5500"); if (box) box.innerHTML = '<h3>5500 filings</h3><div class="empty">Could not load 5500 filings: ' + esc(e.message) + "</div>"; });
+  }
+
+  /* ---------- 1315: Upcoming 5500 filings - the whole-database query (route #upcoming) ----------
+     Reads peo_5500_upcoming(days, kind, include_staff, include_overdue). */
+  var UP = { rows: [], days: sget("up_days") || "90", kind: sget("up_kind") || "both", staff: false, overdue: false, q: "", capped: false };
+  function showUpcoming() {
+    current = null; ++loadToken;
+    try { if (location.hash !== "#upcoming") history.replaceState(null, "", "#upcoming"); } catch (e) { /* ignore */ }
+    $("peo").value = "";
+    $("main").innerHTML = '<div class="title"><h2>Upcoming 5500 filings</h2><span class="meta">every PEO · Benefits and Retirement</span></div>' +
+      '<p class="blurb">When each PEO’s next Form 5500 is expected, across the whole database. Due the last day of the 7th month after the plan year ends; a Form 5558 extension adds 2½ months; a weekend or federal holiday moves it to the next business day. “Expected by” is the deadline that matches the PEO’s own habit (most PEOs file on the extension). Click a PEO to open its profile.</p>' +
+      '<div class="upbar">' +
+        '<label>Window <select id="upDays"><option value="30">next 30 days</option><option value="60">next 60 days</option><option value="90">next 90 days</option><option value="180">next 6 months</option><option value="365">next 12 months</option><option value="730">next 24 months</option></select></label>' +
+        '<label>Filing <select id="upKind"><option value="both">Benefits + Retirement</option><option value="benefits">Benefits only</option><option value="retirement">Retirement only</option></select></label>' +
+        '<label class="chk"><input id="upOver" type="checkbox"> include overdue / waiting on DOL</label>' +
+        '<label class="chk"><input id="upStaff" type="checkbox"> include PEOs’ own staff plans</label>' +
+        '<input id="upQ" type="search" placeholder="Filter by PEO or plan…">' +
+      '</div><div id="upTiles" class="tiles"></div><section><div id="upBody"><div class="empty">Loading…</div></div></section>';
+    $("upDays").value = UP.days; $("upKind").value = UP.kind; $("upOver").checked = UP.overdue; $("upStaff").checked = UP.staff; $("upQ").value = UP.q;
+    $("upDays").onchange = function () { UP.days = this.value; sset("up_days", this.value); loadUpcoming(); };
+    $("upKind").onchange = function () { UP.kind = this.value; sset("up_kind", this.value); loadUpcoming(); };
+    $("upOver").onchange = function () { UP.overdue = this.checked; loadUpcoming(); };
+    $("upStaff").onchange = function () { UP.staff = this.checked; loadUpcoming(); };
+    $("upQ").oninput = function () { UP.q = this.value.trim().toLowerCase(); paintUpcoming(); };
+    loadUpcoming();
+  }
+  function loadUpcoming() {
+    var tok = ++loadToken;
+    setStatus("loading upcoming 5500s…");
+    var days = parseInt(UP.days, 10) || 90, kind = /^(both|benefits|retirement)$/.test(UP.kind) ? UP.kind : "both";
+    sql("select * from peo_5500_upcoming(" + days + ", '" + kind + "', " + (UP.staff ? "true" : "false") + ", " + (UP.overdue ? "true" : "false") + ")", "upcoming 5500 filings", 30000)
+      .then(function (res) { if (tok !== loadToken) return; UP.rows = res.rows || []; UP.capped = !!res.truncated; paintUpcoming(); setStatus(""); })
+      .catch(function (e) { if (tok !== loadToken) return; var b = $("upBody"); if (b) b.innerHTML = '<div class="empty">Could not load: ' + esc(e.message) + "</div>"; setStatus("error", true); });
+  }
+  function paintUpcoming() {
+    var b = $("upBody"); if (!b) return;
+    var rows = UP.rows.filter(function (r) { return !UP.q || (String(r.peo_name) + " " + (r.plan_name || "")).toLowerCase().indexOf(UP.q) >= 0; });
+    var peos = {}, nb = 0, nr = 0, nover = 0;
+    rows.forEach(function (r) { peos[r.family_slug] = 1; if (r.filing_kind === "Benefits") nb++; else nr++; if (r.status !== "upcoming") nover++; });
+    $("upTiles").innerHTML = tile("Filings expected", n0(rows.length), "in this view") + tile("PEOs", n0(Object.keys(peos).length), "with a filing in this view") +
+      tile("Benefits 5500s", n0(nb), "health and welfare plans") + tile("Retirement 5500s", n0(nr), "401(k) and pension plans") +
+      tile("Overdue / waiting", n0(nover), "deadline passed, not in DOL data yet");
+    if (!rows.length) { b.innerHTML = '<div class="empty">Nothing expected in this window.</div>'; return; }
+    var thru = rows[0].data_through;
+    b.innerHTML = '<table id="upTbl" class="aligned"><thead><tr><th>Expected by</th><th>PEO</th><th>Filing</th><th>Plan</th><th>Deadline / extended</th><th>Predicted</th><th>Habit</th><th>Status</th><th class="num">Participants</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var peo = r.dir_slug ? '<a href="#peo=' + esc(r.dir_slug) + '">' + esc(r.peo_name) + "</a>" : esc(r.peo_name) + ' <span class="muted">(not on the map list)</span>';
+        var d = r.days_until_expected;
+        var when = dateFmt(r.expected_by) + (r.status === "upcoming" && d != null ? ' <span class="muted">(' + (Number(d) === 0 ? "today" : n0(d) + " days") + ")</span>" : "");
+        return "<tr><td>" + when + '</td><td class="pe">' + peo + "</td><td>" + esc(r.filing_kind) + '</td><td class="pl">' + esc(r.plan_name || "—") + ' <span class="muted">' + esc(r.plan_type || "") +
+          (r.plan_role !== "client_plan" ? " · " + esc(F55_ROLE[r.plan_role] || "") : "") + " · plan year ends " + dateFmt(r.next_plan_year_end) + "</span></td><td>" + dateFmt(r.due_original) + '<br><span class="muted">' +
+          dateFmt(r.due_extended) + "</span></td><td>" + f55pred(r.predicted_filing_date) + '</td><td title="' + esc(r.habit_detail || "") + '">' + esc(F55_HABIT_SHORT[r.habit] || r.habit || "—") + "</td><td>" + f55chip(F55_STATUS, r.status) +
+          '</td><td class="num">' + n0(r.participants) + "</td></tr>";
+      }).join("") + "</tbody></table>" +
+      '<p class="note">' + (UP.capped ? "Showing the first 500 rows. Narrow the window or filter. " : "") + (thru ? "DOL data runs to " + dateFmt(thru) + ". " : "") +
+      "Database query: <code>select * from peo_5500_upcoming(90, &#39;both&#39;, false, true)</code> (days, both / benefits / retirement, include staff plans, include overdue).</p>";
+  }
+  $("upBtn").onclick = function () { if (location.hash === "#upcoming") showUpcoming(); else location.hash = "upcoming"; };
 
   /* ---------- start ---------- */
   if (!KEY) askKey(); else loadList();
