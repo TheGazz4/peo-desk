@@ -1521,7 +1521,8 @@ setInterval(poll, POLL_MS);
     if (cnt) cnt.textContent = " " + rows.length + " PEOs";
     tb.innerHTML = rows.map(function (r) {
       var v = V[r.overall] || [r.overall, "inherit"];
-      var have = n0(r.book_clients) + " current clients<br><span class=\"mut\">" + n0(r.book_confirmed != null ? r.book_confirmed : (r.book_clients - (r.book_unconfirmed || 0))) + " confirmed (seen in the last 24 months) · " + n0(r.book_likely != null ? r.book_likely : (r.book_unconfirmed || 0)) + " likely (older or undated, nothing contradicts)</span>";   // 2175: current = confirmed + likely
+      var have = n0(r.book_clients) + " current clients<br><span class=\"mut\">" + n0(r.book_confirmed != null ? r.book_confirmed : (r.book_clients - (r.book_unconfirmed || 0))) + " confirmed (seen in the last 24 months) · " + n0(r.book_likely != null ? r.book_likely : (r.book_unconfirmed || 0)) + " likely (older or undated, nothing contradicts)</span>"
+        + (r.book_at_statement != null && r.stated_clients_as_of && r.book_at_statement !== r.book_clients ? "<br><span class=\"mut\">as of " + String(r.stated_clients_as_of).slice(0, 7) + ", when they stated it: " + n0(r.book_at_statement) + "</span>" : "");   // 2175: current = confirmed + likely; 2177: same-day comparison
       if (r.wse_status === "published") have += "<br>published headcount on file";
       else if (r.plan_participants != null) have += "<br>" + n0(r.plan_participants) + " in its own plans (" + e(r.plan_year) + ")";
       if (r.wse_low != null && r.wse_status !== "published") have += '<br><span class="age cold">size model ' + n0(r.wse_low) + "–" + n0(r.wse_high) + "</span>";
