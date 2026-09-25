@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.74 (2026-09-24, instanceB 2179): an undated website figure is dated by OUR crawl, and the Quick Card says so
+            ("on its site, seen Sep 2026") instead of passing our crawl date off as the PEO's date. Data: map-data v2.21.
      v3.73 (2026-09-24, owner: "current is: we have no information that contradicts they are still with the PEO"; "title it
             likely"): the Quick Card's "in our records" count is CURRENT = confirmed (seen with the PEO in the last 24 months) +
             likely (older or undated listing, nothing since contradicts). Former clients need dated contradicting evidence
@@ -1477,12 +1479,12 @@ function peoCardHtml(b,pc){
       rows+=kv('Website','<a class="lk" href="'+esc(href)+'" target="_blank" rel="noopener">'+esc(w.replace(/^https?:\/\/(www\.)?/i,'').replace(/\/$/,''))+'</a>'); }
     // v3.71 (owner 2026-09-24: "a precision database not a collection of ranges"): what the PEO itself states, or "Not stated"
     // plus the exact counts we hold. No estimate ranges. Rank and share only when the headcount is an exact published figure.
-    var said=function(qual,v,d){ return (qual==='approximately'?'about ':'')+n(v)+(qual==='more_than'?'+':'')+
-      ' <span class="mut">(stated by the PEO'+(d?', '+PEO_MONTHS[+String(d).slice(5,7)-1].slice(0,3)+' '+String(d).slice(0,4):'')+')</span>'; };
-    var cl=pc.clients_stated!=null?said(pc.clients_stated_qual,pc.clients_stated,pc.clients_stated_as_of):'<span class="mut">Not stated</span>';
+    var said=function(qual,v,d,k){ var when=d?PEO_MONTHS[+String(d).slice(5,7)-1].slice(0,3)+' '+String(d).slice(0,4):''; return (qual==='approximately'?'about ':'')+n(v)+(qual==='more_than'?'+':'')+
+      ' <span class="mut">('+(k==='crawl'?'on its site, seen '+when:'stated by the PEO'+(when?', '+when:''))+')</span>'; };   // v3.74 (2179): crawl-dated vs PEO-dated
+    var cl=pc.clients_stated!=null?said(pc.clients_stated_qual,pc.clients_stated,pc.clients_stated_as_of,pc.clients_stated_as_of_kind):'<span class="mut">Not stated</span>';
     if(pc.clients_ours!=null) cl+='<br><span class="mut">'+n(pc.clients_ours)+' in our records ('+n(pc.clients_confirmed||0)+' confirmed in the last 24 months, '+n(pc.clients_likely||0)+' likely)</span>';   // v3.73 (2175): current = confirmed + likely
     rows+=kv('Clients',cl);
-    var wse=pc.wse_stated!=null?said(pc.wse_stated_qual,pc.wse_stated,pc.wse_stated_as_of):'<span class="mut">Not stated</span>';
+    var wse=pc.wse_stated!=null?said(pc.wse_stated_qual,pc.wse_stated,pc.wse_stated_as_of,pc.wse_stated_as_of_kind):'<span class="mut">Not stated</span>';
     if(pc.wse_stated==null&&pc.plan_participants!=null) wse+='<br><span class="mut">'+n(pc.plan_participants)+' enrolled in its benefit plans'+(pc.plan_year?' ('+pc.plan_year+')':'')+'</span>';
     rows+=kv('Worksite employees',wse);
     if(pc.rank_best!=null&&pc.rank_best===pc.rank_worst) rows+=kv('National rank','#'+pc.rank_best+' <span class="mut">of '+pc.rank_of_n+'</span>');
@@ -1501,7 +1503,7 @@ function openPeoCard(b){
   var slug=b.family_slug; S.peoCardSlug=slug; S.peoCard=S.peoCard||{};
   var pc=S.peoCard[slug];
   c.innerHTML=peoCardHtml(b,pc); c.style.display='block';
-  if(pc===undefined||pc===null||(pc&&pc.clients_likely===undefined)){   // not fetched yet, or fetched by an older payload (v3.73 fields)
+  if(pc===undefined||pc===null||(pc&&pc.clients_stated_as_of_kind===undefined)){   // not fetched yet, or fetched by an older payload (v3.74 fields)
     api({mode:'peo_card',slug:slug}).then(function(r){
       S.peoCard[slug]=(r&&r.card)?r.card:false;
       if(S.peoCardSlug===slug&&c.dataset.kind==='peo') c.innerHTML=peoCardHtml(b,S.peoCard[slug]);
