@@ -619,7 +619,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_actions","desk_ruling_recheck","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
+const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_actions","desk_ruling_recheck","desk_record_strength","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -2203,6 +2203,97 @@ setInterval(poll, POLL_MS);
 
   var orig = renderDecisions;
   window.renderDecisions = function (d) { orig(d); try { render(d); } catch (e) { if (window.console) console.error("decision desk v2", e); } };
+  try { if (typeof latest !== "undefined" && latest) render(latest); } catch (e) {}
+})();
+</script>
+<style id="recordStrengthCss">
+  /* ---- record strength (cowork 2026-09-25) ---- */
+  #recordStrength .rs-hero { display: flex; flex-wrap: wrap; gap: 18px 36px; margin: 6px 0 10px; }
+  #recordStrength .rs-big { font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  #recordStrength .rs-big small { font-size: 13px; font-weight: 400; color: var(--ink-muted); margin-left: 2px; }
+  #recordStrength .rs-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--grid); margin: 4px 0 8px; }
+  #recordStrength .rs-bar i { display: block; height: 100%; }
+  #recordStrength .rs-bar i.strong { background: var(--good); } #recordStrength .rs-bar i.usable { background: var(--warning); }
+  #recordStrength .rs-bar i.thin { background: var(--serious); } #recordStrength .rs-bar i.weak { background: var(--critical); }
+  #recordStrength .rs-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  #recordStrength .rs-parts { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  #recordStrength .rs-parts th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); padding: 4px 8px 4px 0; border-bottom: 1px solid var(--grid); }
+  #recordStrength .rs-parts td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+  #recordStrength .rs-parts tr.worst td { background: color-mix(in srgb, var(--critical) 8%, transparent); }
+  #recordStrength .rs-mini { display: inline-block; width: 80px; height: 8px; border-radius: 4px; background: var(--grid); vertical-align: middle; margin-right: 6px; overflow: hidden; }
+  #recordStrength .rs-mini i { display: block; height: 100%; background: var(--series-1); }
+  #recordStrength .rs-rul { margin-top: 10px; font-size: 12.5px; }
+  #recordStrength .rs-rul summary { cursor: pointer; color: var(--ink-2); }
+  #recordStrength .rs-rul table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  #recordStrength .rs-rul th, #recordStrength .rs-rul td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--grid); }
+</style>
+<script id="recordStrength">
+/* ---- record strength (cowork 2026-09-25, migration 3083): one grade per PEO-user record, five parts that match what the
+   story builder has to say (who / which PEO / since when / renewal trigger / fresh & consistent). Daily snapshot; 7-day
+   movement; what each applied ruling did to the book. Reads desk_record_strength. ---- */
+(function () {
+  "use strict";
+  if (typeof renderDecisions !== "function") return;
+  var E = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var N = function (v) { return v == null ? "-" : Number(v).toLocaleString(); };
+  var sgn = function (v, unit) { if (v == null) return ""; var n = Number(v); if (!n) return "no change"; return (n > 0 ? "+" : "") + (unit === "n" ? n.toLocaleString() : n.toFixed(2)) + " in 7 days"; };
+  var PARTS = [
+    ["who",     "Who they are",       15, "EIN on file, seen by a public record"],
+    ["which",   "Which PEO",          30, "how well the PEO is proven (two public sources = full marks)"],
+    ["when",    "Since when",         25, "a dated, running relationship (to the day = full marks)"],
+    ["trigger", "Renewal trigger",    15, "health renewal month proven (known) or likely; WC date only = partial"],
+    ["fresh",   "Fresh & consistent", 15, "a source touched it in 90 days; no open conflict"]
+  ];
+  var lastSig = null;
+
+  function ensureSection() {
+    var sec = document.getElementById("recordStrength");
+    if (sec) return sec;
+    var anchor = document.getElementById("decisionDesk"); if (!anchor) return null;
+    sec = document.createElement("section"); sec.className = "wide"; sec.id = "recordStrength"; sec.dataset.tab = anchor.dataset.tab || "overview";
+    sec.innerHTML = '<h2>Record strength <span class="sub">— is every PEO user\'s record getting more provable?</span></h2>' +
+      '<p class="blurb">One grade per record, 0-100, in five parts - one per thing the story builder has to say about a company. A guess never scores: only proven state counts (corroborated PEO, dated periods, graded renewal tiers). Recomputed nightly, so every ruling\'s effect on the book is measured, not described.</p>' +
+      '<div id="rsBody"></div>';
+    anchor.parentNode.insertBefore(sec, anchor.nextSibling);
+    // mirror the decision desk's tab visibility (the tab script only knows the sections that existed at load)
+    var sync = function () { sec.classList.toggle("hidden", anchor.classList.contains("hidden")); };
+    sync(); new MutationObserver(sync).observe(anchor, { attributes: true, attributeFilter: ["class"] });
+    return sec;
+  }
+
+  function render(d) {
+    var r = d && d.desk_record_strength && d.desk_record_strength.rows && d.desk_record_strength.rows[0];
+    var sec = ensureSection(); if (!sec) return;
+    var body = document.getElementById("rsBody");
+    if (!r) { body.innerHTML = '<p class="muted">No snapshot yet - the first nightly run has not happened.</p>'; return; }
+    var sig = JSON.stringify(r); if (sig === lastSig) return; lastSig = sig;
+    var total = Number(r.companies) || 1;
+    var pct = function (n) { return (100 * Number(n) / total).toFixed(1) + "%"; };
+    var bands = [["strong", "Strong", "good", "75-100: provable PEO, dated, fresh"], ["usable", "Usable", "warning", "50-74"], ["thin", "Thin", "serious", "25-49"], ["weak", "Weak", "critical", "under 25: a name and little else"]];
+    var bar = '<div class="rs-bar">' + bands.map(function (b) { return '<i class="' + b[0] + '" style="width:' + (100 * Number(r[b[0]]) / total) + '%" title="' + E(b[1] + " " + pct(r[b[0]])) + '"></i>'; }).join("") + "</div>";
+    var chips = bands.map(function (b) { return '<span class="chip ' + b[2] + '" title="' + E(b[3]) + '">' + E(b[1]) + " " + N(r[b[0]]) + " · " + pct(r[b[0]]) + "</span>"; }).join("") +
+      '<span class="chip" title="proven PEO + dated running relationship + no conflict: the story builder can tell a dated, defensible story">Story-ready ' + N(r.story_ready) + " · " + pct(r.story_ready) + "</span>";
+    var hero = '<div class="rs-hero"><div><div class="rs-big">' + E(Number(r.avg_score).toFixed(1)) + '<small>/100</small></div><div class="muted">average record · ' + E(sgn(r.avg_7d)) + "</div></div>" +
+      '<div><div class="rs-big">' + E(pct(r.story_ready)) + '</div><div class="muted">story-ready · ' + E(sgn(r.story_ready_7d, "n")) + "</div></div>" +
+      '<div><div class="rs-big">' + E(pct(r.strong)) + '</div><div class="muted">strong · ' + E(sgn(r.strong_7d, "n")) + "</div></div></div>";
+    var weakest = PARTS.slice().sort(function (a, b) { return (Number(r["avg_" + a[0]]) / a[2]) - (Number(r["avg_" + b[0]]) / b[2]); })[0];
+    var parts = '<table class="rs-parts"><thead><tr><th>Part</th><th>Average</th><th>Of max</th><th>7 days</th><th>What earns it</th></tr></thead><tbody>' +
+      PARTS.map(function (p) {
+        var v = Number(r["avg_" + p[0]]), f = v / p[2];
+        return "<tr" + (p === weakest ? ' class="worst"' : "") + "><td><b>" + E(p[1]) + "</b>" + (p === weakest ? ' <span class="chip critical">bottleneck</span>' : "") + "</td><td>" + E(v.toFixed(1)) + " / " + p[2] + '</td><td><div class="rs-mini"><i style="width:' + (100 * f).toFixed(0) + '%"></i></div>' + E((100 * f).toFixed(0)) + "%</td><td>" + E(sgn(r[p[0] + "_7d"])) + "</td><td class=\"muted\">" + E(p[3]) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+    var books = r.by_book ? '<div class="muted" style="margin-top:6px">' + Object.keys(r.by_book).map(function (k) { var b = r.by_book[k]; return E(k) + " users: " + N(b.n) + " records, avg " + E(b.avg) + ", " + N(b.story_ready) + " story-ready"; }).join(" · ") + "</div>" : "";
+    var rul = r.recent_rulings && r.recent_rulings.length ? '<details class="rs-rul"><summary>What the last ' + r.recent_rulings.length + " applied rulings did to the book</summary><table><thead><tr><th>Ruling</th><th>Applied</th><th>Avg score</th><th>Story-ready</th><th>Which PEO</th><th>Since when</th><th>Trigger</th><th>Declared</th></tr></thead><tbody>" +
+      r.recent_rulings.map(function (m) {
+        var dv = function (v) { return v == null ? '<span class="muted">not yet measured</span>' : (Number(v) > 0 ? "+" : "") + E(v); };
+        var dec = m.declared ? E((m.declared.parts || []).join(", ") + " " + (m.declared.direction || "") + (m.declared.kind ? " (" + m.declared.kind + ")" : "")) : '<span class="muted">none</span>';
+        return '<tr><td><a href="#dec-' + E(m.ruling_id) + '">#' + E(m.ruling_id) + "</a></td><td>" + E(m.applied_on) + "</td><td>" + dv(m.d_avg_score) + "</td><td>" + dv(m.d_story_ready) + "</td><td>" + dv(m.d_which) + "</td><td>" + dv(m.d_when) + "</td><td>" + dv(m.d_trigger) + "</td><td>" + dec + "</td></tr>";
+      }).join("") + "</tbody></table><p class=\"muted\">Book-wide change from the day before the ruling to the latest day after. Several rulings on one day share the same movement.</p></details>" : "";
+    body.innerHTML = hero + bar + '<div class="rs-chips">' + chips + "</div>" + parts + books + rul + '<div class="muted" style="margin-top:6px">Snapshot ' + E(r.day) + "</div>";
+  }
+
+  var orig = window.renderDecisions;
+  window.renderDecisions = function (d) { orig(d); try { render(d); } catch (e) { if (window.console) console.error("record strength", e); } };
   try { if (typeof latest !== "undefined" && latest) render(latest); } catch (e) {}
 })();
 </script>
