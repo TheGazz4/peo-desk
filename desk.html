@@ -496,6 +496,13 @@
     <table id="tblPiReview"><thead><tr><th>PEO</th><th class="num">Clients</th><th>Possible site</th></tr></thead><tbody></tbody></table>
   </section>
 
+  <section class="wide" id="ownerCorrections">
+    <h2>Corrections &amp; judge memory <small>&mdash; what you have taught the engine, whether it stuck, and proof the judge still remembers it</small></h2>
+    <p class="blurb">Every correction you give is saved with what it replaced and re-checked every morning: is the rule still written, does the brain that needs it actually receive it, and do answers since then follow it. The judge no longer forgets old rules: it holds every rule, every ruling you have made and every veto, and reads in full the ones that matter for the case in front of it. Audited daily.</p>
+    <div class="sc-tiles" id="ocTiles"></div>
+    <div class="tw" style="max-height:420px;overflow:auto"><table id="tblOc"><thead><tr><th>Corrected</th><th>Status</th><th>Where</th><th>What it did</th><th>What is right</th><th>Last checked</th></tr></thead><tbody><tr><td colspan="6" class="age cold">loading&hellip;</td></tr></tbody></table></div>
+  </section>
+
   <section class="wide" id="peoPushdown">
     <h2>PEO news &rarr; clients <small>&mdash; what each PEO event did to its clients, and whose story it is written into</small></h2>
     <p class="blurb">Every fact logged on a PEO profile (sales, mergers, name changes, carrier or pricing changes) is checked against each client's own dated history with that PEO. Only clients proven to be with the PEO on the date get it in their story, key moments and timeline. Carve-out clients, clients who joined later or left earlier, and clients whose dates can't prove it are kept out. The PEO itself is always named as it was at the time.</p>
@@ -619,7 +626,7 @@
 /* ================= config ================= */
 const API   = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/desk-api";
 const ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8";
-const VIEWS = ["desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_actions","desk_ruling_recheck","desk_record_strength","desk_rulebook_sync","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
+const VIEWS = ["desk_owner_corrections","desk_status_board","desk_spend","desk_rate_limits","desk_api_usage_live","desk_append_live","desk_freshness","desk_lane_health","desk_system_health","desk_purification_live","desk_mesh_mail_live","desk_intel_ticker","desk_ready_plays","desk_hub_utilization","desk_enrichment_progress","desk_mesh_scorecard","desk_decision_actions","desk_ruling_recheck","desk_record_strength","desk_rulebook_sync","desk_carrier_supervisor","desk_peo_networks","desk_peo_health_status","desk_data_calendar","desk_peo_identity","desk_peo_intel_pushdown"];
 const POLL_MS = 5000;
 const HISTORY_MAX = 180;           /* 15 min of 5s samples */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -1246,6 +1253,27 @@ function renderPeoIdentity(d) {
   const tr = $("#tblPiReview tbody");
   if (tr) tr.innerHTML = rv.map((r) => `<tr><td>${esc(r.label)}</td><td class="num">${fmtN(r.clients)}</td><td>${esc(r.detail || "")}</td></tr>`).join("") || `<tr><td colspan="3">none waiting</td></tr>`;
 }
+/* instanceA 1356: corrections & judge memory panel. Fenced: an error here can never stop the renders after it. */
+function renderOwnerCorrections(d) {
+  try {
+    const rows = d.desk_owner_corrections?.rows || [];
+    const fmtN = (v) => (v == null ? "\u2014" : Number(v).toLocaleString());
+    const tiles = rows.filter((r) => r.kind === "tile").sort((a, b) => a.ord - b.ord);
+    const t = $("#ocTiles");
+    if (t) t.innerHTML = tiles.map((r) => {
+      const good = (r.ord === 2 && Number(r.n) > 0) || (r.ord === 8 && r.verdict === "holds");
+      const warn = (r.ord === 3 && Number(r.n) > 0) || (r.ord === 8 && r.verdict && r.verdict !== "holds");
+      const v = r.ord === 8 ? (r.verdict === "holds" ? "OK" : (r.verdict ? "CHECK" : "\u2014")) : fmtN(r.n);
+      return `<div class="tile ${good ? "t-good" : ""}"><div class="k">${esc(r.label)}</div><div class="v">${warn ? `<span class="chip serious">${esc(v)}</span>` : esc(v)}</div><div class="d">${esc(r.detail || "")}</div></div>`;
+    }).join("");
+    const chip = { holds: "ok", untested: "warn", never_checked: "warn", not_delivered: "serious", rule_changed: "serious", check_broken: "serious", regressed: "critical", rule_missing: "critical" };
+    const words = { holds: "holding", untested: "waiting for proof", never_checked: "not checked yet", not_delivered: "not reaching the brain", rule_changed: "rule edited since", check_broken: "proof check broken", regressed: "slipped back", rule_missing: "rule deleted" };
+    const day = (s) => (s ? String(s).slice(0, 10) : "\u2014");
+    const c = rows.filter((r) => r.kind === "correction").sort((a, b) => String(b.corrected_at || "").localeCompare(String(a.corrected_at || "")));
+    const tb = $("#tblOc tbody");
+    if (tb) tb.innerHTML = c.map((r) => `<tr><td>${esc(day(r.corrected_at))}</td><td><span class="chip ${chip[r.verdict] || "warn"}">${esc(words[r.verdict] || r.verdict || "")}</span></td><td>${esc(r.target || "")}<div class="mut">${esc(r.rule || "")}</div></td><td class="mut">${esc(r.what_it_did || "")}</td><td>${esc(r.what_is_right || "")}</td><td>${esc(day(r.checked_at))}</td></tr>`).join("") || `<tr><td colspan="6">No corrections recorded yet. Correct the engine in chat and it lands here.</td></tr>`;
+  } catch (e) { try { console.error("renderOwnerCorrections", e); } catch (_) {} }
+}
 function renderPeoPushdown(d) {
   const rows = d.desk_peo_intel_pushdown?.rows || [];
   const fmtN = (v) => (v == null ? "\u2014" : Number(v).toLocaleString());
@@ -1291,6 +1319,7 @@ function renderAll(d) {
   renderPeoNetworks(d);
   renderPeoIdentity(d);
   renderPeoPushdown(d);
+  renderOwnerCorrections(d);
   renderDecisions(d);
   renderStrip(d);
   renderPlays(d);
