@@ -1313,7 +1313,25 @@ function renderDataCalendar(d) {
   }).join("") || `<tr><td colspan="8">nothing due in the next 45 days</td></tr>`;
 }
 
+/* instanceA 1356: a panel whose feed never arrives used to sit empty with no signal (desk-api view cap overflow,
+   twice). Compare what was asked for with what came back and say so on screen. */
+function renderFeedGuard(d) {
+  try {
+    const bad = VIEWS.filter((v) => !d || !(v in d) || (d[v] && d[v].error));
+    let b = document.getElementById("feedGuard");
+    if (!bad.length) { if (b) b.remove(); return; }
+    if (!b) {
+      b = document.createElement("div");
+      b.id = "feedGuard";
+      b.style.cssText = "position:sticky;top:0;z-index:50;margin:0 0 10px;padding:8px 12px;border-radius:8px;font-size:13px;background:color-mix(in srgb, var(--critical) 18%, transparent);border:1px solid var(--critical);";
+      const host = document.querySelector("main") || document.body;
+      host.insertBefore(b, host.firstChild);
+    }
+    b.textContent = "Missing data for " + bad.length + " panel feed" + (bad.length > 1 ? "s" : "") + " (these panels will look empty): " + bad.join(", ");
+  } catch (e) { try { console.error("renderFeedGuard", e); } catch (_) {} }
+}
 function renderAll(d) {
+  renderFeedGuard(d);
   renderScorecard(d);
   renderCarrierSupervisor(d);
   renderPeoNetworks(d);
