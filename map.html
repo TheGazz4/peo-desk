@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.82 (2026-09-28, Instance B, owner: "HMO Regional Contract on file (Regional) (12,856 insured) - no need to say on this contract or list Aetna Health, Inc."):
+            a Schedule-A contract card reads on one line: network, tier chip, label, (region), (N insured). Carrier entity name dropped from the card.
      v3.80 (2026-09-28, Instance B, owner: "confirmed as an example Paychex HR (arrow) paychex - no arrow appears. this is widespread"): the
             pin HOVER box only named the family. On the Family brand view it now reads  ● Brand -> ● ... -> ● Family  for a folded
             brand (same chainHtml as the list and the card); PEO specific view unchanged.
@@ -516,8 +518,8 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="netchips" id="svc-chips"></div>
         <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Employees" data-tip="Filter by employee count - the Employee Count Brain's best number for each client (the middle of its range).&#10;&#10;Click a chip to hide or show that size. No count yet = no number we can back up.">Employees <i>?</i></span></h2>
         <div class="netchips" id="emp-chips"></div>
-        <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Carve Outs" data-tip="PEO clients that stay with their PEO but keep one piece in-house.&#10;&#10;Workers Comp Carve Out = keeps its own workers comp policy.&#10;Health Carve Out = runs its own health plan instead of the PEO's.&#10;&#10;Off shows every client; pick one or Both to show only those clients.">Carve Outs <i>?</i></span></h2>
-        <div class="seg" id="co-seg"><button id="co-0" class="on" title="No carve-out filter - every client shows">Off</button><button id="co-1" title="Only Workers Comp Carve Out clients">Workers Comp</button><button id="co-2" title="Only Health Carve Out clients">Health</button><button id="co-3" title="Workers Comp Carve Out and Health Carve Out clients together">Both</button></div>
+        <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Carve Outs" data-tip="PEO clients that stay with their PEO but keep one piece in-house.&#10;&#10;Workers Comp Carve Out = keeps its own workers comp policy.&#10;Benefits Carve Out = runs its own health plan instead of the PEO's.&#10;&#10;Off shows every client; pick one or Both to show only those clients.">Carve Outs <i>?</i></span></h2>
+        <div class="seg" id="co-seg"><button id="co-0" class="on" title="No carve-out filter - every client shows">Off</button><button id="co-1" title="Only Workers Comp Carve Out clients">Workers Comp</button><button id="co-2" title="Only Benefits Carve Out clients">Benefits</button><button id="co-3" title="Workers Comp Carve Out and Benefits Carve Out clients together">Both</button></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
           <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO user departures">Both</button><button id="hist-2" title="Former PEO user departures only — current pins hidden">Former only</button></div>
@@ -819,7 +821,7 @@ function commitDetail(st,r){
             // Employees chips, the card and the table always read Counting. Keep them.
             hc:(r.hc&&r.hc.length===n)?r.hc:null, hct:(r.hct&&r.hct.length===n)?r.hct:null, hcl:(r.hcl&&r.hcl.length===n)?r.hcl:null,
             lie:(r.lie&&r.lie.length===n)?r.lie:null, pcs:(r.pcs&&r.pcs.length===n)?r.pcs:null, pcsb:(r.pcsb&&r.pcsb.length===n)?r.pcsb:null,
-            // v3.68b (1278h): Workers Comp Carve Out / Health Carve Out flags
+            // v3.68b (1278h): Workers Comp Carve Out / Benefits Carve Out flags
             wco:(r.wco&&r.wco.length===n)?r.wco:null, bco:(r.bco&&r.bco.length===n)?r.bco:null,
             // v3.81 (9013): website, current client (1 Yes / 2 No / 0 not known), benefits renewal month (0 = not known)
             web:(r.web&&r.web.length===n)?r.web:null, cc:(r.cc&&r.cc.length===n)?r.cc:null, br:(r.br&&r.br.length===n)?r.br:null};
@@ -1438,12 +1440,12 @@ function onMove(e){
       if(hSv&&SVC[hSv]) renLine+='Relationship: <b>'+SVC[hSv].name+'</b> <span class="mut">('+SVC[hSv].card+')</span><br>';
       var hBr=hd0.br?hd0.br[hi]:0;
       if(hBr&&MONTHS[hBr]) renLine+='Benefits renewal: <b>'+MONTHS[hBr]+'</b><br>';
-      renLine+=coLines(hd0,hi);   // v3.82 (Gazz 2026-09-28 16:17 MST): Health Carve Out / WC carve-out flags sit right under Benefits renewal
       var hEt=hd0.hct?hd0.hct[hi]:null, hEl=hd0.hcl?hd0.hcl[hi]:4;
       if(hEt&&hEl<=3) renLine+='Employee count: <b>'+esc(hEt)+'</b>'+(hEl>1?' <span class="mut">'+(['','','likely','indicated'][hEl]||'')+'</span>':'')+'<br>';
       var hCs=hd0.cs?hd0.cs[hi]:0, hCx=hd0.cx?hd0.cx[hi]:0;
       if(hCs>=1) renLine+=evidenceLine(hCs,hCx)+'<br>';
       else if(hCx) renLine+='<span style="color:#d9822b;font-weight:650">Under review</span><br>';
+      renLine+=coLines(hd0,hi);   // v3.68 carve-outs (only when flagged)
       if(hd0.ld&&hd0.ld[hi]){ renLine+='<span style="color:#ff7b72">! address disputed — a public listing puts this exact company name in another state</span><br>'; }   // v3.39
       var hEc=hd0.ec?hd0.ec[hi]:0;
       if(hEc){ var EC=['','UNCONFIRMED — not on any PEO roster that covers this name','likely — a name variant is on a public PEO roster','confirmed on a public PEO roster','confirmed by a second source'];
@@ -1824,11 +1826,11 @@ function empBand(v){ v=Number(v)||0; if(v<=0) return 7; if(v<10) return 0; if(v<
 function empOk(dd,i){ for(var k in S.empOff){ if(S.empOff[k]){ if(!dd||!dd.hc) return true; return !S.empOff[empBand(dd.hc[i])]; } } return true; }
 function renderEmpChips(){ var box=$('emp-chips'); if(!box) return;
   box.innerHTML=EMP_BANDS.map(function(t,k){ return '<span class="netchip'+(S.empOff[k]?'':' on')+'" data-eb="'+k+'" title="'+(k===7?'Clients with no employee number we can back up yet':'Clients whose best employee count is '+t)+'">'+t+'</span>'; }).join(''); }
-// v3.68 (1278h, owner 2026-09-24): Workers Comp Carve Out / Health Carve Out - filter + labels.
+// v3.68 (1278h, owner 2026-09-24): Workers Comp Carve Out / Benefits Carve Out - filter + labels.
 function coOk(dd,i){ if(!S.wcoOnly&&!S.bcoOnly) return true; if(!dd) return false; return !!((S.wcoOnly&&dd.wco&&dd.wco[i])||(S.bcoOnly&&dd.bco&&dd.bco[i])); }
 function coLines(dd,i){ if(!dd) return ''; var s='';
   if(dd.wco&&dd.wco[i]) s+='<b style="color:#e8a33d">Workers Comp Carve Out</b> <span class="mut">('+(dd.wco[i]===2?'own comp policy alongside the PEO\'s':'keeps its own comp policy')+')</span><br>';
-  if(dd.bco&&dd.bco[i]) s+='<b style="color:#4fb3a9">Health Carve Out</b> <span class="mut">(runs its own health plan)</span><br>';
+  if(dd.bco&&dd.bco[i]) s+='<b style="color:#4fb3a9">Benefits Carve Out</b> <span class="mut">(runs its own health plan)</span><br>';
   return s; }
 function coOf(cid){ for(var st in S.pinData){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.ids) continue; var j=dd.ids.indexOf(String(cid)); if(j>=0) return {dd:dd,i:j}; } return null; }
 function svcOk(dd,i){ if(!coOk(dd,i)) return false; if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
@@ -2005,17 +2007,14 @@ function openCard(p,slug,history){
     histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+'</div>';
   });
   var formerBanner=p.historical?'<div class="note" style="margin-top:0;margin-bottom:6px;font-weight:650">FORMER PEO client — shown from the historical layer</div>':'';
-  // v3.82 (Gazz 2026-09-28 16:17 MST): the card's Benefits renewal = the same month as the hover (map detail 'br'):
-  // a Health Carve Out company's own plan month, else its PEO's researched book month; shown only when known.
-  var hco0=p.historical?null:coOf(p.company_id), hbr0=(hco0&&hco0.dd.br)?hco0.dd.br[hco0.i]:0;
-  var hren=(hbr0&&MONTHS[hbr0])?MONTHS[hbr0]+((hco0.dd.bco&&hco0.dd.bco[hco0.i])?' <span class="mut">(its own health plan — Health Carve Out)</span>':''):'';
+  var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(fpr&&fpr.hg?'PEO plan year — not this client’s date':basisWord(p.health_renewal_basis))+')':'unknown';
   var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(basisWord(p.peo_current_since_basis))+')':'unknown';
   c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
     '<div><b>'+esc(p.company_display)+'</b>'+affHeader(p,slug)+foldLine(p)+'</div>'+
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
     '<div class="bd">'+formerBanner+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
-    (p.historical?'':((hren?kv('Benefits renewal',hren):'')+kv('WC renewal',ren)))+
+    (p.historical?'':(kv('Health renewal',hren)+kv('WC renewal',ren)))+
     kv('Employees',empCard(p))+(function(){var e=empOf(p);return (e&&e.li)?kv('LinkedIn Employee Count',esc(e.li)):'';})()+
     (p.historical?'':(kv('With PEO since',since)+kv('Operating footprint',fpText(p))))+
     (p.historical?'':kv('Confidence',(function(){
@@ -2669,7 +2668,7 @@ function tblPaintInner(){
   if(renLens()) bits.push('renewal heat on');
   if(S.minSrc) bits.push(S.minSrc>=2?'cross-verified only':'verified only');
   var svh=SVC_ORDER.filter(function(k){ return S.svcOff[k]; }); if(svh.length) bits.push('hiding '+svh.map(function(k){ return SVC[k].name; }).join(', '));
-  if(S.wcoOnly||S.bcoOnly) bits.push('only '+[S.wcoOnly?'Workers Comp Carve Out':null,S.bcoOnly?'Health Carve Out':null].filter(Boolean).join(' + ')+' clients');
+  if(S.wcoOnly||S.bcoOnly) bits.push('only '+[S.wcoOnly?'Workers Comp Carve Out':null,S.bcoOnly?'Benefits Carve Out':null].filter(Boolean).join(' + ')+' clients');
   var emh=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(emh.length) bits.push('hiding employees '+emh.map(function(k){ return EMP_BANDS[k]; }).join(', '));
   if(S.msOnly) bits.push('multi-state only');
   if(S.hist) bits.push('current users only (former records are on the map, not here)');
@@ -2970,17 +2969,19 @@ function renderList(){
         order.forEach(function(k){ var x=cards[k]; var mk=x.map_key||x.network_key;
           var tag=/contract/i.test(x.label||'')?' <span class="netlbl netlbl-sa" title="This carrier entity is a medical contract on the PEO\'s Form 5500 Schedule A; the network name is still being researched">Contract on file</span>':/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':/confirmed/i.test(x.label||'')?' <span class="netlbl netlbl-ok">Confirmed</span>':' <span class="netlbl">Likely</span>';
           var where=x.region&&!/^national$/i.test(x.region)?' <span class="netmut">('+esc(x.region)+')</span>':'';
-          var named=(x.contract_persons?'<div class="netmut">'+(+x.contract_persons).toLocaleString()+' insured on this contract · '+esc(x.contract_entity||'')+'</div>':'')+(x.named.length&&!x.contract_persons?'<div class="netmut">'+esc(p.peo)+' calls it: '+esc(x.named.join(' · '))+'</div>':'');
+          // v3.82 (owner 2026-09-28 16:25): a contract reads "<network> <tier> Contract on file (<region>) (12,856 insured)" on one line - no "on this contract", no carrier entity name
+          var ins=x.contract_persons?' <span class="netmut">('+(+x.contract_persons).toLocaleString()+' insured)</span>':'';
+          var named=(x.named.length&&!x.contract_persons?'<div class="netmut">'+esc(p.peo)+' calls it: '+esc(x.named.join(' · '))+'</div>':'');
           var others=(x.card_others>0)?'<div class="netmut" title="'+esc((x.card_products||[]).join(', '))+'">'+x.card_others+' more product name'+(x.card_others>1?'s':'')+' on this network'+(x.card_match_pct?' · '+x.card_match_pct+'% same doctors':'')+'</div>':'';
           var m=x.mapped?netMeta(mk):null;
           if(m){ var sel=!!N.on[mk], dim=N.tiers[m.tier]===false;
             html+='<label class="netrow netind'+(dim?' dim':'')+'" title="Named in '+esc(p.peo)+'\'s '+esc(x.plan_year||'')+' plan documents · '+x.docs+' document'+(x.docs>1?'s':'')+' · verified '+fmtDate(x.verified_on)+'"><input type="checkbox" name="netsel" value="'+esc(mk)+'" '+(sel?'checked':'')+' title="'+(sel?'Switch this network\'s layer off':'Switch this network\'s layer on')+'"><i class="netsw" style="background:'+netHex(m)+'"></i>'+
-              '<div class="netmeta"><div>'+esc(x.card_title||m.network_name)+' <span class="nettier">'+esc(m.tier)+'</span>'+tag+where+'</div>'+named+others+
+              '<div class="netmeta"><div>'+esc(x.card_title||m.network_name)+' <span class="nettier">'+esc(m.tier)+'</span>'+tag+where+ins+'</div>'+named+others+
               (sel?'<div class="netmut">'+(m.clinicians||0).toLocaleString()+' clinicians · '+(m.hospitals||0).toLocaleString()+' hospitals · '+m.states_covered+' states covered</div>'+
                 '<div class="netmut" title="Carrier network file '+fmtDate(m.data_as_of)+' · provider registry '+fmtDate(m.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(m.data_as_of,m.registry_as_of)+' · updates monthly</div>'+
                 (N.layers[mk]&&!N.layers[mk].n?'<div class="netmut">Map is being built from the carrier\'s file, check back shortly</div>':''):'')+
               '</div></label>';
-          } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+named+' · map not built yet</div>';
+          } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+ins+named+' · map not built yet</div>';
         });
       });
     }
