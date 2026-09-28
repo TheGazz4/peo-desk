@@ -136,6 +136,8 @@
   #tblPeoHealth .mut, #tblDataCal .mut { color: var(--ink-muted); font-size: 12px; }
   #tblDataCal tr.grp td { border-top: 1px solid var(--baseline); padding-top: 10px; }
   .pn-bar select { font: inherit; font-size: 12px; }
+  #tblPeoNet tr.bkt td { background: rgba(127,127,127,.10); padding-top: 8px; border-top: 1px solid var(--border); }
+  #tblPeoNet tr.grp td.peo { font-weight: 700; padding-top: 14px; }
   .pn-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; font-size: 12px; color: var(--ink-2); }
   .delta-up { color: var(--good); font-weight: 650; }
   .delta-dn { color: var(--serious); }
@@ -457,7 +459,7 @@
   </section>
 
   <section class="wide" id="peoNet">
-    <h2>PEO health networks <small>— every PEO, every carrier, every network, sorted National / Regional / Local</small></h2>
+    <h2>PEO health networks <small>— each PEO's networks bucketed National / Regional / Local, listed by name with plan type</small></h2>
     <p class="blurb">Each PEO's carriers come from its newest federal health filing (Form 5500 Schedule A, 2024 or later). The network is named by the PEO's or carrier's own plan documents (benefits guides, SBCs), saved in the evidence vault and checked against the carrier's monthly federal network file. <b>Likely</b> = named in a current document; <b>Inferred</b> = older, third-party, plan type only, or a two-step match. <b>Tier</b>: National = 40+ states, Regional = 3–39, Local = 1–2 (Blue plans count as Local in their home state and reach other states through BlueCard). A tier marked <i>measured</i> comes from the carrier's own network file; otherwise it is documented, and <i>re-cite</i> means the source page was general and needs a service-area page. Research repeats by itself 60 days before each PEO's renewal, and at once when a new filing lands.</p>
     <div class="sc-tiles" id="pnTiles"></div>
     <h3 style="margin:14px 0 6px;font-size:13px">Every PEO profile</h3>
@@ -466,7 +468,7 @@
       <label>status <select id="pnStatus"><option value="">all</option><option>network named</option><option>plan type only</option><option>older or third-party source only</option><option>researched - not public</option><option>not researched yet</option><option>not a medical carrier</option></select></label>
       <label>tier <select id="pnTier"><option value="">all</option><option>National</option><option>Regional</option><option>Local</option></select></label>
       <span id="pnCount"></span><a href="map.html" style="margin-left:auto">Open the Coverage Map →</a></div>
-    <table id="tblPeoNet"><thead><tr><th>PEO</th><th>carrier</th><th class="num">people on plan</th><th>network</th><th>tier</th><th>label</th><th>pair status</th><th>plan year · source</th><th>next check</th><th>strength map</th></tr></thead><tbody></tbody></table>
+    <table id="tblPeoNet"><thead><tr><th>carrier · people on plan</th><th>network</th><th>plan type</th><th>states</th><th>label</th><th>pair status</th><th>plan year · source</th><th>next check</th><th>strength map</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="wide" id="nonPeo">
@@ -1216,20 +1218,44 @@ function renderPeoNetworks(d) {
   if (tb) tb.innerHTML = hs.map((h) => `<tr><td>${esc(h.health_status)}</td><td class="num">${fmtN(h.peos)}</td><td class="num">${fmtN(h.all_named)}</td><td class="num">${fmtN(h.some_named)}</td><td class="num">${fmtN(h.lives)}</td><td class="num">${fmtN(h.lives_named)}</td><td class="mut">${esc((h.examples || []).join(", "))}</td></tr>`).join("") || `<tr><td colspan="7">no rows yet</td></tr>`;
   const show = rows.filter((r) => (!pnOnly || r.network_printed) && (!pnStatus || r.pair_status === pnStatus) && (!pnTier || r.network_tier === pnTier));
   $("#pnCount").textContent = `${show.length} rows`;
-  let lastPeo = null, lastCar = null;
+  /* 2026-09-28 (instanceB, owner ruling): headers are the buckets National / Regional / Local; under each, the
+     networks listed by name with their plan type (HMO, EPO, PPO, POS…) and states. */
   const stChip = (s) => s === "network named" ? "ok" : (s === "plan type only" || s === "older or third-party source only") ? "warn" : "";
-  $("#tblPeoNet tbody").innerHTML = show.map((r) => {
-    const newPeo = r.family_slug !== lastPeo, newCar = newPeo || r.carrier_family !== lastCar; lastPeo = r.family_slug; lastCar = r.carrier_family;
-    const sw = `<span class="sw" style="background:${PN_HEX[r.carrier_family] || "#e0913a"}"></span>`;
-    const lab = r.label ? `<span class="chip ${r.label === "Likely Network" ? "ok" : "warn"}">${r.label === "Likely Network" ? "Likely" : "Inferred"}</span>${r.stale ? ' <span class="mut">(pre-2024 document)</span>' : ""}${r.name_basis === "plan_type_only" ? ' <span class="mut">(plan type only)</span>' : ""}` : "";
-    const net = r.network_printed ? `${esc(r.network_printed)}${r.region && !/^national$/i.test(r.region) ? ` <span class="mut">(${esc(r.region)})</span>` : ""}${r.scored_network && r.scored_network !== r.network_printed ? `<div class="mut">carrier file: ${esc(r.scored_network)}</div>` : ""}` : `<span class="mut">${esc(r.research_notes ? r.research_notes.slice(0, 140) : "not identified yet — research queued")}</span>`;
-    const tier = r.network_tier ? `<b>${esc(r.network_tier)}</b>${r.tier_source === "measured" ? ' <span class="mut">measured</span>' : r.tier_source === "general_page" ? ' <span class="mut" title="source page is general; needs a service-area citation">re-cite</span>' : ""}${r.tier_basis ? `<div class="mut" title="${esc(r.tier_basis)}">${esc(r.tier_basis.slice(0, 90))}${r.tier_basis.length > 90 ? "…" : ""}</div>` : ""}` : "";
-    const src = r.source_url ? `${esc(r.plan_year_text || "")} · <a href="${esc(r.source_url)}" target="_blank" rel="noopener">${esc(String(r.evidence_type || "").replace(/_/g, " "))}</a>${r.vault_path ? ' <span class="mut">· vaulted</span>' : ""}` : "";
-    const nxt = `${r.refresh_due_on ? esc(r.refresh_due_on) : "—"}${r.next_renewal_on ? `<div class="mut">renews ${esc(r.next_renewal_on)}</div>` : ""}`;
-    const st = r.heat_live ? '<span class="chip ok">live</span>' : r.scored_network ? '<span class="chip warn">building</span>' : r.network_printed ? '<span class="mut">carrier file not in pipeline yet</span>' : "";
-    const flag = newPeo && r.peo_flag ? `<div class="mut" title="${esc(r.peo_flag)}">⚑ ${esc(r.peo_flag.split(":")[0])}</div>` : "";
-    return `<tr class="${newPeo ? "grp" : ""}"><td class="peo">${newPeo ? esc(r.peo) + flag : ""}</td><td>${newCar ? sw + esc(r.carrier) : ""}</td><td class="num">${newCar ? fmtN(r.schedule_a_lives) + (r.share_pct != null ? ` <span class="mut">${r.share_pct}%</span>` : "") : ""}</td><td>${net}</td><td>${tier}</td><td>${lab}</td><td>${newCar ? `<span class="chip ${stChip(r.pair_status)}">${esc(r.pair_status || "")}</span>` : ""}</td><td>${src}</td><td>${newCar ? nxt : ""}</td><td>${st}</td></tr>`;
-  }).join("") || `<tr><td colspan="10">no rows yet</td></tr>`;
+  const planTypes = (r) => { const t = new Set(); const s = `${r.product_printed || ""} ${r.network_printed || ""}`; (s.match(/\b(HMO|EPO|PPO|POS|HDHP|HSA|Indemnity)\b/gi) || []).forEach((x) => t.add(x.toUpperCase())); return [...t]; };
+  const BUCKETS = ["National", "Regional", "Local"];
+  const byPeo = new Map();
+  show.forEach((r) => { if (!byPeo.has(r.family_slug)) byPeo.set(r.family_slug, { peo: r.peo, flag: r.peo_flag, rows: [] }); byPeo.get(r.family_slug).rows.push(r); });
+  const html = [];
+  byPeo.forEach((g) => {
+    const carriers = new Map(); g.rows.forEach((r) => { carriers.set(r.carrier_family, Math.max(carriers.get(r.carrier_family) || 0, Number(r.schedule_a_lives) || 0)); }); let lv = 0; carriers.forEach((v) => (lv += v));
+    const flag = g.flag ? ` <span class="mut" title="${esc(g.flag)}">⚑ ${esc(g.flag.split(":")[0])}</span>` : "";
+    html.push(`<tr class="grp"><td colspan="9" class="peo">${esc(g.peo)}${flag} <span class="mut">· ${carriers.size} carriers · ${fmtN(lv)} people on plan</span></td></tr>`);
+    const named = g.rows.filter((r) => r.network_printed), unnamed = g.rows.filter((r) => !r.network_printed);
+    const bucketsHere = BUCKETS.concat(named.some((r) => !BUCKETS.includes(r.network_tier)) ? ["Not yet sorted"] : []);
+    bucketsHere.forEach((b) => {
+      const inB = named.filter((r) => (b === "Not yet sorted" ? !BUCKETS.includes(r.network_tier) : r.network_tier === b)).sort((a, c) => (a.carrier || "").localeCompare(c.carrier || "") || (a.network_printed || "").localeCompare(c.network_printed || ""));
+      if (!inB.length && (pnTier || b === "Not yet sorted")) return;
+      html.push(`<tr class="bkt"><td colspan="9"><b>${esc(b)}</b> <span class="mut">${inB.length} network${inB.length === 1 ? "" : "s"}</span></td></tr>`);
+      if (!inB.length) { html.push(`<tr><td></td><td colspan="8" class="mut">none identified</td></tr>`); return; }
+      inB.forEach((r) => {
+        const sw = `<span class="sw" style="background:${PN_HEX[r.carrier_family] || "#e0913a"}"></span>`;
+        const pt = planTypes(r); const ptHtml = pt.length ? pt.map((x) => `<span class="chip">${esc(x)}</span>`).join(" ") : `<span class="mut">—</span>`;
+        const states = r.region && !/^(national|regional)$/i.test(r.region) ? esc(r.region) : `<span class="mut">${esc(r.region || "")}</span>`;
+        const lab = r.label ? `<span class="chip ${r.label === "Likely Network" ? "ok" : r.label === "Contract on file" ? "" : "warn"}">${esc(r.label === "Likely Network" ? "Likely" : r.label === "Inferred Network" ? "Inferred" : r.label)}</span>${r.stale ? ' <span class="mut">(pre-2024 document)</span>' : ""}${r.name_basis === "plan_type_only" ? ' <span class="mut">(plan type only)</span>' : ""}` : "";
+        const tierNote = r.tier_source === "measured" ? '<span class="mut">measured</span>' : r.tier_source === "general_page" ? '<span class="mut" title="source page is general; needs a service-area citation">re-cite</span>' : "";
+        const net = `${esc(r.network_printed)}${r.scored_network && r.scored_network !== r.network_printed ? `<div class="mut">carrier file: ${esc(r.scored_network)}</div>` : ""}${tierNote ? `<div>${tierNote}</div>` : ""}`;
+        const src = r.source_url ? `${esc(r.plan_year_text || "")} · <a href="${esc(r.source_url)}" target="_blank" rel="noopener">${esc(String(r.evidence_type || "").replace(/_/g, " "))}</a>${r.vault_path ? ' <span class="mut">· vaulted</span>' : ""}` : "";
+        const nxt = `${r.refresh_due_on ? esc(r.refresh_due_on) : "—"}${r.next_renewal_on ? `<div class="mut">renews ${esc(r.next_renewal_on)}</div>` : ""}`;
+        const st = r.heat_live ? '<span class="chip ok">live</span>' : r.scored_network ? '<span class="chip warn">building</span>' : '<span class="mut">carrier file not in pipeline yet</span>';
+        html.push(`<tr><td>${sw}${esc(r.carrier)} <span class="mut">${fmtN(r.schedule_a_lives)}${r.share_pct != null ? ` · ${r.share_pct}%` : ""}</span></td><td>${net}</td><td>${ptHtml}</td><td>${states}</td><td>${lab}</td><td><span class="chip ${stChip(r.pair_status)}">${esc(r.pair_status || "")}</span></td><td>${src}</td><td>${nxt}</td><td>${st}</td></tr>`);
+      });
+    });
+    if (unnamed.length && !pnTier) {
+      html.push(`<tr class="bkt"><td colspan="9"><b>Carriers with no network identified yet</b> <span class="mut">${unnamed.length}</span></td></tr>`);
+      unnamed.forEach((r) => { const sw = `<span class="sw" style="background:${PN_HEX[r.carrier_family] || "#e0913a"}"></span>`; html.push(`<tr><td>${sw}${esc(r.carrier)} <span class="mut">${fmtN(r.schedule_a_lives)}</span></td><td colspan="4" class="mut">${esc(r.research_notes ? r.research_notes.slice(0, 140) : "not identified yet — research queued")}</td><td><span class="chip ${stChip(r.pair_status)}">${esc(r.pair_status || "")}</span></td><td></td><td>${r.refresh_due_on ? esc(r.refresh_due_on) : "—"}</td><td></td></tr>`); });
+    }
+  });
+  $("#tblPeoNet tbody").innerHTML = html.join("") || `<tr><td colspan="9">no rows yet</td></tr>`;
   renderDataCalendar(d);
 }
 function renderPeoIdentity(d) {
