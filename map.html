@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.76 (2026-09-28, Instance B, owner: "under the family brand toggle on what I want to see is the first PEO (in its
+            respective color) and then an arrow to the right to its family brand in its respective color and name"): on the
+            Family brand view every folded PEO reads  ● Brand -> ● Family  (each in its own color) - in the left list's tree rows
+            and in the client card header. Off on the PEO specific view. Family brand is only an association we track.
      v3.75 (2026-09-28, Instance B 2213, owner: "Go to ALL of this - make it all work"): the Family brand toggle now folds ONLY on
             ruled, reasoned links (peo_corporate_events: acquired / merged / rebranded, chain-resolved to the top PEO brand; PE and
             external owners never fold). The PEO specific view is never folded - it shows the brand on the customer's paperwork.
@@ -273,6 +277,12 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .peo-row .nm{flex:1;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peo-row.on .nm{color:var(--ink)}
 .peo-row .ct{font-size:11px;color:var(--muted)}
+.peo-row .aff{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.peo-row .aff .arr{color:var(--muted);font-weight:600}
+.peo-row .aff .fsw{width:8px;height:8px;border-radius:2px;box-shadow:0 0 0 1px var(--ring)}
+.aff-hd{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+.aff-hd .fsw{width:10px;height:10px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--ring)}
+.aff-hd .arr{color:var(--muted);font-weight:600}
 .peo-row .ct.pend{border-bottom:1px dotted var(--muted);cursor:help}
 .peo-row .solo{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden}
 .peo-row:hover .solo{visibility:visible}
@@ -466,7 +476,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.75 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.76 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1612,7 +1622,16 @@ function buildPeoPanel(){
     cb.title=(on?'showing':'hidden')+' on the map — click to toggle';
     cb.setAttribute('aria-label',(r.display||r.slug)+' visible on the map');
     cb.onclick=function(e){ e.stopPropagation(); map[r.slug]=cb.checked; afterSel(); };
-    d.appendChild(cb); d.appendChild(sw); d.appendChild(nm); d.appendChild(ct);
+    d.appendChild(cb); d.appendChild(sw); d.appendChild(nm);
+    if(child){   // v3.76: ● Brand -> ● Family, each in its own color (Family brand view only; an association we track)
+      var f=r.family_slug, aff=document.createElement('span'); aff.className='aff';
+      var ar=document.createElement('span'); ar.className='arr'; ar.textContent='\u2192';
+      var fsw=document.createElement('span'); fsw.className='fsw'; fsw.style.background=(S.colors.family&&S.colors.family[f])||OTHER;
+      var fn=document.createElement('span'); fn.textContent=dispOfGrain('family',f);
+      aff.appendChild(ar); aff.appendChild(fsw); aff.appendChild(fn); d.appendChild(aff);
+      sw.style.background=(S.colors.brand&&S.colors.brand[r.slug])||r.color_hex||OTHER;   // the PEO in ITS colour
+    }
+    d.appendChild(ct);
     if(!child){
       var so=document.createElement('span'); so.className='solo'; so.textContent='solo';
       so.onclick=function(e){ e.stopPropagation(); Object.keys(sel).forEach(function(k){sel[k]=false}); sel[r.slug]=true; afterSel(); };
@@ -1908,11 +1927,20 @@ function foldLine(p){
   var kind=f.kind==='rebranded'?'rebranded':(f.kind==='merged'?'merged':'acquired');
   var parent=esc(f.display||dispOfGrain('family',f.to));
   var line='<div style="font-size:11.5px;color:#9aa5ad;margin-top:2px">'+
-    (S.grain==='family'?('Brand on file: <b>'+esc(brandDisp(b))+'</b> &middot; '):'')+
     'Part of <b>'+parent+'</b> since '+esc(foldDate(f))+' ('+kind+(f.hops>1?', via '+(f.hops-1)+' earlier step'+(f.hops>2?'s':'')+'':'')+')</div>';
   return line;
 }
 function dispOfGrain(g,slug){ return (S.displays[g]&&S.displays[g][slug])||slug; }
+// v3.76: card header. PEO specific view = the brand in its colour. Family view, folded brand = ● Brand -> ● Family, each in its own colour.
+function affHeader(p,slug){
+  var b=p.brand_slug||p.family_slug, f=S.folds&&b?S.folds[b]:null;
+  if(S.grain==='family' && f){
+    var bc=(S.colors.brand&&S.colors.brand[b])||OTHER, fc=(S.colors.family&&S.colors.family[f.to])||OTHER;
+    return '<div class="aff-hd"><span class="fsw" style="background:'+bc+'"></span><span style="color:'+bc+'">'+esc(brandDisp(b))+'</span>'+
+           '<span class="arr">&rarr;</span><span class="fsw" style="background:'+fc+'"></span><span style="color:'+fc+'">'+esc(f.display||dispOfGrain('family',f.to))+'</span></div>';
+  }
+  return '<div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div>';
+}
 function openCard(p,slug,history){
   var c=$('card'); stClear(true); c.dataset.kind='company';   // v3.59: a company card replaces the state card + outline
   // v3.22: basis fields arrive as tier words/classes from map-data v2.10 (never raw source text); basisWord() is the belt-and-braces.
@@ -1929,7 +1957,7 @@ function openCard(p,slug,history){
   var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(fpr&&fpr.hg?'PEO plan year — not this client’s date':basisWord(p.health_renewal_basis))+')':'unknown';
   var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(basisWord(p.peo_current_since_basis))+')':'unknown';
   c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
-    '<div><b>'+esc(p.company_display)+'</b><div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div>'+foldLine(p)+'</div>'+
+    '<div><b>'+esc(p.company_display)+'</b>'+affHeader(p,slug)+foldLine(p)+'</div>'+
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
     '<div class="bd">'+formerBanner+
     kv('Location',esc((p.city||'')+', '+(p.state||''))+' '+esc(p.zip5||''))+
