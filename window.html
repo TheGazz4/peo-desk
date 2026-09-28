@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEO Engine — The Window</title>
+<!--
+  THE WINDOW (owner-only data display) — Instance B, 2026-09-28, migration 2186
+  Left: "Sent to me" (drops from chat) + every hub's panes (tables).
+  Right: the table — page, search, sort by column, hide columns, CSV of the page.
+  Data door: POST functions/v1/window-api with x-desk-key (same desk_key the other surfaces use).
+  Publish door: desk_assets row 'window.html' -> desk_asset_commit('window.html', ...)
+-->
+<style>
+  :root { color-scheme:dark; --surface-1:#1a1a19; --page:#0d0d0d; --ink-1:#fff; --ink-2:#c3c2b7; --ink-muted:#898781;
+          --grid:#2c2c2a; --border:rgba(255,255,255,.10); --series-1:#3987e5; --good:#0ca30c; --warning:#fab219; --critical:#d03b3b; }
+  :root[data-theme="light"] { color-scheme:light; --surface-1:#fcfcfb; --page:#f9f9f7; --ink-1:#0b0b0b; --ink-2:#52514e;
+          --ink-muted:#898781; --grid:#e1e0d9; --border:rgba(11,11,11,.10); --series-1:#2a78d6; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--page); color:var(--ink-1); font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  body { display:grid; grid-template-columns:300px 1fr; grid-template-rows:auto 1fr; height:100%; }
+  header { grid-column:1/3; display:flex; gap:12px; align-items:center; padding:8px 14px; border-bottom:1px solid var(--border); background:var(--surface-1); }
+  header h1 { font-size:13px; margin:0; letter-spacing:.08em; font-weight:650; }
+  header h1 span { color:var(--ink-muted); font-weight:400; letter-spacing:.03em; }
+  .spacer { margin-left:auto; }
+  .ctl { background:none; border:1px solid var(--border); color:var(--ink-2); border-radius:6px; padding:3px 10px; cursor:pointer; font:inherit; font-size:12px; }
+  .ctl:hover { color:var(--ink-1); } .ctl.primary { border-color:var(--series-1); color:var(--ink-1); }
+  input.ctl { cursor:text; }
+  aside { border-right:1px solid var(--border); background:var(--surface-1); overflow:auto; padding:10px 0; }
+  aside h2 { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-muted); margin:10px 14px 4px; }
+  .item { display:block; width:100%; text-align:left; background:none; border:0; border-left:3px solid transparent; color:var(--ink-2);
+          padding:6px 14px 6px 11px; cursor:pointer; font:inherit; }
+  .item:hover { color:var(--ink-1); background:rgba(127,127,127,.10); }
+  .item.on { color:var(--ink-1); border-left-color:var(--series-1); background:rgba(57,135,229,.12); }
+  .item .sub { display:block; font-size:11px; color:var(--ink-muted); }
+  .item .new { color:var(--warning); font-size:10px; margin-left:6px; letter-spacing:.08em; }
+  .hub { margin-top:6px; }
+  .hub summary { cursor:pointer; padding:5px 14px; color:var(--ink-2); font-weight:600; list-style:none; }
+  .hub summary::-webkit-details-marker { display:none; }
+  .hub summary .st { font-size:10px; color:var(--ink-muted); margin-left:6px; font-weight:400; }
+  main { display:flex; flex-direction:column; min-width:0; min-height:0; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--border); }
+  .bar .title { font-weight:650; }
+  .bar .meta { color:var(--ink-muted); font-size:12px; }
+  .wrap { flex:1; overflow:auto; min-height:0; }
+  table { border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; }
+  th,td { padding:4px 8px; border-bottom:1px solid var(--grid); border-right:1px solid var(--grid); white-space:nowrap; max-width:420px; overflow:hidden; text-overflow:ellipsis; vertical-align:top; }
+  th { position:sticky; top:0; background:var(--surface-1); text-align:left; cursor:pointer; user-select:none; }
+  th.sorted { color:var(--series-1); }
+  td.null { color:var(--ink-muted); font-style:italic; }
+  tr:hover td { background:rgba(127,127,127,.08); }
+  #cols { display:none; gap:6px; flex-wrap:wrap; padding:6px 14px; border-bottom:1px solid var(--border); font-size:12px; }
+  #cols.show { display:flex; }
+  #cols label { border:1px solid var(--border); border-radius:999px; padding:1px 8px; cursor:pointer; color:var(--ink-2); }
+  #cols label.off { text-decoration:line-through; color:var(--ink-muted); }
+  #empty { padding:40px; color:var(--ink-muted); text-align:center; }
+  #gate { grid-column:1/3; display:none; padding:40px; text-align:center; color:var(--ink-2); }
+  #gate.show { display:block; }
+  #gate input { width:360px; max-width:90%; }
+  .note { font-size:12px; color:var(--warning); padding:6px 14px; border-bottom:1px solid var(--border); display:none; }
+  .note.show { display:block; }
+  @media (max-width:800px) { body { grid-template-columns:1fr; grid-template-rows:auto auto 1fr; } aside { max-height:38vh; border-right:0; border-bottom:1px solid var(--border);} header { grid-column:1; } #gate { grid-column:1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>THE WINDOW <span>· owner-only data display</span></h1>
+  <span id="asof" class="meta" style="color:var(--ink-muted);font-size:11px"></span>
+  <div class="spacer"></div>
+  <button class="ctl" id="refreshBtn">refresh</button>
+  <button class="ctl" id="keyBtn">key</button>
+</header>
+
+<div id="gate">
+  <p>This surface is owner-only. Paste the desk key (Vault: <code>desk_access_key</code>) — it is the same key the other surfaces use and unlocks all of them.</p>
+  <input class="ctl" id="keyInput" type="password" placeholder="desk key" autocomplete="off">
+  <button class="ctl primary" id="keySave">unlock</button>
+</div>
+
+<aside id="side"></aside>
+
+<main>
+  <div class="bar">
+    <span class="title" id="title">Pick something on the left</span>
+    <span class="meta" id="meta"></span>
+    <div class="spacer"></div>
+    <input class="ctl" id="search" placeholder="search this table…" style="width:220px">
+    <button class="ctl" id="colsBtn">columns</button>
+    <button class="ctl" id="csvBtn">csv</button>
+    <button class="ctl" id="prevBtn">‹</button>
+    <span class="meta" id="page"></span>
+    <button class="ctl" id="nextBtn">›</button>
+    <button class="ctl" id="pinBtn" style="display:none">pin</button>
+    <button class="ctl" id="clearBtn" style="display:none">clear</button>
+  </div>
+  <div class="note" id="note"></div>
+  <div id="cols"></div>
+  <div class="wrap"><div id="empty">Nothing open.</div><table id="tbl" style="display:none"><thead></thead><tbody></tbody></table></div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var API = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/window-api";
+  var ANON = "sb_publishable_HhVH7JdPftsLC1WAw6P_Cg_wMj2Fl_V";
+  function ls(k){ try{return localStorage.getItem(k);}catch(e){return null;} }
+  function lset(k,v){ try{localStorage.setItem(k,v);}catch(e){} }
+  var theme = ls("desk_theme"); if (theme) document.documentElement.dataset.theme = theme;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var state = { list:null, mode:null, pane:null, drop:null, page:1, size:100, search:"", order:null, cols:[], hidden:{}, rows:[], total:0 };
+
+  /* ---------- key gate (same desk_key as every other surface) ---------- */
+  function key(){ return ls("desk_key") || ls("peo_dash_key"); }
+  function gate(show){ $("gate").className = show ? "show" : ""; $("side").style.display = show?"none":""; document.querySelector("main").style.display = show?"none":""; }
+  $("keySave").onclick = function(){ var v = $("keyInput").value.trim(); if(!v) return; lset("desk_key", v); $("keyInput").value=""; gate(false); load(); };
+  $("keyBtn").onclick = function(){ gate(true); };
+  $("keyInput").addEventListener("keydown", function(e){ if(e.key==="Enter") $("keySave").onclick(); });
+
+  async function api(body){
+    var r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", "apikey":ANON, "Authorization":"Bearer "+ANON, "x-desk-key": key()||"" }, body: JSON.stringify(body) });
+    if (r.status === 401) { gate(true); throw new Error("desk key refused"); }
+    var j = await r.json();
+    if (j && j.error) throw new Error(j.error);
+    return j;
+  }
+
+  /* ---------- left column ---------- */
+  async function load(){
+    if (!key()) { gate(true); return; }
+    try { state.list = await api({action:"list"}); } catch(e){ $("title").textContent = "Could not load: " + e.message; return; }
+    $("asof").textContent = "as of " + new Date(state.list.as_of).toLocaleTimeString();
+    renderSide();
+  }
+  function renderSide(){
+    var s = $("side"); s.innerHTML = "";
+    var h = document.createElement("h2"); h.textContent = "Sent to me (" + state.list.drops.length + ")"; s.appendChild(h);
+    if (!state.list.drops.length) { var p=document.createElement("div"); p.className="item"; p.style.color="var(--ink-muted)"; p.textContent="Nothing yet. In chat, say “show this to me in the window”."; s.appendChild(p); }
+    state.list.drops.forEach(function(d){
+      var b = document.createElement("button"); b.className = "item" + (state.mode==="drop" && state.drop && state.drop.id===d.id ? " on":"");
+      b.innerHTML = (d.pinned?"📌 ":"") + esc(d.title) + (d.seen_at?"":"<span class='new'>NEW</span>") +
+        "<span class='sub'>" + esc(d.sent_by) + " · " + d.row_count + " rows · " + new Date(d.sent_at).toLocaleString() + "</span>";
+      b.onclick = function(){ openDrop(d.id); };
+      s.appendChild(b);
+    });
+    var byHub = {};
+    state.list.panes.forEach(function(p){ (byHub[p.hub_slug] = byHub[p.hub_slug] || {name:p.hub_name, status:p.hub_status, panes:[]}).panes.push(p); });
+    var h2 = document.createElement("h2"); h2.textContent = "Hubs, brains & banks"; s.appendChild(h2);
+    Object.keys(byHub).sort(function(a,b){ return byHub[a].name.localeCompare(byHub[b].name); }).forEach(function(slug){
+      var g = byHub[slug]; var det = document.createElement("details"); det.className="hub"; det.open = (state.pane && state.pane.hub_slug===slug);
+      var sm = document.createElement("summary"); sm.innerHTML = esc(g.name) + "<span class='st'>" + esc(g.status||"") + "</span>"; det.appendChild(sm);
+      g.panes.forEach(function(p){
+        var b = document.createElement("button"); b.className = "item" + (state.mode==="pane" && state.pane && state.pane.pane_slug===p.pane_slug ? " on":"");
+        b.innerHTML = esc(p.label) + "<span class='sub'>" + esc(p.relation) + "</span>"; b.title = p.description || "";
+        b.onclick = function(){ openPane(p); };
+        det.appendChild(b);
+      });
+      s.appendChild(det);
+    });
+  }
+
+  /* ---------- open a pane (live table, paged) ---------- */
+  async function openPane(p){
+    state.mode="pane"; state.pane=p; state.drop=null; state.page=1; state.search=""; state.order=null; state.hidden={};
+    $("search").value=""; $("pinBtn").style.display="none"; $("clearBtn").style.display="none";
+    await fetchPane(); renderSide();
+  }
+  async function fetchPane(){
+    $("title").textContent = state.pane.label; $("meta").textContent = "loading…";
+    try {
+      var r = await api({action:"fetch", pane:state.pane.pane_slug, page:state.page, page_size:state.size, search:state.search||null, order:state.order});
+      state.cols = r.columns; state.rows = r.rows; state.total = r.total;
+      $("meta").textContent = r.relation + " · " + r.total.toLocaleString() + " rows" + (state.search?" matching":"") + " · live as of " + new Date(r.as_of).toLocaleTimeString();
+      note(""); renderTable();
+    } catch(e){ $("meta").textContent = "error: " + e.message; }
+  }
+
+  /* ---------- open a drop (snapshot) ---------- */
+  async function openDrop(id){
+    state.mode="drop"; state.pane=null; state.page=1; state.search=""; state.order=null; state.hidden={}; $("search").value="";
+    try {
+      var d = await api({action:"drop", id:id}); state.drop = d;
+      state.cols = d.columns; state.rows = d.rows; state.total = d.row_count;
+      $("title").textContent = d.title;
+      $("meta").textContent = "sent by " + d.sent_by + (d.hub_slug?" from "+d.hub_slug:"") + " · " + d.row_count.toLocaleString() + " rows · snapshot " + new Date(d.sent_at).toLocaleString();
+      note(d.note || ""); $("pinBtn").style.display=""; $("pinBtn").textContent = d.pinned?"unpin":"pin"; $("clearBtn").style.display="";
+      state.list.drops.forEach(function(x){ if(x.id===id) x.seen_at = x.seen_at || new Date().toISOString(); });
+      renderTable(); renderSide();
+    } catch(e){ $("title").textContent = "error: " + e.message; }
+  }
+  $("pinBtn").onclick = async function(){ if(!state.drop) return; await api({action:"drop_act", id:state.drop.id, act: state.drop.pinned?"unpin":"pin"}); await load(); openDrop(state.drop.id); };
+  $("clearBtn").onclick = async function(){ if(!state.drop) return; if(!confirm("Clear this drop from the Window? (it is only a snapshot; nothing in any hub changes)")) return; await api({action:"drop_act", id:state.drop.id, act:"clear"}); state.mode=null; state.drop=null; $("tbl").style.display="none"; $("empty").style.display=""; $("title").textContent="Cleared."; $("meta").textContent=""; note(""); $("pinBtn").style.display="none"; $("clearBtn").style.display="none"; load(); };
+
+  /* ---------- table ---------- */
+  function visibleRows(){
+    if (state.mode!=="drop") return state.rows;
+    var rows = state.rows;
+    if (state.search) { var q = state.search.toLowerCase(); rows = rows.filter(function(r){ return JSON.stringify(r).toLowerCase().indexOf(q)>=0; }); }
+    if (state.order) { var c = state.order.split(" ")[0], dir = state.order.indexOf(" desc")>0?-1:1;
+      rows = rows.slice().sort(function(a,b){ var x=a[c], y=b[c]; if(x==null) return 1; if(y==null) return -1; return (x>y?1:x<y?-1:0)*dir; }); }
+    state.total = rows.length;
+    return rows.slice((state.page-1)*state.size, state.page*state.size);
+  }
+  function renderTable(){
+    var rows = visibleRows();
+    var cols = state.cols.filter(function(c){ return !state.hidden[c]; });
+    var th = "<tr>" + cols.map(function(c){ var s = state.order && state.order.split(" ")[0]===c; return "<th class='"+(s?"sorted":"")+"' data-c='"+esc(c)+"'>"+esc(c)+(s?(state.order.indexOf(" desc")>0?" ↓":" ↑"):"")+"</th>"; }).join("") + "</tr>";
+    var tb = rows.map(function(r){ return "<tr>" + cols.map(function(c){ var v=r[c]; if(v===null||v===undefined) return "<td class='null'>null</td>"; if(typeof v==="object") v=JSON.stringify(v); return "<td title='"+esc(String(v))+"'>"+esc(String(v))+"</td>"; }).join("") + "</tr>"; }).join("");
+    $("tbl").querySelector("thead").innerHTML = th; $("tbl").querySelector("tbody").innerHTML = tb;
+    $("tbl").style.display = rows.length?"":"none"; $("empty").style.display = rows.length?"none":""; $("empty").textContent = rows.length?"":"No rows.";
+    var pages = Math.max(1, Math.ceil(state.total/state.size)); $("page").textContent = "page " + state.page + " / " + pages;
+    $("prevBtn").disabled = state.page<=1; $("nextBtn").disabled = state.page>=pages;
+    var cb = $("cols"); cb.innerHTML = state.cols.map(function(c){ return "<label class='"+(state.hidden[c]?"off":"")+"' data-c='"+esc(c)+"'>"+esc(c)+"</label>"; }).join("");
+    Array.prototype.forEach.call($("tbl").querySelectorAll("th"), function(t){ t.onclick = function(){ var c=t.dataset.c; state.order = (state.order===c+" asc")?c+" desc":c+" asc"; state.page=1; refetch(); }; });
+    Array.prototype.forEach.call(cb.querySelectorAll("label"), function(l){ l.onclick = function(){ var c=l.dataset.c; state.hidden[c]=!state.hidden[c]; renderTable(); }; });
+  }
+  function refetch(){ if(state.mode==="pane") fetchPane(); else if(state.mode==="drop") renderTable(); }
+  $("prevBtn").onclick = function(){ if(state.page>1){ state.page--; refetch(); } };
+  $("nextBtn").onclick = function(){ state.page++; refetch(); };
+  var t; $("search").addEventListener("input", function(){ clearTimeout(t); t = setTimeout(function(){ state.search = $("search").value.trim(); state.page=1; refetch(); }, 350); });
+  $("colsBtn").onclick = function(){ $("cols").classList.toggle("show"); };
+  $("refreshBtn").onclick = function(){ load(); if(state.mode==="pane") fetchPane(); };
+  $("csvBtn").onclick = function(){
+    var cols = state.cols.filter(function(c){ return !state.hidden[c]; }); var rows = visibleRows();
+    var csv = [cols.join(",")].concat(rows.map(function(r){ return cols.map(function(c){ var v=r[c]; if(v==null) v=""; if(typeof v==="object") v=JSON.stringify(v); v=String(v); return '"'+v.replace(/"/g,'""')+'"'; }).join(","); })).join("\n");
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download = ((state.mode==="drop"&&state.drop)?state.drop.title:(state.pane?state.pane.pane_slug:"window")).replace(/[^a-z0-9_-]+/gi,"_") + "_p"+state.page+".csv"; a.click();
+  };
+  function note(s){ $("note").textContent = s; $("note").className = "note" + (s?" show":""); }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+  /* new drops show up on their own */
+  setInterval(function(){ if(key() && !document.hidden) load(); }, 15000);
+  load();
+})();
+</script>
+</body>
+</html>
