@@ -125,7 +125,8 @@
     { id:"review", file:"review.html", label:"Review",        hint:"adjudication queue",          refresh:false },
     { id:"intel",  file:"intel.html",  label:"Industry Intel", hint:"pick a PEO: industry yardsticks + full profile", refresh:false },
     { id:"client", file:"client.html", label:"Client Lifecycle", hint:"one company: lifecycle story, PEO periods, renewal clock", refresh:false },
-    { id:"lineage", file:"lineage.html", label:"Record Lineage", hint:"owner only: latest 100 appended records; where each record came from and every append since", refresh:false }
+    { id:"lineage", file:"lineage.html", label:"Record Lineage", hint:"owner only: latest 100 appended records; where each record came from and every append since", refresh:false },
+    { id:"window", file:"window.html", label:"The Window", hint:"owner only: any hub's tables, plus results sent to you from chat", refresh:false }
   ];
   var DEEP = { client:1, lineage:1 };   /* routes that take a record id: #/<route>?id=<uuid> */
   var STALE_MS = 5 * 60 * 1000;   /* a refreshable surface hidden this long reloads on return */
@@ -182,7 +183,7 @@
 
   /* ---------- keep cross-links between surfaces inside the shell ---------- */
   var FILE2ID = { "index.html":"desk", "":"desk", "desk.html":"desk", "map.html":"map",
-                  "ask.html":"ask", "send.html":"send", "review.html":"review", "intel.html":"intel", "client.html":"client", "lineage.html":"lineage" };
+                  "ask.html":"ask", "send.html":"send", "review.html":"review", "intel.html":"intel", "client.html":"client", "lineage.html":"lineage", "window.html":"window" };
   function wire(f) {
     var d;
     try { d = f.contentDocument; } catch (e) { return; }
