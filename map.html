@@ -2717,7 +2717,7 @@ function buildSection(){
   var anchor=$n('states'); anchor=anchor?anchor.parentNode:null;
   if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec,anchor); else $n('panel').appendChild(sec);
     if(!document.getElementById('netinscss')){ var sti=document.createElement('style'); sti.id='netinscss';
-      sti.textContent='.netinsrow{margin:-2px 0 4px 22px;font-size:11.5px;line-height:1.4}.netins{color:var(--ink,#fff);font-weight:600}.netlbl-ok{background:rgba(29,158,117,.22);color:#9fe1cb}'+
+      sti.textContent='.netinsrow{margin:-2px 0 4px 22px;font-size:11.5px;line-height:1.4}.netins{color:var(--ink,#fff);font-weight:600}.netlbl-ok{background:rgba(29,158,117,.22);color:#9fe1cb}.netlbl-sa{background:rgba(55,138,221,.22);color:#b5d4f4}'+
         '.netcar-h{cursor:pointer;user-select:none}.netcar-h:hover b{text-decoration:underline}.netcaret{margin-left:auto;padding-left:8px;color:var(--muted,#8a90a0);font-weight:700}.netcar-h.open .netcaret{color:var(--ink,#fff)}'+
         /* v3.62 (owner 2026-09-28): the selected PEO must be unmistakable */
         '.netpeo.open{border:1px solid rgba(155,79,208,.55);border-radius:10px;background:rgba(155,79,208,.08);padding:2px 6px 6px;margin:6px 0 8px}'+
@@ -2843,9 +2843,9 @@ function renderList(){
           if(/confirmed/i.test(x.label||'')) cards[k].label=x.label;
           cards[k].docs+=(x.documents||1); });
         order.forEach(function(k){ var x=cards[k]; var mk=x.map_key||x.network_key;
-          var tag=/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':/confirmed/i.test(x.label||'')?' <span class="netlbl netlbl-ok">Confirmed</span>':' <span class="netlbl">Likely</span>';
+          var tag=/contract/i.test(x.label||'')?' <span class="netlbl netlbl-sa" title="This carrier entity is a medical contract on the PEO\'s Form 5500 Schedule A; the network name is still being researched">Contract on file</span>':/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':/confirmed/i.test(x.label||'')?' <span class="netlbl netlbl-ok">Confirmed</span>':' <span class="netlbl">Likely</span>';
           var where=x.region&&!/^national$/i.test(x.region)?' <span class="netmut">('+esc(x.region)+')</span>':'';
-          var named=x.named.length?'<div class="netmut">'+esc(p.peo)+' calls it: '+esc(x.named.join(' · '))+'</div>':'';
+          var named=(x.contract_persons?'<div class="netmut">'+(+x.contract_persons).toLocaleString()+' insured on this contract · '+esc(x.contract_entity||'')+'</div>':'')+(x.named.length&&!x.contract_persons?'<div class="netmut">'+esc(p.peo)+' calls it: '+esc(x.named.join(' · '))+'</div>':'');
           var others=(x.card_others>0)?'<div class="netmut" title="'+esc((x.card_products||[]).join(', '))+'">'+x.card_others+' more product name'+(x.card_others>1?'s':'')+' on this network'+(x.card_match_pct?' · '+x.card_match_pct+'% same doctors':'')+'</div>':'';
           var m=x.mapped?netMeta(mk):null;
           if(m){ var sel=N.sel===mk, dim=N.tiers[m.tier]===false;
