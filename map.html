@@ -490,7 +490,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.80 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.81 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -820,7 +820,9 @@ function commitDetail(st,r){
             hc:(r.hc&&r.hc.length===n)?r.hc:null, hct:(r.hct&&r.hct.length===n)?r.hct:null, hcl:(r.hcl&&r.hcl.length===n)?r.hcl:null,
             lie:(r.lie&&r.lie.length===n)?r.lie:null, pcs:(r.pcs&&r.pcs.length===n)?r.pcs:null, pcsb:(r.pcsb&&r.pcsb.length===n)?r.pcsb:null,
             // v3.68b (1278h): Workers Comp Carve Out / Benefits Carve Out flags
-            wco:(r.wco&&r.wco.length===n)?r.wco:null, bco:(r.bco&&r.bco.length===n)?r.bco:null};
+            wco:(r.wco&&r.wco.length===n)?r.wco:null, bco:(r.bco&&r.bco.length===n)?r.bco:null,
+            // v3.81 (9013): website, current client (1 Yes / 2 No / 0 not known), benefits renewal month (0 = not known)
+            web:(r.web&&r.web.length===n)?r.web:null, cc:(r.cc&&r.cc.length===n)?r.cc:null, br:(r.br&&r.br.length===n)?r.br:null};
   try{ renderSvcChips(); }catch(_){}
   d.lat0=null; d.lng0=null;
 }
@@ -1422,25 +1424,36 @@ function onMove(e){
     var nm=d.detail?(d.detail.names[h.i]||'—'):'Loading…';
     var city=d.detail?(d.detail.cities[h.i]||''):'';
     var street=d.detail?!!d.detail.street[h.i]:false;
+    // v3.81 (Gazz 2026-09-28 15:43-15:45 MST, Instance B): hover order = name, PEO, City/state, website, Current client,
+    // Relationship, Benefits renewal, Employee count, then the rest. Every line shows ONLY when we know it: no
+    // "unknown", "pending", "unconfirmed" or "not testable" placeholders. No WC renewal information of any kind.
     var renLine='';
     if(d.detail){
-      var hm=(d.detail.hrm&&d.detail.hrm[h.i])||0, hb=(d.detail.hrmb&&d.detail.hrmb[h.i])||0;
-      if(hm){ var hw=(d.detail.hg&&d.detail.hg[h.i])?'PEO plan year — not this client’s date':(RMB_LABELS[hb]||'unverified');
-              renLine+='Health renews ~'+MONTHS[hm]+' <span class="mut">('+hw+')</span><br>'; }
-      else if(S.lens==='health'){ renLine+='<span class="mut">Health renewal month unknown</span><br>'; }
-      // 2026-09-28 Gazz (Instance B): no WC renewal information of any kind on the hover box (record card unchanged)
-      renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
-      renLine+=coLines(d.detail,h.i);   // v3.68 carve-outs
-      if(d.detail.sv){ var svq=d.detail.sv[h.i]; renLine+='Relationship: '+(svq?'<b>'+SVC[svq].name+'</b>':'<span class="mut">unconfirmed</span>')+' <span class="mut">('+SVC[svq].card+')</span><br>'; }   // v3.58
-      if(d.detail.ld&&d.detail.ld[h.i]){ renLine+='<span style="color:#ff7b72">! address disputed — a public listing puts this exact company name in another state</span><br>'; }   // v3.39
-      if(d.detail.ec){ var EC=['not testable — no roster covers this company yet','UNCONFIRMED — not on any PEO roster that covers this name','likely — a name variant is on a public PEO roster','confirmed on a public PEO roster','confirmed by a second source'];
-        var ecc=['#71808b','#d03b3b','#fab219','#43a566','#43a566'][d.detail.ec[h.i]]||'#71808b';
-        renLine+='<span style="color:'+ecc+'">'+esc(EC[d.detail.ec[h.i]]||EC[0])+'</span><br>'; }   // v3.40
+      var hd0=d.detail, hi=h.i;
+      var hWeb=hd0.web?hd0.web[hi]:'';
+      if(hWeb) renLine+='<span style="color:#58a6ff">'+esc(hWeb)+'</span><br>';
+      var hCc=hd0.cc?hd0.cc[hi]:0;
+      if(hCc===1) renLine+='Current client: <b>Yes</b><br>'; else if(hCc===2) renLine+='Current client: <b>No</b><br>';
+      var hSv=hd0.sv?hd0.sv[hi]:0;
+      if(hSv&&SVC[hSv]) renLine+='Relationship: <b>'+SVC[hSv].name+'</b> <span class="mut">('+SVC[hSv].card+')</span><br>';
+      var hBr=hd0.br?hd0.br[hi]:0;
+      if(hBr&&MONTHS[hBr]) renLine+='Benefits renewal: <b>'+MONTHS[hBr]+'</b><br>';
+      var hEt=hd0.hct?hd0.hct[hi]:null, hEl=hd0.hcl?hd0.hcl[hi]:4;
+      if(hEt&&hEl<=3) renLine+='Employee count: <b>'+esc(hEt)+'</b>'+(hEl>1?' <span class="mut">'+(['','','likely','indicated'][hEl]||'')+'</span>':'')+'<br>';
+      var hCs=hd0.cs?hd0.cs[hi]:0, hCx=hd0.cx?hd0.cx[hi]:0;
+      if(hCs>=1) renLine+=evidenceLine(hCs,hCx)+'<br>';
+      else if(hCx) renLine+='<span style="color:#d9822b;font-weight:650">Under review</span><br>';
+      renLine+=coLines(hd0,hi);   // v3.68 carve-outs (only when flagged)
+      if(hd0.ld&&hd0.ld[hi]){ renLine+='<span style="color:#ff7b72">! address disputed — a public listing puts this exact company name in another state</span><br>'; }   // v3.39
+      var hEc=hd0.ec?hd0.ec[hi]:0;
+      if(hEc){ var EC=['','UNCONFIRMED — not on any PEO roster that covers this name','likely — a name variant is on a public PEO roster','confirmed on a public PEO roster','confirmed by a second source'];
+        var ecc=['#71808b','#d03b3b','#fab219','#43a566','#43a566'][hEc]||'#71808b';
+        if(EC[hEc]) renLine+='<span style="color:'+ecc+'">'+esc(EC[hEc])+'</span><br>'; }   // v3.40 (roster result only when a roster covers it)
     }
     tipShow('<b>'+esc(nm)+'</b><br>'+
       tipPeoLine(d,h.i,slug)+'<br>'+
       esc(city+(city?', ':'')+rs(h.st))+'<br>'+renLine+
-      '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
+      '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area'))+(d.detail?' · click for details':'')+'</span>',e);
   });
 }
 // v3.80: the PEO line of a pin's hover box. PEO specific view = the brand in its colour. Family view, folded brand =
