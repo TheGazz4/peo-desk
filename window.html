@@ -170,9 +170,9 @@
     try {
       var r = await api({action:"fetch", pane:state.pane.pane_slug, page:state.page, page_size:state.size, search:state.search||null, order:state.order});
       state.cols = r.columns; state.rows = r.rows; state.total = r.total;
-      $("meta").textContent = r.relation + " · " + r.total.toLocaleString() + " rows" + (state.search?" matching":"") + " · live as of " + new Date(r.as_of).toLocaleTimeString();
+      $("meta").textContent = r.relation + " · " + (r.total_exact===false?"≈ ":"") + r.total.toLocaleString() + (r.total_exact===false && state.search ? "+" : "") + " rows" + (state.search?" matching":"") + (r.total_exact===false && !state.search ? " (estimate)" : "") + " · live as of " + new Date(r.as_of).toLocaleTimeString();
       note(""); renderTable();
-    } catch(e){ $("meta").textContent = "error: " + e.message; }
+    } catch(e){ showError(e.message); }
   }
 
   /* ---------- open a drop (snapshot) ---------- */
@@ -186,7 +186,7 @@
       note(d.note || ""); $("pinBtn").style.display=""; $("pinBtn").textContent = d.pinned?"unpin":"pin"; $("clearBtn").style.display="";
       state.list.drops.forEach(function(x){ if(x.id===id) x.seen_at = x.seen_at || new Date().toISOString(); });
       renderTable(); renderSide();
-    } catch(e){ $("title").textContent = "error: " + e.message; }
+    } catch(e){ showError(e.message); }
   }
   $("pinBtn").onclick = async function(){ if(!state.drop) return; await api({action:"drop_act", id:state.drop.id, act: state.drop.pinned?"unpin":"pin"}); await load(); openDrop(state.drop.id); };
   $("clearBtn").onclick = async function(){ if(!state.drop) return; if(!confirm("Clear this drop from the Window? (it is only a snapshot; nothing in any hub changes)")) return; await api({action:"drop_act", id:state.drop.id, act:"clear"}); state.mode=null; state.drop=null; $("tbl").style.display="none"; $("empty").style.display=""; $("title").textContent="Cleared."; $("meta").textContent=""; note(""); $("pinBtn").style.display="none"; $("clearBtn").style.display="none"; load(); };
@@ -226,6 +226,7 @@
     var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download = ((state.mode==="drop"&&state.drop)?state.drop.title:(state.pane?state.pane.pane_slug:"window")).replace(/[^a-z0-9_-]+/gi,"_") + "_p"+state.page+".csv"; a.click();
   };
   function note(s){ $("note").textContent = s; $("note").className = "note" + (s?" show":""); }
+  function showError(msg){ $("meta").textContent = "failed"; $("tbl").style.display="none"; $("empty").style.display=""; $("empty").innerHTML = "<div style='color:var(--critical);font-weight:600;margin-bottom:6px'>Could not load this.</div><div style='max-width:640px;margin:0 auto;white-space:pre-wrap;text-align:left;font-family:ui-monospace,monospace;font-size:12px'>" + esc(msg) + "</div>"; }
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
 
   /* new drops show up on their own */
