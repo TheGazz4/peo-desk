@@ -2718,7 +2718,14 @@ function buildSection(){
   if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec,anchor); else $n('panel').appendChild(sec);
     if(!document.getElementById('netinscss')){ var sti=document.createElement('style'); sti.id='netinscss';
       sti.textContent='.netinsrow{margin:-2px 0 4px 22px;font-size:11.5px;line-height:1.4}.netins{color:var(--ink,#fff);font-weight:600}.netlbl-ok{background:rgba(29,158,117,.22);color:#9fe1cb}'+
-        '.netcar-h{cursor:pointer;user-select:none}.netcar-h:hover b{text-decoration:underline}.netcaret{margin-left:auto;padding-left:8px;color:var(--muted,#8a90a0);font-weight:700}.netcar-h.open .netcaret{color:var(--ink,#fff)}';
+        '.netcar-h{cursor:pointer;user-select:none}.netcar-h:hover b{text-decoration:underline}.netcaret{margin-left:auto;padding-left:8px;color:var(--muted,#8a90a0);font-weight:700}.netcar-h.open .netcaret{color:var(--ink,#fff)}'+
+        /* v3.62 (owner 2026-09-28): the selected PEO must be unmistakable */
+        '.netpeo.open{border:1px solid rgba(155,79,208,.55);border-radius:10px;background:rgba(155,79,208,.08);padding:2px 6px 6px;margin:6px 0 8px}'+
+        '.netpeo.open>.netrow.netpeohd{background:rgba(155,79,208,.28);border-radius:8px;padding:8px 10px;margin:0 -2px 6px}'+
+        '.netpeo.open>.netrow.netpeohd .netmeta b{font-size:15px;color:#fff;letter-spacing:.01em}'+
+        '.netpeo.open>.netrow.netpeohd .netmut{color:#d9b8f5}'+
+        '.netpeosel{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:#9b4fd0;color:#fff;vertical-align:2px}'+
+        '.netpeo:not(.open)>.netrow.netpeohd{opacity:.72}.netpeo:not(.open)>.netrow.netpeohd:hover{opacity:1}';
       document.head.appendChild(sti); }
   var bands=$n('netbands');
   for(var b=3;b>=0;b--){ var sp=document.createElement('span'); sp.className='netchip on'; sp.dataset.b=b; sp.title=BAND_RANGE[b]+' of local doctors/hospitals signed (weighted)'; sp.textContent=BAND_NAMES[b]; bands.appendChild(sp); }
@@ -2809,7 +2816,7 @@ function renderList(){
     var open=N.peo===p.family_slug, ready=0;
     cars.forEach(function(c){ (c.networks||[]).forEach(function(x){ if(x.mapped) ready++; }); });
     var row=document.createElement('div'); row.className='netpeo'+(open?' open':'');
-    var html='<label class="netrow"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b></div>'+
+    var html='<label class="netrow netpeohd"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b>'+(open?'<span class="netpeosel">Selected PEO</span>':'')+'</div>'+
       '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+'</div></div></label>';
     // v3.60 (owner 2026-09-28, Instance B): Insured line per carrier (WSE | Total, "~" = estimated side) and ONE card per
     // provider network — product names that ride the same doctors fold together, identically for every PEO (net_network_group).
