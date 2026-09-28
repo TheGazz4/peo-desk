@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.84 (2026-09-28, Instance B, owner: "put next to the second peo something small that says family ... this way folks know
+            what the arrow is present there"): the last stop of an affiliation chain carries a small FAMILY tag (same pill style as
+            NATIONAL / Confirmed on the network panel) on the Family brand view - hover box, client card and the left list.
      v3.83 (2026-09-28, Instance B, owner: "click one is aetna, click 2 plan types, click 3 turn the network plans on/off - progressive and indented";
             "use the totalsource aetna setup as a sample before we roll out"): network sidebar becomes a tree - carrier, then plan type
             (HMO / EPO / POS / PPO, classified once in the data by public.net_plan_type, migration 2225), then the network on/off toggles.
@@ -304,6 +307,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .aff-hd{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-size:12px;white-space:normal;line-height:1.4}
 .aff-hd .fsw{width:10px;height:10px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--ring)}
 .aff-hd .arr{color:var(--muted);font-weight:600}
+.fam-tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 5px;line-height:15px;border-radius:7px;border:1px solid var(--border);color:var(--muted);margin-left:2px;vertical-align:middle}
 .peo-row .ct.pend{border-bottom:1px dotted var(--muted);cursor:help}
 .peo-row .solo{font-size:10px;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:1px 5px;visibility:hidden}
 .peo-row:hover .solo{visibility:visible}
@@ -497,7 +501,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.83 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.84 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1997,6 +2001,7 @@ function chainHtml(brand, fam, small){
     var col=nodeColor(sl);
     h+='<span class="'+c+'" style="background:'+col+'"></span><span style="color:'+(small?'inherit':col)+'">'+esc(nodeName(sl, path[path.length-1]))+'</span>';
   });
+  h+='<span class="fam-tag" title="Family brand: an affiliation we track from a researched acquisition, merger or name change. The PEO before the arrows is the brand on the customer\'s paperwork.">Family</span>';   // v3.84
   return h;
 }
 function openCard(p,slug,history){
