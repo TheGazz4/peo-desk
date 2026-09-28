@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.80 (2026-09-28, Instance B, owner: "confirmed as an example Paychex HR ---> paychex - no arrow appears. this is widespread"): the
+            pin HOVER box only named the family. On the Family brand view it now reads  ● Brand -> ● ... -> ● Family  for a folded
+            brand (same chainHtml as the list and the card); PEO specific view unchanged.
      v3.79 (2026-09-28, Instance B, owner: "I think the arrows are largely missing"): the arrow chain was on the same line as the name and
             count and the panel clips at ~350px, so 2-3 arrow chains were cut off. The chain now sits on its own line under the PEO name
             (wraps if needed); the card header chain wraps too. Nothing about the fold data changed.
@@ -487,7 +490,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.79 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.80 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1435,10 +1438,22 @@ function onMove(e){
         renLine+='<span style="color:'+ecc+'">'+esc(EC[d.detail.ec[h.i]]||EC[0])+'</span><br>'; }   // v3.40
     }
     tipShow('<b>'+esc(nm)+'</b><br>'+
-      '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span><br>'+
+      tipPeoLine(d,h.i,slug)+'<br>'+
       esc(city+(city?', ':'')+rs(h.st))+'<br>'+renLine+
       '<span class="mut">'+(S.placement==='zip'?'shown at ZIP center':(street?'exact address':'ZIP area — exact location coming'))+(d.detail?' · click for details':'')+'</span>',e);
   });
+}
+// v3.80: the PEO line of a pin's hover box. PEO specific view = the brand in its colour. Family view, folded brand =
+// ● Brand -> ● ... -> ● Family, each stop in its own colour (an association we track); unfolded = the family name as before.
+function tipPeoLine(d,i,slug){
+  if(S.grain==='family' && d && d.brds && d.bis){
+    var b=d.brds[d.bis[i]];
+    if(b && S.folds && S.folds[b]){
+      var bc=(S.colors.brand&&S.colors.brand[b])||OTHER;
+      return '<span class="aff-hd" style="font-weight:650"><span class="fsw" style="background:'+bc+'"></span><span style="color:'+bc+'">'+esc(brandDisp(b))+'</span>'+chainHtml(b, slug, false)+'</span>';
+    }
+  }
+  return '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span>';
 }
 var HKIND=['Switched','Departed — confirmed open market','Departed — ASSUMED (pending confirmation)'];
 function famDisp(s){ return S.displays.family[s]||s; }
