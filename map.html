@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.79 (2026-09-28, Instance B, owner: "I think the arrows are largely missing"): the arrow chain was on the same line as the name and
+            count and the panel clips at ~350px, so 2-3 arrow chains were cut off. The chain now sits on its own line under the PEO name
+            (wraps if needed); the card header chain wraps too. Nothing about the fold data changed.
      v3.78 (2026-09-28, Instance B, owner: "toggle for instance the HMO heat map on/off"): every network in the sidebar is its own on/off
             checkbox (up to 4 layers at once, from any of the selected PEO's carriers); each carrier keeps its colour, sister networks of one
             carrier get their own shade; National/Regional/Local chips mute a bucket without losing the toggles; opening a carrier turns nothing on.
@@ -284,10 +287,11 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .peo-row .nm{flex:1;font-size:12.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peo-row.on .nm{color:var(--ink)}
 .peo-row .ct{font-size:11px;color:var(--muted)}
-.peo-row .aff{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.peo-row.child{flex-wrap:wrap}
+.peo-row .aff{display:flex;align-items:center;flex-wrap:wrap;gap:4px 5px;flex:1 1 100%;order:10;padding-left:22px;font-size:11.5px;color:var(--muted);white-space:normal;line-height:1.4}
 .peo-row .aff .arr{color:var(--muted);font-weight:600}
 .peo-row .aff .fsw{width:8px;height:8px;border-radius:2px;box-shadow:0 0 0 1px var(--ring)}
-.aff-hd{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+.aff-hd{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-size:12px;white-space:normal;line-height:1.4}
 .aff-hd .fsw{width:10px;height:10px;border-radius:3px;flex:none;box-shadow:0 0 0 1px var(--ring)}
 .aff-hd .arr{color:var(--muted);font-weight:600}
 .peo-row .ct.pend{border-bottom:1px dotted var(--muted);cursor:help}
@@ -483,7 +487,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.78 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.79 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
