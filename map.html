@@ -1425,9 +1425,7 @@ function onMove(e){
       if(hm){ var hw=(d.detail.hg&&d.detail.hg[h.i])?'PEO plan year — not this client’s date':(RMB_LABELS[hb]||'unverified');
               renLine+='Health renews ~'+MONTHS[hm]+' <span class="mut">('+hw+')</span><br>'; }
       else if(S.lens==='health'){ renLine+='<span class="mut">Health renewal month unknown</span><br>'; }
-      if(d.detail.rm[h.i]){ var ww=(d.detail.ws&&d.detail.ws[h.i])?'policy expired — not a current renewal':RMB_LABELS[d.detail.rmb[h.i]];
-              renLine+='WC renews ~'+MONTHS[d.detail.rm[h.i]]+' <span class="mut">('+ww+')</span><br>'; }
-      else if(S.lens==='wc'){ renLine+='<span class="mut">WC renewal month unknown</span><br>'; }
+      // 2026-09-28 Gazz (Instance B): no WC renewal information of any kind on the hover box (record card unchanged)
       renLine+=evidenceLine(d.detail.cs?d.detail.cs[h.i]:null, d.detail.cx?d.detail.cx[h.i]:0)+'<br>';   // v3.21
       renLine+=coLines(d.detail,h.i);   // v3.68 carve-outs
       if(d.detail.sv){ var svq=d.detail.sv[h.i]; renLine+='Relationship: '+(svq?'<b>'+SVC[svq].name+'</b>':'<span class="mut">unconfirmed</span>')+' <span class="mut">('+SVC[svq].card+')</span><br>'; }   // v3.58
