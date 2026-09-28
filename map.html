@@ -2716,6 +2716,9 @@ function buildSection(){
    '</div>';
   var anchor=$n('states'); anchor=anchor?anchor.parentNode:null;
   if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec,anchor); else $n('panel').appendChild(sec);
+    if(!document.getElementById('netinscss')){ var sti=document.createElement('style'); sti.id='netinscss';
+      sti.textContent='.netinsrow{margin:-2px 0 4px 22px;font-size:11.5px;line-height:1.4}.netins{color:var(--ink,#fff);font-weight:600}.netlbl-ok{background:rgba(29,158,117,.22);color:#9fe1cb}';
+      document.head.appendChild(sti); }
   var bands=$n('netbands');
   for(var b=3;b>=0;b--){ var sp=document.createElement('span'); sp.className='netchip on'; sp.dataset.b=b; sp.title=BAND_RANGE[b]+' of local doctors/hospitals signed (weighted)'; sp.textContent=BAND_NAMES[b]; bands.appendChild(sp); }
   $n('netview').addEventListener('click',function(e){ var v=e.target&&e.target.dataset.v; if(!v) return; setView(v); });
@@ -2791,9 +2794,9 @@ function netMeta(k){ return ((N.cat&&N.cat.networks)||[]).filter(function(n){ re
 function peoOf(slug,cat){ return (((cat||N.cat)||{}).peos||[]).filter(function(p){ return p.family_slug===slug; })[0]||null; }
 function firstMapped(slug,cat){ var p=peoOf(slug,cat); if(!p) return null;
   for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if(N.carriersOff[c.carrier]) continue;
-    for(var j=0;j<(c.networks||[]).length;j++){ var x=c.networks[j]; if(x.mapped&&x.network_key) return x.network_key; } }
+    for(var j=0;j<(c.networks||[]).length;j++){ var x=c.networks[j]; if(x.mapped&&(x.map_key||x.network_key)) return x.map_key||x.network_key; } }
   return null; }
-function selAllowed(){ var p=peoOf(N.peo); if(!p) return false; return (p.carriers||[]).some(function(c){ return !N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return x.network_key===N.sel&&x.mapped; }); }); }
+function selAllowed(){ var p=peoOf(N.peo); if(!p) return false; return (p.carriers||[]).some(function(c){ return !N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return (x.map_key||x.network_key)===N.sel&&x.mapped; }); }); }
 function netVisible(n){ return !!N.sel && n.network_key===N.sel && N.tiers[n.tier]!==false; }
 function renderList(){
   var box=$n('netlist'); box.innerHTML='';
@@ -2807,22 +2810,36 @@ function renderList(){
     var row=document.createElement('div'); row.className='netpeo'+(open?' open':'');
     var html='<label class="netrow"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b></div>'+
       '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+'</div></div></label>';
+    // v3.60 (owner 2026-09-28, Instance B): Insured line per carrier (WSE | Total, "~" = estimated side) and ONE card per
+    // provider network — product names that ride the same doctors fold together, identically for every PEO (net_network_group).
     if(open) cars.forEach(function(c){
+      var ins=c.insured?'<span class="netins" title="'+esc(c.insured_basis_reason||'')+'">Insured '+esc(c.insured)+'</span>':'<span class="netmut">'+(c.lives||0).toLocaleString()+' insured</span>';
+      var chg=(c.insured_change_pct!=null&&c.insured_prior!=null)?' <span class="netmut" title="Prior plan year: '+(+c.insured_prior).toLocaleString()+'">'+(c.insured_change_pct>0?'+':'')+c.insured_change_pct+'% vs prior yr</span>':'';
       html+='<div class="netcar"><i class="netsw" style="background:'+carrierHex(c.carrier)+'"></i><b>'+esc(shortCarrier(c.carrier))+'</b>'+
-        '<span class="netmut">'+(c.lives||0).toLocaleString()+' people'+(c.share_pct!=null?' · '+c.share_pct+'% of the plan':'')+'</span></div>';
+        '<span class="netmut">'+(c.share_pct!=null?c.share_pct+'% of the plan':'')+(c.schedule_a_year?' · plan yr '+c.schedule_a_year:'')+'</span></div>'+
+        '<div class="netinsrow">'+ins+chg+'</div>';
       if(!(c.networks||[]).length){ var ps=c.pair_status||''; html+='<div class="netpend">'+(ps==='not a medical carrier'?'Not a medical carrier (supplemental, stop-loss or similar)':ps==='researched - not public'?'Network not published by the PEO yet · rechecked before each renewal':'Network not identified yet (research queued)')+'</div>'; return; }
-      (c.networks||[]).forEach(function(x){
-        var tag=/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':'';
+      var cards={}, order=[];
+      (c.networks||[]).forEach(function(x){ var k=x.card_key||x.network_key||x.network;
+        if(!cards[k]){ cards[k]={}; for(var q in x) cards[k][q]=x[q]; cards[k].named=[]; cards[k].docs=0; order.push(k); }
+        if(x.product_named&&cards[k].named.indexOf(x.product_named)<0) cards[k].named.push(x.product_named);
+        if(x.mapped){ cards[k].mapped=true; cards[k].map_key=x.map_key||x.network_key; }
+        if(/confirmed/i.test(x.label||'')) cards[k].label=x.label;
+        cards[k].docs+=(x.documents||1); });
+      order.forEach(function(k){ var x=cards[k]; var mk=x.map_key||x.network_key;
+        var tag=/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':/confirmed/i.test(x.label||'')?' <span class="netlbl netlbl-ok">Confirmed</span>':' <span class="netlbl">Likely</span>';
         var where=x.region&&!/^national$/i.test(x.region)?' <span class="netmut">('+esc(x.region)+')</span>':'';
-        var m=x.mapped?netMeta(x.network_key):null;
-        if(m){ var sel=N.sel===x.network_key, dim=N.tiers[m.tier]===false;
-          html+='<label class="netrow netind'+(dim?' dim':'')+'" title="Named in '+esc(p.peo)+'\'s '+esc(x.plan_year||'')+' plan documents"><input type="radio" name="netsel" value="'+esc(x.network_key)+'" '+(sel?'checked':'')+'>'+
-            '<div class="netmeta"><div>'+esc(m.network_name)+' <span class="nettier">'+esc(m.tier)+'</span>'+tag+where+'</div>'+
+        var named=x.named.length?'<div class="netmut">'+esc(p.peo)+' calls it: '+esc(x.named.join(' · '))+'</div>':'';
+        var others=(x.card_others>0)?'<div class="netmut" title="'+esc((x.card_products||[]).join(', '))+'">'+x.card_others+' more product name'+(x.card_others>1?'s':'')+' on this network'+(x.card_match_pct?' · '+x.card_match_pct+'% same doctors':'')+'</div>':'';
+        var m=x.mapped?netMeta(mk):null;
+        if(m){ var sel=N.sel===mk, dim=N.tiers[m.tier]===false;
+          html+='<label class="netrow netind'+(dim?' dim':'')+'" title="Named in '+esc(p.peo)+'\'s '+esc(x.plan_year||'')+' plan documents · '+x.docs+' document'+(x.docs>1?'s':'')+' · verified '+fmtDate(x.verified_on)+'"><input type="radio" name="netsel" value="'+esc(mk)+'" '+(sel?'checked':'')+'>'+
+            '<div class="netmeta"><div>'+esc(x.card_title||m.network_name)+' <span class="nettier">'+esc(m.tier)+'</span>'+tag+where+'</div>'+named+others+
             (sel?'<div class="netmut">'+(m.clinicians||0).toLocaleString()+' clinicians · '+(m.hospitals||0).toLocaleString()+' hospitals · '+m.states_covered+' states covered</div>'+
               '<div class="netmut" title="Carrier network file '+fmtDate(m.data_as_of)+' · provider registry '+fmtDate(m.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(m.data_as_of,m.registry_as_of)+' · updates monthly</div>'+
-              (N.layers[x.network_key]&&!N.layers[x.network_key].n?'<div class="netmut">Map is being built from the carrier\'s file, check back shortly</div>':''):'')+
+              (N.layers[mk]&&!N.layers[mk].n?'<div class="netmut">Map is being built from the carrier\'s file, check back shortly</div>':''):'')+
             '</div></label>';
-        } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+' · map not built yet</div>';
+        } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+named+' · map not built yet</div>';
       });
     });
     row.innerHTML=html;
