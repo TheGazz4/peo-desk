@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.83 (2026-09-28, Instance B, owner: "click one is aetna, click 2 plan types, click 3 turn the network plans on/off - progressive and indented";
+            "use the totalsource aetna setup as a sample before we roll out"): network sidebar becomes a tree - carrier, then plan type
+            (HMO / EPO / POS / PPO, classified once in the data by public.net_plan_type, migration 2225), then the network on/off toggles.
+            Each level indents with a guide line; breadcrumb PEO / carrier / plan type; a plan-type checkbox switches its whole group
+            (4-layer cap respected); collapsing never switches layers off. Gated to ADP TotalSource / Aetna (NET_TREE_SAMPLE) until rollout.
      v3.82 (2026-09-28, Instance B, owner: "HMO Regional Contract on file (Regional) (12,856 insured) - no need to say on this contract or list Aetna Health, Inc."):
             a Schedule-A contract card reads on one line: network, tier chip, label, (region), (N insured). Carrier entity name dropped from the card.
      v3.80 (2026-09-28, Instance B, owner: "confirmed as an example Paychex HR (arrow) paychex - no arrow appears. this is widespread"): the
@@ -492,7 +497,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.82 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.83 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2772,8 +2777,15 @@ var CARRIER_HEX={aetna:'#9b4fd0',unitedhealthcare:'#2f7fe0',uhc:'#2f7fe0',oxford
 var BAND_NAMES=['Thin','Moderate','Solid','Strong'];
 var BAND_RANGE=['under 35%','35–44%','45–54%','55%+'];
 var N={method:((location.search.match(/[?&]netmethod=(v2|dens)\b/)||[])[1]||'now'),cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
-       layers:{},pts:{},loading:{},carriersOff:{},hover:null,peo:null,sel:null,on:{},note:null,car:null};
-var NET_MAX_ON=4;   // v3.78 (owner 2026-09-28): up to 4 network layers at once; more turns the map to mud
+       layers:{},pts:{},loading:{},carriersOff:{},hover:null,peo:null,sel:null,on:{},note:null,car:null,pt:{}};
+var NET_MAX_ON=4;
+// v3.83 (owner 2026-09-28 16:39): progressive, indented tree - carrier > plan type > network toggles. SAMPLE on ADP TotalSource > Aetna;
+// every other PEO/carrier keeps the flat card list until the owner approves the rollout (then set NET_TREE_ALL=true).
+var NET_TREE_ALL=false, NET_TREE_SAMPLE={adp_totalsource:{aetna:1}};
+function treeOn(p,ck){ if(NET_TREE_ALL) return true; var s=NET_TREE_SAMPLE[p.family_slug]; return !!(s&&s[String(ck||'').toLowerCase()]); }
+var PT_NAME={HMO:'HMO',EPO:'EPO',POS:'POS',PPO:'PPO',Other:'Other networks'};
+var PT_HINT={HMO:'Health Maintenance Organization: in-network care only, a primary care doctor coordinates referrals',EPO:'Exclusive Provider Organization: in-network care only, no referrals needed',
+  POS:'Point of Service: in-network primary care doctor, some out-of-network cover',PPO:'Preferred Provider Organization: in- and out-of-network cover, no referrals',Other:'Network type not stated in the carrier file'};   // v3.78 (owner 2026-09-28): up to 4 network layers at once; more turns the map to mud
 window.NETSTATE=N;
 var $n=function(id){return document.getElementById(id)};
 
@@ -2835,7 +2847,14 @@ function buildSection(){
         '.netpeo.open>.netrow.netpeohd .netmeta b{font-size:15px;color:#fff;letter-spacing:.01em}'+
         '.netpeo.open>.netrow.netpeohd .netmut{color:#d9b8f5}'+
         '.netpeosel{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:#9b4fd0;color:#fff;vertical-align:2px}'+
-        '.netpeo:not(.open)>.netrow.netpeohd{opacity:.72}.netpeo:not(.open)>.netrow.netpeohd:hover{opacity:1}';
+        '.netpeo:not(.open)>.netrow.netpeohd{opacity:.72}.netpeo:not(.open)>.netrow.netpeohd:hover{opacity:1}'+
+        /* v3.83 progressive tree: each level indents 14px with a guide line down the open branch */
+        '.nettree{margin:2px 0 6px 12px;padding-left:10px;border-left:1px solid rgba(155,79,208,.45)}'+
+        '.netcrumb{font-size:10.5px;letter-spacing:.03em;color:var(--muted,#8a90a0);margin:2px 0 4px}'+
+        '.netpt{display:flex;align-items:center;gap:7px;padding:5px 4px;margin:1px 0;border-radius:6px;cursor:pointer;user-select:none;font-size:12.5px}'+
+        '.netpt:hover{background:rgba(155,79,208,.10)}.netpt.open{background:rgba(155,79,208,.16)}.netpt b{color:var(--ink,#fff)}'+
+        '.netptc{width:10px;color:var(--muted,#8a90a0);font-size:10px}.netpt .netmut{margin-left:2px}.netpton{color:#d9b8f5;font-weight:600}'+
+        '.netpt input{margin:0;cursor:pointer}.nettree3{margin:0 0 4px 14px;padding-left:10px;border-left:1px dashed rgba(155,79,208,.35)}';
       document.head.appendChild(sti); }
   var bands=$n('netbands');
   for(var b=3;b>=0;b--){ var sp=document.createElement('span'); sp.className='netchip on'; sp.dataset.b=b; sp.title=BAND_RANGE[b]+' of local doctors/hospitals signed (weighted)'; sp.textContent=BAND_NAMES[b]; bands.appendChild(sp); }
@@ -2966,7 +2985,7 @@ function renderList(){
           if(x.mapped){ cards[k].mapped=true; cards[k].map_key=x.map_key||x.network_key; }
           if(/confirmed/i.test(x.label||'')) cards[k].label=x.label;
           cards[k].docs+=(x.documents||1); });
-        order.forEach(function(k){ var x=cards[k]; var mk=x.map_key||x.network_key;
+        var cardHtml=function(k){ var html='', x=cards[k], mk=x.map_key||x.network_key;
           var tag=/contract/i.test(x.label||'')?' <span class="netlbl netlbl-sa" title="This carrier entity is a medical contract on the PEO\'s Form 5500 Schedule A; the network name is still being researched">Contract on file</span>':/inferred/i.test(x.label||'')?' <span class="netlbl">Inferred</span>':/confirmed/i.test(x.label||'')?' <span class="netlbl netlbl-ok">Confirmed</span>':' <span class="netlbl">Likely</span>';
           var where=x.region&&!/^national$/i.test(x.region)?' <span class="netmut">('+esc(x.region)+')</span>':'';
           // v3.82 (owner 2026-09-28 16:25): a contract reads "<network> <tier> Contract on file (<region>) (12,856 insured)" on one line - no "on this contract", no carrier entity name
@@ -2982,10 +3001,37 @@ function renderList(){
                 (N.layers[mk]&&!N.layers[mk].n?'<div class="netmut">Map is being built from the carrier\'s file, check back shortly</div>':''):'')+
               '</div></label>';
           } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+ins+named+' · map not built yet</div>';
+          return html; };
+        // v3.83 (owner 2026-09-28 16:39): progressive tree - click 1 carrier, click 2 plan type, click 3 network on/off
+        if(!treeOn(p,ck)){ order.forEach(function(k){ html+=cardHtml(k); }); return; }
+        var PT_ORD=['HMO','EPO','POS','PPO','Other'], grp={}, gks=[];
+        order.forEach(function(k){ var t=cards[k].plan_type||'Other'; if(!grp[t]){ grp[t]=[]; gks.push(t); } grp[t].push(k); });
+        gks.sort(function(a,b){ return PT_ORD.indexOf(a)-PT_ORD.indexOf(b); });
+        var openPt=(N.pt[ck]&&grp[N.pt[ck]])?N.pt[ck]:'';
+        html+='<div class="nettree"><div class="netcrumb">'+esc(p.peo)+' › '+esc(shortCarrier(c.carrier))+(openPt?' › '+esc(PT_NAME[openPt]||openPt):'')+'</div>';
+        if(gks.length===1){ grp[gks[0]].forEach(function(k){ html+=cardHtml(k); }); html+='</div>'; return; }   // one plan type: skip the level
+        gks.forEach(function(t){
+          var keys=[], on=0; grp[t].forEach(function(k){ var x=cards[k]; if(x.mapped){ var mk=x.map_key||x.network_key; if(keys.indexOf(mk)<0){ keys.push(mk); if(N.on[mk]) on++; } } });
+          var op=openPt===t, all=keys.length>0&&on===keys.length;
+          html+='<div class="netpt'+(op?' open':'')+'" data-car="'+esc(ck)+'" data-pt="'+esc(t)+'" title="'+esc(PT_HINT[t]||'')+'"><span class="netptc">'+(op?'▾':'▸')+'</span>'+
+            (keys.length?'<input type="checkbox" class="netptall" data-keys="'+esc(JSON.stringify(keys))+'" data-some="'+(on&&!all?'1':'0')+'" '+(all?'checked':'')+' title="Switch every '+esc(PT_NAME[t]||t)+' network on or off">':'')+
+            '<b>'+esc(PT_NAME[t]||t)+'</b><span class="netmut">'+grp[t].length+' network'+(grp[t].length>1?'s':'')+(on?' · <span class="netpton">'+on+' on</span>':'')+'</span></div>';
+          if(op){ html+='<div class="nettree3">'; grp[t].forEach(function(k){ html+=cardHtml(k); }); html+='</div>'; }
         });
+        html+='</div>';
       });
     }
     row.innerHTML=html;
+    [].forEach.call(row.querySelectorAll('.netpt'),function(h){ h.onclick=function(e){ if(e.target&&e.target.classList&&e.target.classList.contains('netptall')) return;
+      var ck=h.getAttribute('data-car'), t=h.getAttribute('data-pt'); N.pt[ck]=(N.pt[ck]===t?'':t); renderList(); }; });
+    [].forEach.call(row.querySelectorAll('input.netptall'),function(cb){ cb.indeterminate=cb.getAttribute('data-some')==='1';
+      cb.onclick=function(e){ e.stopPropagation(); };
+      cb.onchange=function(){ var keys=JSON.parse(cb.getAttribute('data-keys')||'[]');
+        if(cb.checked){ var add=keys.filter(function(k){ return !N.on[k]; }), room=Math.max(0,NET_MAX_ON-onKeys().length);
+          add.slice(0,room).forEach(function(k){ N.on[k]=true; N.sel=k; });
+          N.note=add.length>room?NET_MAX_ON+' layers max — '+(add.length-room)+' of this group left off':null; }
+        else { keys.forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; }
+        renderList(); ensureData(); redraw(); }; });
     row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.on={}; N.note=null; N.sel=firstMapped(p.family_slug); if(N.sel) N.on[N.sel]=true; renderList(); ensureData(); redraw(); };
     [].forEach.call(row.querySelectorAll('.netcar-h'),function(h){ h.onclick=function(){ var ck=h.getAttribute('data-car'); if(N.car===ck){ N.car=''; renderList(); return; } N.car=ck; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){
