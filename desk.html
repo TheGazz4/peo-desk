@@ -1331,6 +1331,11 @@ function renderFeedGuard(d) {
   } catch (e) { try { console.error("renderFeedGuard", e); } catch (_) {} }
 }
 function renderAll(d) {
+  /* 2026-09-28 (instanceB): the 5-second poll rebuilt the DOM around any open <select>, which closes its dropdown
+     (tier / status / verdict filters vanished mid-pick). While a dropdown has focus, hold the paint; render once on focusout. */
+  const ae = document.activeElement;
+  if (ae && ae.tagName === "SELECT") { renderAll._held = true; return; }
+  renderAll._held = false;
   renderFeedGuard(d);
   renderScorecard(d);
   renderCarrierSupervisor(d);
@@ -1496,6 +1501,7 @@ if (DEMO) { poll(); }
 else if (!deskKey) { showOverlay(); }
 else { poll(); }
 setInterval(poll, POLL_MS);
+document.addEventListener("focusout", (e) => { if (e.target && e.target.tagName === "SELECT" && renderAll._held && latest) setTimeout(() => { if (document.activeElement?.tagName !== "SELECT") renderAll(latest); }, 0); });
 </script>
 <script>
 /* Latest appended records panel (record lineage, instanceA 2026-09-23). Owner only: dash-ai admits only the desk key or
