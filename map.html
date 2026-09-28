@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.77 (2026-09-28, Instance B 2217, owner: "if there is more than one through acquisition, you can use multiple arrows
+            up to a max of 3"): the affiliation row and the card header draw the whole ruled chain, each PEO in its own colour -
+            ● Peliton -> ● Aureon HR -> ● Oasis Outsourcing -> ● Paychex. More than 3 arrows collapses the middle to "...".
+            Chain = catalog.folds[brand].path (map-data v2.22.1), member first, family last.
      v3.76 (2026-09-28, Instance B, owner: "under the family brand toggle on what I want to see is the first PEO (in its
             respective color) and then an arrow to the right to its family brand in its respective color and name"): on the
             Family brand view every folded PEO reads  ● Brand -> ● Family  (each in its own color) - in the left list's tree rows
@@ -476,7 +480,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.76 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.77 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1623,12 +1627,10 @@ function buildPeoPanel(){
     cb.setAttribute('aria-label',(r.display||r.slug)+' visible on the map');
     cb.onclick=function(e){ e.stopPropagation(); map[r.slug]=cb.checked; afterSel(); };
     d.appendChild(cb); d.appendChild(sw); d.appendChild(nm);
-    if(child){   // v3.76: ● Brand -> ● Family, each in its own color (Family brand view only; an association we track)
-      var f=r.family_slug, aff=document.createElement('span'); aff.className='aff';
-      var ar=document.createElement('span'); ar.className='arr'; ar.textContent='\u2192';
-      var fsw=document.createElement('span'); fsw.className='fsw'; fsw.style.background=(S.colors.family&&S.colors.family[f])||OTHER;
-      var fn=document.createElement('span'); fn.textContent=dispOfGrain('family',f);
-      aff.appendChild(ar); aff.appendChild(fsw); aff.appendChild(fn); d.appendChild(aff);
+    if(child){   // v3.76/v3.77: ● Brand -> ● ... -> ● Family, each PEO in its own colour (Family brand view only; an association we track)
+      var aff=document.createElement('span'); aff.className='aff';
+      aff.innerHTML=chainHtml(r.slug, r.family_slug, true);
+      d.appendChild(aff);
       sw.style.background=(S.colors.brand&&S.colors.brand[r.slug])||r.color_hex||OTHER;   // the PEO in ITS colour
     }
     d.appendChild(ct);
@@ -1935,11 +1937,27 @@ function dispOfGrain(g,slug){ return (S.displays[g]&&S.displays[g][slug])||slug;
 function affHeader(p,slug){
   var b=p.brand_slug||p.family_slug, f=S.folds&&b?S.folds[b]:null;
   if(S.grain==='family' && f){
-    var bc=(S.colors.brand&&S.colors.brand[b])||OTHER, fc=(S.colors.family&&S.colors.family[f.to])||OTHER;
-    return '<div class="aff-hd"><span class="fsw" style="background:'+bc+'"></span><span style="color:'+bc+'">'+esc(brandDisp(b))+'</span>'+
-           '<span class="arr">&rarr;</span><span class="fsw" style="background:'+fc+'"></span><span style="color:'+fc+'">'+esc(f.display||dispOfGrain('family',f.to))+'</span></div>';
+    var bc=(S.colors.brand&&S.colors.brand[b])||OTHER;
+    return '<div class="aff-hd"><span class="fsw" style="background:'+bc+'"></span><span style="color:'+bc+'">'+esc(brandDisp(b))+'</span>'+chainHtml(b, f.to, false)+'</div>';
   }
   return '<div style="font-size:12px;color:'+colorOf(slug)+'">'+esc(dispOf(slug))+'</div>';
+}
+// v3.77 (2217): the arrows after a folded brand: -> ● next -> ● next -> ● family. Up to 3 arrows (owner); a longer chain shows
+// the first hop, "...", and the family. Each stop is coloured as the PEO it is (brand colour first, family colour if it is a family).
+function nodeColor(sl){ return (S.colors.brand&&S.colors.brand[sl])||(S.colors.family&&S.colors.family[sl])||OTHER; }
+function nodeName(sl,fam){ var f=S.folds&&S.folds[fam]; if(sl===fam&&f&&f.display) return f.display; return brandDisp(sl); }
+function chainHtml(brand, fam, small){
+  var f=S.folds&&S.folds[brand], path=(f&&f.path&&f.path.length>1)?f.path.slice():[brand, fam];
+  var stops=path.slice(1);                       // everything after the brand itself
+  if(stops.length>3) stops=[stops[0], null, stops[stops.length-1]];   // max 3 arrows: A -> B -> ... -> Z
+  var h='', c=small?'fsw':'fsw';
+  stops.forEach(function(sl){
+    h+='<span class="arr">&rarr;</span>';
+    if(sl===null){ h+='<span class="arr">&hellip;</span>'; return; }
+    var col=nodeColor(sl);
+    h+='<span class="'+c+'" style="background:'+col+'"></span><span style="color:'+(small?'inherit':col)+'">'+esc(nodeName(sl, path[path.length-1]))+'</span>';
+  });
+  return h;
 }
 function openCard(p,slug,history){
   var c=$('card'); stClear(true); c.dataset.kind='company';   // v3.59: a company card replaces the state card + outline
