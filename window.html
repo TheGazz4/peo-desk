@@ -44,6 +44,10 @@
   .hub.on summary { color:var(--series-1); }
   .hub summary .st { font-size:10px; color:var(--ink-muted); font-weight:400; }
   .hub summary .n { margin-left:auto; font-size:11px; color:var(--ink-muted); font-weight:400; font-variant-numeric:tabular-nums; }
+  /* v3 (2026-09-28, instanceB): panes indent under their open hub, with a guide line */
+  .hub .item { margin-left:22px; width:calc(100% - 28px); border-left:2px solid var(--border); border-radius:0 6px 6px 0; }
+  .hub .item:hover { border-left-color:var(--ink-muted); }
+  .hub .item.on { border-left-color:#fff; }
   main { display:flex; flex-direction:column; min-width:0; min-height:0; }
   .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--border); }
   .bar .title { font-weight:650; }
@@ -156,6 +160,8 @@
     $("asof").textContent = "as of " + new Date(state.list.as_of).toLocaleTimeString();
     renderSide();
   }
+  /* v3: a pane's label repeats its hub name ("Health 5500 hub — carriers…"); under the hub header show only the part after the dash */
+  function paneLabel(p, hubName){ var l=String(p.label||""); var m=l.match(/^(.*?)\s+[—–-]\s+(.+)$/); return (m && m[1].toLowerCase().indexOf(String(hubName||"").toLowerCase().slice(0,10))===0) ? m[2] : l; }
   function fmtN(n){ if(n==null) return ""; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,"")+"M"; if(n>=1e3) return (n/1e3).toFixed(n>=1e5?0:1).replace(/\.0$/,"")+"k"; return String(n); }
   function renderSide(){
     var s = $("side"); s.innerHTML = "";
@@ -188,7 +194,7 @@
       g.panes.forEach(function(p){
         var on = state.mode==="pane" && state.pane && state.pane.pane_slug===p.pane_slug;
         var b = document.createElement("button"); b.className = "item" + (on?" on":""); if(on) b.id="sel-item";
-        b.innerHTML = esc(p.label) + "<span class='sub'>" + esc(p.relation) + (p.est_rows!=null?" · ≈"+fmtN(p.est_rows)+" rows":"") + "</span>"; b.title = p.description || "";
+        b.innerHTML = esc(paneLabel(p, g.name)) + "<span class='sub'>" + esc(p.relation) + (p.est_rows!=null?" · ≈"+fmtN(p.est_rows)+" rows":"") + "</span>"; b.title = p.description || "";
         b.onclick = function(){ openPane(p); };
         det.appendChild(b);
       });
