@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.97 (2026-09-29, Instance B, owner 11:25: "i want all carriers networks (universally) listed as most robust to least robust"):
+            within every carrier, networks sort by contracted clinicians (biggest first; no map yet = last) and plan-type groups by
+            their strongest network. Same rule for every carrier.
      v3.96 (2026-09-29, Instance B, owner 11:09: "this little gray triangle needs to be more prominent ... or is there a better way to just
             display as auto indented?"): every plan-type group under an opened carrier starts expanded (all networks visible at once);
             the caret is larger, in the PEO colour, and only collapses a group; crumb reads "· all networks shown".
@@ -550,7 +553,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.96 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.97 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3142,10 +3145,16 @@ function renderList(){
           } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+ins+named+' · map not built yet</div>';
           return html; };
         // v3.83 (owner 2026-09-28 16:39): progressive tree - click 1 carrier, click 2 plan type, click 3 network on/off
+        var robustF=function(k){ var x=cards[k]; if(!x.mapped) return -1; var m=netMeta(x.map_key||x.network_key); return m?((m.clinicians||0)+(m.hospitals||0)/1000):-1; };   // v3.97
+        order.sort(function(a,b){ return robustF(b)-robustF(a); });
         if(!treeOn(p,ck)){ order.forEach(function(k){ html+=cardHtml(k); }); return; }
         var PT_ORD=['HMO','EPO','POS','PPO','Behavioral','Other','Unidentified'], grp={}, gks=[];   // v3.90
+        // v3.97 (owner 2026-09-29 11:25 "i want all carriers networks (universally) listed as most robust to least robust"): every carrier's
+        // networks sort by contracted clinicians (then hospitals) from the carrier's own federal file, biggest first; networks without a
+        // map yet go last; each plan-type group is ranked by its strongest network. The plan-type order is no longer fixed.
+        var robust=robustF;
         order.forEach(function(k){ var t=cards[k].plan_type||'Other'; if(!grp[t]){ grp[t]=[]; gks.push(t); } grp[t].push(k); });
-        gks.sort(function(a,b){ return PT_ORD.indexOf(a)-PT_ORD.indexOf(b); });
+        gks.sort(function(a,b){ var ra=robust(grp[a][0]), rb=robust(grp[b][0]); return rb!==ra?rb-ra:PT_ORD.indexOf(a)-PT_ORD.indexOf(b); });
         // v3.96 (owner 2026-09-29 11:09 "i dont want the user to think we failed to account for some networks because they dont know to expand"):
         // every plan-type group starts OPEN (auto-indented, all networks visible); the caret only collapses one. N.pt[ck] = {type:true} for the collapsed ones.
         var closed=(N.pt[ck]&&typeof N.pt[ck]==='object')?N.pt[ck]:{};
