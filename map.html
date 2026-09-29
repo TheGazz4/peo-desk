@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.88 (2026-09-28, Instance B, owner: "the network strength heatmap should take on the color of the carrier - Aetna is purple,
+            United is blue"): every network layer keeps its carrier's hue (sister networks of one carrier differ by lightness only,
+            no more hue rotation that turned a second Aetna layer pink); the heat ramp keeps a 42% saturation floor so thin areas
+            still read as the carrier colour instead of fading to grey.
      v3.87 (2026-09-28, Instance B, owner: "make this reset a full reset of all filters back to defaults"): Reset now returns
             EVERYTHING to the page defaults - view (PEO specific), every PEO/state on, renewal heat off, headquarters Top 25, beacons
             and unverified HQ candidates off, multi-state off, confidence Any, Relationship PEO only, all employee sizes, carve outs
@@ -515,7 +519,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.87 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.88 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2849,7 +2853,7 @@ function ramp(hex){
   if(rampCache[hex]) return rampCache[hex];
   var hsl=hexToHsl(hex), out=[];
   for(var s=0;s<=100;s++){
-    var t=s/100, sat=12+83*t, lig=DARK?(34+36*t):(84-48*t), a=0.04+0.92*Math.pow(t,1.6);
+    var t=s/100, sat=42+53*t, lig=DARK?(34+36*t):(84-48*t), a=0.04+0.92*Math.pow(t,1.6);   // v3.88: saturation floor 42% so thin areas still read as the carrier's colour
     out.push('hsla('+hsl[0].toFixed(0)+','+sat.toFixed(0)+'%,'+lig.toFixed(0)+'%,'+a.toFixed(3)+')');
   }
   return rampCache[hex]=out;
@@ -2989,7 +2993,9 @@ function hslToHex(h,s,l){ s/=100; l/=100; var c=(1-Math.abs(2*l-1))*s, x=c*(1-Ma
 function netHex(n){ var base=carrierHex(n.carrier);
   var sib=onKeys().filter(function(k){ var m=netMeta(k); return m&&carrierKey(m.carrier)===carrierKey(n.carrier); }).sort();
   var i=sib.indexOf(n.network_key); if(i<=0) return base;
-  var h=hexToHsl(base); return hslToHex((h[0]+i*26)%360, Math.min(100,Math.max(45,h[1])), Math.max(32,Math.min(68,h[2]+(i%2?12:-9)))); }
+  // v3.88 (owner 2026-09-28 17:19: "the heatmap should take on the color of the carrier - Aetna is purple, United is blue"): the carrier's HUE
+  // never changes; a sister network of the same carrier is told apart by lightness only (lighter, darker, lighter still).
+  var h=hexToHsl(base), dl=[0,14,-12,24][Math.min(i,3)]; return hslToHex(h[0], Math.min(100,Math.max(45,h[1])), Math.max(28,Math.min(74,h[2]+dl))); }
 function renderList(){
   var box=$n('netlist'); box.innerHTML='';
   var peos=(N.cat&&N.cat.peos)||[];
