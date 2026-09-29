@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.100b (owner 13:24): networks without a built map now rank most robust -> least (national/regional/local reach, then PPO>POS>EPO>HMO), so PPO no longer sits below HMO.
+     v3.100 (2026-09-29, Instance B, owner 13:16: "UHC should say UHC National PPO to make sure the user knows its displaying 2
+            different carriers"): legend and hover names lead with the carrier (UHC National PPO, Aetna Choice POS II ...).
      v3.99 (2026-09-29, Instance B, owner 12:41 "lets install this" on the default-display brainstorm): the lead carrier (largest plan
             share) starts on; another carrier joins the default only within 10 share points of the leader; layers of any non-lead carrier
             draw striped; header lists mapped carriers left off ("Also on this plan ... switch on to compare").
@@ -559,7 +562,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.99 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.100 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3037,6 +3040,11 @@ function loadCatalog(){
     renderCarriers(); renderList(); ensureData();
   }).catch(function(e){ if(e.message!=='auth') $n('netlist').innerHTML='<div class="netmut">Network layer unavailable.</div>'; });
 }
+// v3.100 (owner 2026-09-29 13:16 "when these selections are on we need to name them just like Aetna does ... UHC should say UHC National
+// PPO"): the legend and hover always lead with the carrier, so two carriers on at once can never be confused.
+function legendName(n){ var c=shortCarrier(n.carrier||''), nm=String(n.network_name||''); if(!c) return nm;
+  var cl=c.toLowerCase(), nl=nm.toLowerCase(); if(nl.indexOf(cl)>=0||(cl==='unitedhealthcare'&&/\buhc\b/.test(nl))||(cl==='anthem'&&/elevance|anthem/.test(nl))) return nm;
+  return (c==='UnitedHealthcare'?'UHC':c)+' '+nm; }
 function shortCarrier(c){ return String(c||'').replace(' (other plan)','').replace('Elevance / Anthem','Anthem').replace(/^Blue Cross Blue Shield of /,'BCBS ').replace(/^Blue Cross Blue Shield/,'Blue plans').replace(/^Point32Health.*/,'Harvard Pilgrim').replace(/^HMSA.*/,'HMSA').replace(/^Health Care Service Corp.*/,'BCBS TX/IL/OK/NM/MT'); }
 function renderCarriers(){
   var seen={},box=$n('netcarriers'); box.innerHTML='';
@@ -3175,8 +3183,15 @@ function renderList(){
           } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+ins+named+' · map not built yet</div>';
           return html; };
         // v3.83 (owner 2026-09-28 16:39): progressive tree - click 1 carrier, click 2 plan type, click 3 network on/off
-        var robustF=function(k){ var x=cards[k]; if(!x.mapped) return -1; var m=netMeta(x.map_key||x.network_key); return m?((m.clinicians||0)+(m.hospitals||0)/1000):-1; };   // v3.97
-        order.sort(function(a,b){ return robustF(b)-robustF(a); });
+        // v3.100 (owner 2026-09-29 13:24 "why would HMO be listed before PPO with Insperity ... this goes for all peo's and all carriers"):
+        // a network with a built map ranks by its contracted clinicians/hospitals; a network with no map yet has no counts, so it ranks below
+        // every mapped one by the filed facts we do hold: national > regional > local reach, then PPO > POS > EPO > HMO > other, then name.
+        var UNMAPPED_PT={PPO:12,POS:9,EPO:7,HMO:4};
+        var robustF=function(k){ var x=cards[k];
+          if(x.mapped){ var m=netMeta(x.map_key||x.network_key); if(m) return (m.clinicians||0)+(m.hospitals||0)/1000; }
+          var reach=/^national$/i.test(x.region||'')||/^national/i.test(x.tier||'')?60:/regional/i.test(x.tier||'')&&!/^local/i.test(x.region||'')?30:0;
+          return -1000+reach+(UNMAPPED_PT[x.plan_type]||0); };
+        order.sort(function(a,b){ var d=robustF(b)-robustF(a); return d||String(cards[a].card_title||cards[a].network||'').localeCompare(String(cards[b].card_title||cards[b].network||'')); });
         if(!treeOn(p,ck)){ order.forEach(function(k){ html+=cardHtml(k); }); return; }
         var PT_ORD=['HMO','EPO','POS','PPO','Behavioral','Other','Unidentified'], grp={}, gks=[];   // v3.90
         // v3.97 (owner 2026-09-29 11:25 "i want all carriers networks (universally) listed as most robust to least robust"): every carrier's
@@ -3479,7 +3494,7 @@ function legend(){
   var ld=leadCarrier(); if(ld&&vis.some(function(n){ return keyCarrier(n.network_key)!==ld; })) html+='<div class="netmut" style="margin-bottom:3px">Solid = '+esc(shortCarrier(ld))+' (lead carrier) · striped = another carrier, layered on top</div>';   // v3.99
   vis.forEach(function(n){
     var rp=ramp(netHex(n));
-    html+='<div class="lgrow"><i class="netsw" style="background:'+netHex(n)+'"></i><b>'+n.network_name+'</b> <span class="nettier">'+n.tier+'</span></div>'+
+    html+='<div class="lgrow"><i class="netsw" style="background:'+netHex(n)+'"></i><b>'+esc(legendName(n))+'</b> <span class="nettier">'+n.tier+'</span></div>'+
       '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div>'+
       '<div class="lgscale"><span>Few</span><span>Some</span><span>Many</span><span>Most</span></div>'+
       '<div class="netmut" title="Carrier network file '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(n.data_as_of,n.registry_as_of)+' · updates monthly</div>';
@@ -3494,9 +3509,9 @@ function hoverAt(mx,my){
   var f=N.frame; if(!f||N.view==='off'){ return null; }
   for(var t=N.hitsP.length-1;t>=0;t--){ var hp=N.hitsP[t];
     if(Math.abs(hp.x-mx)<=hp.r&&Math.abs(hp.y-my)<=hp.r){
-      var P=hp.P,i=hp.i;
-      if(P.k[i]===1) return '<b>'+P.lb[i]+'</b><br>'+(P.city[i]||'')+', '+(P.st[i]||'')+' · in-network hospital';
-      return '<b>ZIP '+P.lb[i]+'</b> · '+(P.city[i]||'')+', '+(P.st[i]||'')+'<br>'+(P.nc[i]||0).toLocaleString()+' in-network clinicians'+(P.nh[i]?' · '+P.nh[i]+' hospital'+(P.nh[i]>1?'s':''):'')+'';
+      var P=hp.P,i=hp.i,nt=hp.net?'<span class="netmut">'+esc(legendName(hp.net))+'</span><br>':'';   // v3.100: carrier-led network name on every pin hover
+      if(P.k[i]===1) return nt+'<b>'+P.lb[i]+'</b><br>'+(P.city[i]||'')+', '+(P.st[i]||'')+' · in-network hospital';
+      return nt+'<b>ZIP '+P.lb[i]+'</b> · '+(P.city[i]||'')+', '+(P.st[i]||'')+'<br>'+(P.nc[i]||0).toLocaleString()+' in-network clinicians'+(P.nh[i]?' · '+P.nh[i]+' hospital'+(P.nh[i]>1?'s':''):'')+'';
     } }
   if(N.view==='pins') return null;
   // exact cell under the cursor, at the grid resolution currently drawn
@@ -3506,7 +3521,7 @@ function hoverAt(mx,my){
   var res=netRes(f.z), out=null;
   N.cat.networks.forEach(function(n){ var L=N.layers[n.network_key]; if(out||!netVisible(n)||!L) return;
     var V=netLevel(L,res), j=V.idx[h3.latLngToCell(lat,lng,res)]; if(j==null) return;
-    out='<b>'+n.network_name+'</b><br>This '+RES_SQMI[res]+' cell: '+(V.nc[j]||0).toLocaleString()+' contracted clinicians'+
+    out='<b>'+esc(legendName(n))+'</b><br>This '+RES_SQMI[res]+' cell: '+(V.nc[j]||0).toLocaleString()+' contracted clinicians'+
       (V.nh[j]?' · '+V.nh[j]+' hospital'+(V.nh[j]>1?'s':''):''); });   // v3.94: counts, not share
   return out;
 }
