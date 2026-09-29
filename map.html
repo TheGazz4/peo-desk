@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.95 (2026-09-29, Instance B, owner 11:04: "a place to account for including/ excluding Franchises ... put that toggle here"):
+            Franchises seg (Include | Exclude | Only) under Multi-location; 2250 bakes fr[] (companies.is_franchise, ruled franchise_systems)
+            onto the detail wave; URL fr=none|only; state card count "Franchise locations".
      v3.94 (2026-09-29, Instance B, owner 10:47: "i dont think i like the concept of share of the docs. lets make it a straight showing of
             who is contracted at that carrier in that particular network. Remove the current | share | density function"): one heat
             method - contracted-clinician density by ZIP (the former 'dens' view); the Heat method control, the Strength (share band)
@@ -543,7 +546,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.94 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.95 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -563,6 +566,8 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <label class="chk" title="A PEO's own administrative offices ◆ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <label class="chk" title="Only clients observed at 2+ locations (distinct city/state — own address, branch locations, WC filings) or in 2+ states"><input type="checkbox" id="ml-only"> Multi-location clients only</label>
+        <h2 style="margin-top:10px" title="Franchise locations (Servpro, Hampton Inn, The Joint …) — flagged from the ruled franchise-systems list. Include = show every pin; Exclude = hide franchise locations; Only = franchise locations alone.">Franchises</h2>
+        <div class="seg"><button id="fr-all" class="on" title="Show every client, franchise or not">Include</button><button id="fr-none" title="Hide franchise locations">Exclude</button><button id="fr-only" title="Show franchise locations only">Only</button></div>
         <h2 style="margin-top:10px" title="How confident we are in the PEO shown on each pin. Cross-verified = independently confirmed.">Confidence</h2>
         <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
         <h2 style="margin-top:10px"><span class="svctipq" tabindex="0" data-tip-t="Relationship" data-tip="What kind of service each client gets from the company on its pin.&#10;&#10;Click a chip to hide or show it. All on shows every pin.">Relationship <i>?</i></span> <span class="svcpv">Preview</span></h2>
@@ -645,7 +650,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'brand', placement:'address', msOnly:false, mlOnly:false, minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
+  grain:'brand', placement:'address', msOnly:false, mlOnly:false, fran:'all', minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -863,7 +868,7 @@ function commitDetail(st,r){
   var zOk=r.z5&&r.z5.length===n;    // ZIP carried for grouping a searched area, never for hover display
   var gOk=r.hg&&r.hg.length===n;    // 1129: health month came from the PEO's master plan year
   var sOk=r.ws&&r.ws.length===n;    // 1129: the WC policy behind the month has expired
-  d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,ml:(r.ml&&r.ml.length===n)?r.ml:null,rm:r.rm,rmb:r.rmb,
+  d.detail={ids:r.ids,names:r.names,cities:r.cities,street:r.street,ms:r.ms,ml:(r.ml&&r.ml.length===n)?r.ml:null,fr:(r.fr&&r.fr.length===n)?r.fr:null,rm:r.rm,rmb:r.rmb,
             hrm:hOk?r.hrm:null,hrmb:hOk?r.hrmb:null,cs:cOk?r.cs:null,cx:cOk?r.cx:null,
             osc:fOk?r.osc:null, os:fOk?r.os:null, z5:zOk?r.z5:null,
             hg:gOk?r.hg:null, ws:sOk?r.ws:null, ld:(r.ld&&r.ld.length===n)?r.ld:null, ec:(r.ec&&r.ec.length===n)?r.ec:null, sv:(r.sv&&r.sv.length===n)?r.sv:null,
@@ -1121,7 +1126,7 @@ function draw(){
     var vis2=[]; for(var k2=0;k2<slugArr2.length;k2++){ vis2[k2]=isNP(slugArr2[k2])?npVis():sel[slugArr2[k2]]!==false; }
     for(var i2=0;i2<d2.n;i2++){
       if(!vis2[IDX2[i2]]) continue;
-      if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue; if(S.mlOnly && d2.detail && !(d2.detail.ml?d2.detail.ml[i2]:d2.detail.ms[i2])) continue;
+      if(S.msOnly && d2.detail && !d2.detail.ms[i2]) continue; if(S.mlOnly && d2.detail && !(d2.detail.ml?d2.detail.ml[i2]:d2.detail.ms[i2])) continue; if(S.fran!=='all' && d2.detail && d2.detail.fr && ((S.fran==='none')===!!d2.detail.fr[i2])) continue;
       if(S.minSrc && d2.detail && d2.detail.cs && d2.detail.cs[i2]<S.minSrc) continue;
       if(!svcOk(d2.detail,i2)) continue;
       if(!heatOk(d2,i2)) continue;
@@ -1382,7 +1387,7 @@ function terrResults(){
     var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
-      if(S.msOnly && d.detail && !d.detail.ms[i]) continue; if(S.mlOnly && d.detail && !(d.detail.ml?d.detail.ml[i]:d.detail.ms[i])) continue;
+      if(S.msOnly && d.detail && !d.detail.ms[i]) continue; if(S.mlOnly && d.detail && !(d.detail.ml?d.detail.ml[i]:d.detail.ms[i])) continue; if(S.fran!=='all' && d.detail && d.detail.fr && ((S.fran==='none')===!!d.detail.fr[i])) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       if(!svcOk(d.detail,i)) continue;
       if(!heatOk(d,i)) continue;
@@ -1442,6 +1447,7 @@ function resetAll(){
   S.wcoOnly=false; S.bcoOnly=false; try{ syncCoSeg(); }catch(_){}
   S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
   S.mlOnly=false; if($('ml-only')) $('ml-only').checked=false;
+  S.fran='all'; try{ syncFranButtons(); }catch(_){}
   S.placement='address'; try{ syncPlacementButtons(); }catch(_){}
   setHistMode(0);
   var q=$('peo-search'); if(q) q.value='';
@@ -1862,6 +1868,11 @@ function setMlOnly(v){
   bump(); scheduleDraw(); updateStats(); writeUrl();
 }
 // v3.21 evidence filter (minimum corroborating sources)
+// v3.95 (owner 2026-09-29 11:04 "a place to account for including/ excluding Franchises"): 2250 bakes fr[] (companies.is_franchise,
+// the ruled franchise_systems list) onto every pin. all = show everything; none = hide franchise locations; only = franchise locations alone.
+function syncFranButtons(){ ['all','none','only'].forEach(function(k){ $('fr-'+k).className=(S.fran===k)?'on':''; }); }
+function setFran(v){ if(S.fran===v) return; S.fran=v; syncFranButtons(); bump(); scheduleDraw(); updateStats(); writeUrl(); }
+$('fr-all').onclick=function(){ setFran('all') }; $('fr-none').onclick=function(){ setFran('none') }; $('fr-only').onclick=function(){ setFran('only') };
 function syncSrcButtons(){ [0,1,2].forEach(function(k){ $('src-'+k).className=(S.minSrc===k)?'on':''; }); }
 function setMinSrc(v){
   v=Math.max(0,Math.min(2,Number(v)||0));
@@ -2154,6 +2165,7 @@ function buildUrl(){
     if(S.hqLogos==='all') p.set('hl','all'); else if(!S.hqLogos) p.set('hl','0');   // v3.64: default = Top 25 HQ logos (owner 2026-09-23)
     if(S.msOnly) p.set('ms','1');
     if(S.mlOnly) p.set('ml','1');
+    if(S.fran!=='all') p.set('fr',S.fran);
     if(S.minSrc) p.set('src',String(S.minSrc));
     if(S.wcoOnly) p.set('wco','1'); if(S.bcoOnly) p.set('bco','1');
     var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }).sort(); if(svo.join(',')!=='0,2,3,4,5') p.set('svoff',svo.length?svo.join(','):'none');   // v3.69: default (PEO only) is not written
@@ -2176,6 +2188,7 @@ function readUrl(){
     if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('ml')==='1'){ S.mlOnly=true; $('ml-only').checked=true; }
+    if(p.get('fr')==='none'||p.get('fr')==='only'){ S.fran=p.get('fr'); syncFranButtons(); }
     if(p.get('wco')==='1') S.wcoOnly=true; if(p.get('bco')==='1') S.bcoOnly=true; syncCoSeg();
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
     if(p.get('svoff')){ S.svcOff={}; p.get('svoff').split(',').forEach(function(k){ if(/^[0-6]$/.test(k)) S.svcOff[k]=true; }); try{ renderSvcChips(); }catch(_){} }   // v3.69: an explicit link overrides the PEO-only default ('none' = every chip on)
@@ -2212,7 +2225,7 @@ function computeViewLegend(){
     var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
-      if(S.msOnly && d.detail && !d.detail.ms[i]) continue; if(S.mlOnly && d.detail && !(d.detail.ml?d.detail.ml[i]:d.detail.ms[i])) continue;
+      if(S.msOnly && d.detail && !d.detail.ms[i]) continue; if(S.mlOnly && d.detail && !(d.detail.ml?d.detail.ml[i]:d.detail.ms[i])) continue; if(S.fran!=='all' && d.detail && d.detail.fr && ((S.fran==='none')===!!d.detail.fr[i])) continue;
       if(S.minSrc && d.detail && d.detail.cs && d.detail.cs[i]<S.minSrc) continue;
       if(!svcOk(d.detail,i)) continue;
       if(!heatOk(d,i)) continue;
@@ -2351,7 +2364,7 @@ function stClear(keepCard){
   var c=$('card'); if(!keepCard&&had&&c&&c.dataset.kind==='state') c.style.display='none';
 }
 function stStats(st){
-  var sel=selMap(), counts={}, o={total:0,nat:0,ms:0,ml:0,ren4:0,hist:0};
+  var sel=selMap(), counts={}, o={total:0,nat:0,ms:0,ml:0,fr:0,ren4:0,hist:0};
   for(var s in S.pinData){
     if(S.histOnly) break;
     if(S.states[rs(s)]===false&&rs(s)!==st) continue;
@@ -2360,7 +2373,7 @@ function stStats(st){
     var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
-      if(S.msOnly && dd && !dd.ms[i]) continue; if(S.mlOnly && dd && !(dd.ml?dd.ml[i]:dd.ms[i])) continue;
+      if(S.msOnly && dd && !dd.ms[i]) continue; if(S.mlOnly && dd && !(dd.ml?dd.ml[i]:dd.ms[i])) continue; if(S.fran!=='all' && dd && dd.fr && ((S.fran==='none')===!!dd.fr[i])) continue;
       if(S.minSrc && dd && dd.cs && dd.cs[i]<S.minSrc) continue;
       if(!svcOk(dd,i)) continue;
       if(!heatOk(d,i)) continue;
@@ -2371,6 +2384,7 @@ function stStats(st){
       o.total++; var sl=slugArr[IDX[i]]; counts[sl]=(counts[sl]||0)+1;
       if(dd&&dd.ms&&dd.ms[i]) o.ms++;
       if(dd&&dd.ml&&dd.ml[i]) o.ml++;
+      if(dd&&dd.fr&&dd.fr[i]) o.fr++;
       if(dd&&dd.hrm&&dd.hrm[i]&&urgClass(dd.hrm[i])===0) o.ren4++;
     }
   }
@@ -2406,7 +2420,7 @@ function stRender(){
       kv('Share of all clients shown',(o.total&&share<0.1)?'&lt;0.1%':share+'%')+
       kv('PEOs with clients here',n(o.top.length)))+
     kv('PEO HQs in '+esc(st),hqV)+
-    (S.histOnly?'':kv('Multi-state clients',n(o.ms))+(o.ml?kv('Multi-location clients',n(o.ml)):'')+kv('Health renewal ≤4 mo',n(o.ren4)))+
+    (S.histOnly?'':kv('Multi-state clients',n(o.ms))+(o.ml?kv('Multi-location clients',n(o.ml)):'')+(o.fr?kv('Franchise locations',n(o.fr)):'')+kv('Health renewal ≤4 mo',n(o.ren4)))+
     ((S.hist&&S.histData)?kv('Former PEO users',n(o.hist)):'')+
     (rows?'<div class="sthd">Top PEOs in '+esc(nm)+'</div><div id="stcard-top">'+rows+'</div>'+(o.top.length>8?'<div class="stmore">+'+(o.top.length-8)+' more PEOs</div>':''):'')+
     '<a class="lk" href="#" id="stcard-list">List every client in '+esc(nm)+' →</a>'+
@@ -2591,7 +2605,7 @@ function tblSelect(){
     var vis=[]; for(var k=0;k<slugArr.length;k++) vis[k]=isNP(slugArr[k])?npVis():sel[slugArr[k]]!==false;
     for(var i=0;i<d.n;i++){
       if(!vis[IDX[i]]) continue;
-      if(S.msOnly && dd && !dd.ms[i]) continue; if(S.mlOnly && dd && !(dd.ml?dd.ml[i]:dd.ms[i])) continue;
+      if(S.msOnly && dd && !dd.ms[i]) continue; if(S.mlOnly && dd && !(dd.ml?dd.ml[i]:dd.ms[i])) continue; if(S.fran!=='all' && dd && dd.fr && ((S.fran==='none')===!!dd.fr[i])) continue;
       if(S.minSrc && dd && dd.cs && dd.cs[i]<S.minSrc) continue;
       if(!svcOk(dd,i)) continue;
       if(!heatOk(d,i)) continue;
@@ -2768,6 +2782,7 @@ function tblPaintInner(){
   var emh=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(emh.length) bits.push('hiding employees '+emh.map(function(k){ return EMP_BANDS[k]; }).join(', '));
   if(S.msOnly) bits.push('multi-state only');
   if(S.mlOnly) bits.push('multi-location only');
+  if(S.fran==='none') bits.push('franchises excluded'); if(S.fran==='only') bits.push('franchises only');
   if(S.hist) bits.push('current users only (former records are on the map, not here)');
   $('tbl-what').textContent='· '+bits.join(' · ')+' · ignores pan and zoom';
 
