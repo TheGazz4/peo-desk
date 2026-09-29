@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.91 (2026-09-29, Instance B, owner: "a small button that reads clear all selections which does that ONLY FOR that respective
+            peo's carriers and networks"): a "Clear all selections" button under the selected PEO's header, shown while any of its
+            layers are on; it switches off only the layers that belong to that PEO's carriers.
      v3.90 (2026-09-29, Instance B, owner: "normalize the UHC networks to fairly represent the coverage ... without misrepresenting"):
             every network is now scored in two lanes (migration 2239, net-strength worker): medical clinicians against medical
             clinicians, mental-health clinicians against mental-health clinicians. The tree gets a "Behavioral health" plan-type
@@ -527,7 +530,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.90 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.91 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2907,7 +2910,8 @@ function buildSection(){
         '.netpt:hover{background:rgba(var(--peo-rgb,155,79,208),.10)}.netpt.open{background:rgba(var(--peo-rgb,155,79,208),.16)}.netpt b{color:var(--ink,#fff)}'+
         '.netptc{width:10px;color:var(--muted,#8a90a0);font-size:10px}.netpt .netmut{margin-left:2px}.netpton{color:rgb(var(--peo-lt,217,184,245));font-weight:600}'+
         '.netpt input{margin:0;cursor:pointer}.nettree3{margin:0 0 4px 14px;padding-left:10px;border-left:1px dashed rgba(var(--peo-rgb,155,79,208),.35)}'+
-        '.netsame{color:rgb(var(--peo-lt,195,174,224))}.netpct{opacity:.75}';
+        '.netsame{color:rgb(var(--peo-lt,195,174,224))}.netpct{opacity:.75}'+
+        '.netclearrow{margin:2px 0 6px 30px}.netclear{font:inherit;font-size:10.5px;letter-spacing:.03em;padding:2px 9px;border-radius:9px;cursor:pointer;color:rgb(var(--peo-lt,217,184,245));background:transparent;border:1px solid rgba(var(--peo-rgb,155,79,208),.55)}.netclear:hover{background:rgba(var(--peo-rgb,155,79,208),.18);color:#fff}';   // v3.91
       document.head.appendChild(sti); }
   var bands=$n('netbands');
   for(var b=3;b>=0;b--){ var sp=document.createElement('span'); sp.className='netchip on'; sp.dataset.b=b; sp.title=BAND_RANGE[b]+' of local doctors/hospitals signed (weighted)'; sp.textContent=BAND_NAMES[b]; bands.appendChild(sp); }
@@ -3025,7 +3029,9 @@ function renderList(){
     if(open&&row.style&&row.style.setProperty){ var ph=peoHex(p.family_slug); row.style.setProperty('--peo-rgb',hexRgb(ph)); row.style.setProperty('--peo-lt',hexRgb(ph,0.62)); }   // v3.89
     var html='<label class="netrow netpeohd"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b>'+(open?'<span class="netpeosel">Selected PEO</span>':'')+'</div>'+
       '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+(open&&onKeys().length?' · '+onKeys().length+' of '+NET_MAX_ON+' layers on':'')+'</div></div></label>'+
-      (open&&N.note?'<div class="netpend" style="color:#f0b25c">'+esc(N.note)+'</div>':'');
+      (open&&N.note?'<div class="netpend" style="color:#f0b25c">'+esc(N.note)+'</div>':'')+
+      // v3.91 (owner 2026-09-29 08:31): "clear all selections" for THIS PEO only - switches off every layer that belongs to its carriers
+      (open&&onKeys().length?'<div class="netclearrow"><button type="button" class="netclear" title="Switch off every network layer of '+esc(p.peo)+'">Clear all selections</button></div>':'');
     // v3.60 (owner 2026-09-28, Instance B): Insured line per carrier (WSE | Total, "~" = estimated side) and ONE card per
     // provider network — product names that ride the same doctors fold together, identically for every PEO (net_network_group).
     // v3.61 (owner 2026-09-28): carriers stay condensed to one line; only the selected carrier opens to its Insured line and cards.
@@ -3100,6 +3106,9 @@ function renderList(){
           N.note=add.length>room?NET_MAX_ON+' layers max — '+(add.length-room)+' of this group left off':null; }
         else { keys.forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; }
         renderList(); ensureData(); redraw(); }; });
+    var clr=row.querySelector('.netclear'); if(clr){ clr.onclick=function(e){ e.preventDefault(); e.stopPropagation();
+      var mine={}; (p.carriers||[]).forEach(function(c){ (c.networks||[]).forEach(function(x){ var k=x.map_key||x.network_key; if(k) mine[k]=1; }); });
+      onKeys().forEach(function(k){ if(mine[k]) delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; renderList(); ensureData(); redraw(); }; }
     row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.on={}; N.note=null; N.sel=firstMapped(p.family_slug); if(N.sel) N.on[N.sel]=true; renderCarriers(); renderList(); ensureData(); redraw(); };
     [].forEach.call(row.querySelectorAll('.netcar-h'),function(h){ h.onclick=function(){ var ck=h.getAttribute('data-car'); if(N.car===ck){ N.car=''; renderList(); return; } N.car=ck; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){
