@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.98 (2026-09-29, Instance B, owner 11:32: "the default box checked for each carrier on their most widespread PPO network by
+            default. this goes for all carriers"): selecting a PEO switches on one layer per mapped carrier - the carrier's PPO with the
+            most contracted clinicians (no PPO -> its most robust network), carriers in plan-share order up to the cross-carrier cap.
      v3.97 (2026-09-29, Instance B, owner 11:25: "i want all carriers networks (universally) listed as most robust to least robust"):
             within every carrier, networks sort by contracted clinicians (biggest first; no map yet = last) and plan-type groups by
             their strongest network. Same rule for every carrier.
@@ -553,7 +556,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.97 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.98 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3027,7 +3030,7 @@ function setView(v){
 function loadCatalog(){
   netFetch({mode:'catalog'}).then(function(c){
     N.cat=c;
-    if(!N.peo){ var first=(c.peos||[]).filter(function(p){ return firstMapped(p.family_slug,c); })[0]; if(first){ N.peo=first.family_slug; N.sel=firstMapped(first.family_slug,c); if(N.sel) N.on[N.sel]=true; } }
+    if(!N.peo){ var first=(c.peos||[]).filter(function(p){ return firstMapped(p.family_slug,c); })[0]; if(first){ N.peo=first.family_slug; defaultOn(first.family_slug,c); } }
     renderCarriers(); renderList(); ensureData();
   }).catch(function(e){ if(e.message!=='auth') $n('netlist').innerHTML='<div class="netmut">Network layer unavailable.</div>'; });
 }
@@ -3052,8 +3055,19 @@ function fmtDate(d){ if(!d) return '—'; var p=String(d).slice(0,10).split('-')
 function fmtMonth(){ var m=[].slice.call(arguments).filter(Boolean).map(String).sort().pop(); if(!m) return '—'; var p=m.slice(0,10).split('-'); return MONTHS[+p[1]]+' '+p[0]; }
 // v3.47 (owner 2026-09-23): PEO-first. A carrier runs several networks and two PEOs on the same carrier can ride
 // different ones, so heat is switched on by picking a PEO and then its networks. v3.78: each network is its own on/off toggle (up to 4 layers).
-function netMeta(k){ return ((N.cat&&N.cat.networks)||[]).filter(function(n){ return n.network_key===k; })[0]||null; }
+function netMeta(k,cat){ var C=cat||N.cat; return ((C&&C.networks)||[]).filter(function(n){ return n.network_key===k; })[0]||null; }   // v3.98: optional catalogue (before N.cat is set)
 function peoOf(slug,cat){ return (((cat||N.cat)||{}).peos||[]).filter(function(p){ return p.family_slug===slug; })[0]||null; }
+// v3.98 (owner 2026-09-29 11:32 "I want the default box checked for each carrier on their most widespread PPO network by default. this goes
+// for all carriers"): when a PEO is selected, every carrier with a map starts with ONE layer on - its PPO network with the most contracted
+// clinicians (no PPO on file -> its most robust network). Carriers are taken in plan-share order until the cross-carrier cap is reached.
+function carrierDefault(c,cat){ var best=null, bestV=-1, bestPPO=false;
+  (c.networks||[]).forEach(function(x){ if(!x.mapped) return; var k=x.map_key||x.network_key, m=netMeta(k,cat); if(!k||!m) return;
+    var v=(m.clinicians||0)+(m.hospitals||0)/1000, ppo=/^ppo$/i.test(x.plan_type||'');
+    if((ppo&&!bestPPO)||(ppo===bestPPO&&v>bestV)){ best=k; bestV=v; bestPPO=ppo; } });
+  return best; }
+function defaultOn(slug,cat){ var p=peoOf(slug,cat); N.on={}; N.sel=null; if(!p) return;
+  var n=0; for(var i=0;i<(p.carriers||[]).length&&n<NET_MAX_ON;i++){ var c=p.carriers[i]; if(N.carriersOff[c.carrier]) continue;
+    var k=carrierDefault(c,cat); if(k&&!N.on[k]){ N.on[k]=true; if(!N.sel) N.sel=k; n++; } } }
 function firstMapped(slug,cat){ var p=peoOf(slug,cat); if(!p) return null;
   for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if(N.carriersOff[c.carrier]) continue;
     for(var j=0;j<(c.networks||[]).length;j++){ var x=c.networks[j]; if(x.mapped&&(x.map_key||x.network_key)) return x.map_key||x.network_key; } }
@@ -3185,7 +3199,7 @@ function renderList(){
     var clr=row.querySelector('.netclear'); if(clr){ clr.onclick=function(e){ e.preventDefault(); e.stopPropagation();
       var mine={}; (p.carriers||[]).forEach(function(c){ (c.networks||[]).forEach(function(x){ var k=x.map_key||x.network_key; if(k) mine[k]=1; }); });
       onKeys().forEach(function(k){ if(mine[k]) delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; renderList(); ensureData(); redraw(); }; }
-    row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.on={}; N.note=null; N.sel=firstMapped(p.family_slug); if(N.sel) N.on[N.sel]=true; renderCarriers(); renderList(); ensureData(); redraw(); };
+    row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.note=null; defaultOn(p.family_slug); renderCarriers(); renderList(); ensureData(); redraw(); };
     [].forEach.call(row.querySelectorAll('.netcar-h'),function(h){ h.onclick=function(){ var ck=h.getAttribute('data-car'); if(N.car===ck){ N.car=''; renderList(); return; } N.car=ck; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){
       if(r.checked){ if(capHit(r.value)){ r.checked=false; N.note=NET_MAX_ON+' layers max across carriers — switch one off first (one carrier\'s own networks have no cap)'; renderList(); return; } N.on[r.value]=true; N.sel=r.value; }
