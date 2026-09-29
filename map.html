@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.89 (2026-09-28, Instance B, owner: "when a peo is selected, i want it to take on the peo's color. so in this case red would be
+            where the purple is for adp but shaded/faded the same exact manner - networks remain the colors of the carriers"): the selected
+            PEO's frame, header band, SELECTED PEO badge, tree guide lines and plan-type highlights use the PEO's own map colour (the
+            same colour as its pins; brand first, then family), at the same opacities as before. Carrier swatches and heat stay carrier-coloured.
      v3.88 (2026-09-28, Instance B, owner: "the network strength heatmap should take on the color of the carrier - Aetna is purple,
             United is blue"): every network layer keeps its carrier's hue (sister networks of one carrier differ by lightness only,
             no more hue rotation that turned a second Aetna layer pink); the heat ramp keeps a 42% saturation floor so thin areas
@@ -519,7 +523,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.88 · 2026-09-28</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.89 · 2026-09-28</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2883,20 +2887,22 @@ function buildSection(){
       sti.textContent='.netinsrow{margin:-2px 0 4px 22px;font-size:11.5px;line-height:1.4}.netins{color:var(--ink,#fff);font-weight:600}.netlbl-ok{background:rgba(29,158,117,.22);color:#9fe1cb}.netlbl-sa{background:rgba(55,138,221,.22);color:#b5d4f4}'+
         '.netcar-h{cursor:pointer;user-select:none}.netcar-h:hover b{text-decoration:underline}.netcaret{margin-left:auto;padding-left:8px;color:var(--muted,#8a90a0);font-weight:700}.netcar-h.open .netcaret{color:var(--ink,#fff)}'+
         /* v3.62 (owner 2026-09-28): the selected PEO must be unmistakable */
-        '.netpeo.open{border:1px solid rgba(155,79,208,.55);border-radius:10px;background:rgba(155,79,208,.08);padding:2px 6px 6px;margin:6px 0 8px}'+
-        '.netpeo.open>.netrow.netpeohd{background:rgba(155,79,208,.28);border-radius:8px;padding:8px 10px;margin:0 -2px 6px}'+
+        /* v3.89 (owner 2026-09-28 17:29): the selected PEO's frame wears the PEO's own map colour (ADP red, TriNet violet ...);
+           set per row as --peo-rgb / --peo-lt. Carrier swatches and heat layers keep the carrier colours. */
+        '.netpeo.open{border:1px solid rgba(var(--peo-rgb,155,79,208),.55);border-radius:10px;background:rgba(var(--peo-rgb,155,79,208),.08);padding:2px 6px 6px;margin:6px 0 8px}'+
+        '.netpeo.open>.netrow.netpeohd{background:rgba(var(--peo-rgb,155,79,208),.28);border-radius:8px;padding:8px 10px;margin:0 -2px 6px}'+
         '.netpeo.open>.netrow.netpeohd .netmeta b{font-size:15px;color:#fff;letter-spacing:.01em}'+
-        '.netpeo.open>.netrow.netpeohd .netmut{color:#d9b8f5}'+
-        '.netpeosel{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:#9b4fd0;color:#fff;vertical-align:2px}'+
+        '.netpeo.open>.netrow.netpeohd .netmut{color:rgb(var(--peo-lt,217,184,245))}'+
+        '.netpeosel{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgb(var(--peo-rgb,155,79,208));color:#fff;vertical-align:2px}'+
         '.netpeo:not(.open)>.netrow.netpeohd{opacity:.72}.netpeo:not(.open)>.netrow.netpeohd:hover{opacity:1}'+
         /* v3.83 progressive tree: each level indents 14px with a guide line down the open branch */
-        '.nettree{margin:2px 0 6px 12px;padding-left:10px;border-left:1px solid rgba(155,79,208,.45)}'+
+        '.nettree{margin:2px 0 6px 12px;padding-left:10px;border-left:1px solid rgba(var(--peo-rgb,155,79,208),.45)}'+
         '.netcrumb{font-size:10.5px;letter-spacing:.03em;color:var(--muted,#8a90a0);margin:2px 0 4px}'+
         '.netpt{display:flex;align-items:center;gap:7px;padding:5px 4px;margin:1px 0;border-radius:6px;cursor:pointer;user-select:none;font-size:12.5px}'+
-        '.netpt:hover{background:rgba(155,79,208,.10)}.netpt.open{background:rgba(155,79,208,.16)}.netpt b{color:var(--ink,#fff)}'+
-        '.netptc{width:10px;color:var(--muted,#8a90a0);font-size:10px}.netpt .netmut{margin-left:2px}.netpton{color:#d9b8f5;font-weight:600}'+
-        '.netpt input{margin:0;cursor:pointer}.nettree3{margin:0 0 4px 14px;padding-left:10px;border-left:1px dashed rgba(155,79,208,.35)}'+
-        '.netsame{color:#c3aee0}.netpct{opacity:.75}';
+        '.netpt:hover{background:rgba(var(--peo-rgb,155,79,208),.10)}.netpt.open{background:rgba(var(--peo-rgb,155,79,208),.16)}.netpt b{color:var(--ink,#fff)}'+
+        '.netptc{width:10px;color:var(--muted,#8a90a0);font-size:10px}.netpt .netmut{margin-left:2px}.netpton{color:rgb(var(--peo-lt,217,184,245));font-weight:600}'+
+        '.netpt input{margin:0;cursor:pointer}.nettree3{margin:0 0 4px 14px;padding-left:10px;border-left:1px dashed rgba(var(--peo-rgb,155,79,208),.35)}'+
+        '.netsame{color:rgb(var(--peo-lt,195,174,224))}.netpct{opacity:.75}';
       document.head.appendChild(sti); }
   var bands=$n('netbands');
   for(var b=3;b>=0;b--){ var sp=document.createElement('span'); sp.className='netchip on'; sp.dataset.b=b; sp.title=BAND_RANGE[b]+' of local doctors/hospitals signed (weighted)'; sp.textContent=BAND_NAMES[b]; bands.appendChild(sp); }
@@ -2990,6 +2996,11 @@ function netVisible(n){ return !!N.on[n.network_key] && N.tiers[n.tier]!==false;
 function hslToHex(h,s,l){ s/=100; l/=100; var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2, r=0,g=0,b=0;
   if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
   return '#'+[r,g,b].map(function(v){ return ('0'+Math.round((v+m)*255).toString(16)).slice(-2); }).join(''); }
+// v3.89 (owner 2026-09-28 17:29 "when a peo is selected, i want it to take on the peo's color ... networks remain the colors of the
+// carriers"): the PEO's own map colour (brand first, then family; the same colour as its pins), as "r,g,b" for the panel's CSS vars.
+function peoHex(slug){ var b=(S.colors.brand||{})[slug], f=(S.colors.family||{})[slug]; return b||f||'#9b4fd0'; }
+function hexRgb(hex,mix){ var r=parseInt(hex.substr(1,2),16),g=parseInt(hex.substr(3,2),16),b=parseInt(hex.substr(5,2),16); mix=mix||0;
+  return [r,g,b].map(function(v){ return Math.round(v+(255-v)*mix); }).join(','); }
 function netHex(n){ var base=carrierHex(n.carrier);
   var sib=onKeys().filter(function(k){ var m=netMeta(k); return m&&carrierKey(m.carrier)===carrierKey(n.carrier); }).sort();
   var i=sib.indexOf(n.network_key); if(i<=0) return base;
@@ -3006,6 +3017,7 @@ function renderList(){
     var open=N.peo===p.family_slug, ready=0;
     cars.forEach(function(c){ (c.networks||[]).forEach(function(x){ if(x.mapped) ready++; }); });
     var row=document.createElement('div'); row.className='netpeo'+(open?' open':'');
+    if(open&&row.style&&row.style.setProperty){ var ph=peoHex(p.family_slug); row.style.setProperty('--peo-rgb',hexRgb(ph)); row.style.setProperty('--peo-lt',hexRgb(ph,0.62)); }   // v3.89
     var html='<label class="netrow netpeohd"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b>'+(open?'<span class="netpeosel">Selected PEO</span>':'')+'</div>'+
       '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+(open&&onKeys().length?' · '+onKeys().length+' of '+NET_MAX_ON+' layers on':'')+'</div></div></label>'+
       (open&&N.note?'<div class="netpend" style="color:#f0b25c">'+esc(N.note)+'</div>':'');
