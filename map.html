@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.92 (2026-09-29, Instance B, owner: "the exception should be if its the same carrier so we can understand their full breadth
+            of coverage"): the 4-layer cap now applies across carriers only; any number of one carrier's own networks may be on at once.
+            Also (owner 10:14 "make this ask the map inquiry movable"): the Ask-the-map dock drags by its title bar, remembers its spot,
+            double-click puts it back. Owner 10:18: the "Unverified HQ candidates" toggle is removed entirely; the panel heading reads
+            "PEO Headquarters".
      v3.91 (2026-09-29, Instance B, owner: "a small button that reads clear all selections which does that ONLY FOR that respective
             peo's carriers and networks"): a "Clear all selections" button under the selected PEO's header, shown while any of its
             layers are on; it switches off only the layers that belong to that PEO's carriers.
@@ -449,6 +454,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
   box-shadow:0 10px 34px rgba(0,0,0,.55)}
 #aidock .hd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--grid);font-size:12.5px;color:var(--ink);font-weight:650;cursor:pointer}
 #aidock .hd .min{margin-left:auto;color:var(--muted);font-size:14px}
+#aidock .hd{cursor:grab;touch-action:none;user-select:none}#aidock .hd.drag{cursor:grabbing}#aidock.moved{max-width:none}   /* v3.92 movable dock */
 #aidock .bd{padding:10px 12px;display:block}
 #aidock.min .bd{display:none}
 #ai-ans{font-size:12.5px;color:var(--ink2);margin-bottom:8px;max-height:150px;overflow-y:auto;white-space:pre-wrap}
@@ -530,7 +536,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.91 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.92 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -545,10 +551,9 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="seg"><button id="g-brand" class="on">PEO specific</button><button id="g-family">Family brand</button></div>
         <h2 style="margin-top:10px" title="Colors every pin by how soon its renewal month comes up — health/benefits is the trigger event that matters; WC is secondary. Off = each PEO's brand color.">Renewal heat</h2>
         <div class="seg"><button id="lens-peo" class="on">Off</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC</button></div>
-        <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">Headquarters</h2>
+        <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">PEO Headquarters</h2>
         <div class="seg" id="hql-seg" title="Top 25 = the 25 largest PEOs on the map (by clients) show their HQ logo; All = every PEO HQ logo; Off = none"><button id="hql-off">Off</button><button id="hql-top" class="on">Top 25</button><button id="hql-all">All</button></div><input type="checkbox" id="hqlogo-on" checked style="display:none">
-        <label class="chk" title="A PEO's own administrative offices ◆ and unverified HQ candidates ✩ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
-        <label class="chk" title="Unverified guesses at a PEO's headquarters — a candidate, not a confirmed address. Off by default; never mistake one for a verified HQ."><input type="checkbox" id="hqcand-on"> Unverified HQ candidates <span style="color:var(--muted)">✩</span></label>
+        <label class="chk" title="A PEO's own administrative offices ◆ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <h2 style="margin-top:10px" title="How confident we are in the PEO shown on each pin. Cross-verified = independently confirmed.">Confidence</h2>
         <div class="seg"><button id="src-0" class="on" title="Show every pin">Any</button><button id="src-1" title="PEO attribution verified">Verified</button><button id="src-2" title="PEO attribution independently cross-verified">Cross-verified</button></div>
@@ -1435,7 +1440,7 @@ function resetAll(){
   try{ switchGrain('brand'); }catch(_){}                                    // view by: PEO specific
   S.hqLogos='top'; try{ syncHqSeg(); }catch(_){}                            // headquarters: Top 25
   S.beaconsOn=false; if($('beacons-on')) $('beacons-on').checked=false;
-  S.hqCand=false; if($('hqcand-on')) $('hqcand-on').checked=false;
+  S.hqCand=false;
   PEO_SORT='count'; try{ localStorage.setItem('peo_sort','count'); }catch(_){} try{ syncAzBtn(); }catch(_){}
   var q2=$('q'); if(q2) q2.value=''; var qd=$('q-drop'); if(qd) qd.style.display='none';
   try{ if(window.netReset) window.netReset(); }catch(_){}                   // network layers off, tiers/bands all on
@@ -1762,7 +1767,7 @@ function syncAzBtn(){ var b=$('peo-az'); if(!b) return; var on=(PEO_SORT==='az')
 $('peo-az').onclick=function(){ PEO_SORT=(PEO_SORT==='az')?'count':'az'; try{ localStorage.setItem('peo_sort',PEO_SORT); }catch(_){} syncAzBtn(); buildPeoPanel(); };
 syncAzBtn();
 $('beacons-on').onchange=function(){ S.beaconsOn=$('beacons-on').checked; scheduleDraw(); writeUrl(); };
-$('hqcand-on').onchange=function(){ S.hqCand=$('hqcand-on').checked; scheduleDraw(); writeUrl(); };
+// v3.92: the "Unverified HQ candidates" toggle is gone (owner 10:18 "remove entirely"); S.hqCand stays false, so ✩ candidates never draw.
 // v3.64 (owner 2026-09-23): "only the top 25 logos displayed as a default when the map loads" - Off / Top 25 / All.
 function hqTopSet(){
   var key=(S.beacons||[]).length+':'+((S.catalog&&S.catalog.families)||[]).length;
@@ -2444,7 +2449,30 @@ function runSearch(v){
 }
 
 // ------------------------- AI dock (the map copilot) -------------------------
-$('ai-hd').onclick=function(){ var a=$('aidock'); a.className=a.className==='min'?'':'min'; $('ai-min').textContent=a.className==='min'?'▴':'▾'; };
+$('ai-hd').onclick=function(){ if(AI_DRAG.moved) return; var a=$('aidock'); a.className=a.className==='min'?'':'min'; $('ai-min').textContent=a.className==='min'?'▴':'▾'; };
+// v3.92 (owner 2026-09-29 10:14: "can you make this ask the map inquiry movable? it sits over the top of the carrier info"):
+// drag the dock anywhere over the map by its title bar; the spot is remembered in this browser; double-click the bar to put it back.
+var AI_DRAG={moved:false};
+(function(){
+  var a=$('aidock'), h=$('ai-hd'), wrap=$('mapwrap'), KEY='map_ai_pos';
+  if(!a||!h||!wrap) return;
+  function clamp(x,y){ var W=wrap.clientWidth, H=wrap.clientHeight, r=a.getBoundingClientRect();
+    return [Math.max(0,Math.min(W-Math.min(r.width,W),x)), Math.max(0,Math.min(H-Math.min(r.height,H),y))]; }
+  function place(x,y){ var p=clamp(x,y); a.style.left=p[0]+'px'; a.style.top=p[1]+'px'; a.style.bottom='auto'; a.style.right='auto'; a.classList.add('moved'); return p; }
+  function reset(){ a.style.left=''; a.style.top=''; a.style.bottom=''; a.style.right=''; a.classList.remove('moved'); try{ localStorage.removeItem(KEY); }catch(e){} }
+  try{ var sv=JSON.parse(localStorage.getItem(KEY)||'null'); if(sv&&isFinite(sv[0])&&isFinite(sv[1])) place(sv[0],sv[1]); }catch(e){}
+  var on=false, x0=0, y0=0, l0=0, t0=0;
+  h.addEventListener('pointerdown',function(e){ if(e.button) return; on=true; AI_DRAG.moved=false; x0=e.clientX; y0=e.clientY;
+    var r=a.getBoundingClientRect(), w=wrap.getBoundingClientRect(); l0=r.left-w.left; t0=r.top-w.top; try{ h.setPointerCapture(e.pointerId); }catch(_){} });
+  h.addEventListener('pointermove',function(e){ if(!on) return; var dx=e.clientX-x0, dy=e.clientY-y0;
+    if(!AI_DRAG.moved&&Math.abs(dx)+Math.abs(dy)<4) return; AI_DRAG.moved=true; h.classList.add('drag'); place(l0+dx,t0+dy); e.preventDefault(); });
+  function end(){ if(!on) return; on=false; h.classList.remove('drag');
+    if(AI_DRAG.moved){ try{ localStorage.setItem(KEY,JSON.stringify([parseFloat(a.style.left)||0,parseFloat(a.style.top)||0])); }catch(e){} setTimeout(function(){ AI_DRAG.moved=false; },0); } }
+  h.addEventListener('pointerup',end); h.addEventListener('pointercancel',end);
+  h.addEventListener('dblclick',function(e){ e.preventDefault(); reset(); });
+  window.addEventListener('resize',function(){ if(a.classList.contains('moved')) place(parseFloat(a.style.left)||0,parseFloat(a.style.top)||0); });
+  h.title='Drag to move · click to open or close · double-click to put it back';
+})();
 $('ai-send').onclick=function(){ aiAsk($('ai-q').value.trim()); };
 $('ai-q').addEventListener('keydown',function(e){ if(e.key==='Enter') aiAsk(this.value.trim()); });
 $('ai-desc').onclick=function(){ aiAsk('Describe this view for me.'); };
@@ -2998,6 +3026,10 @@ function firstMapped(slug,cat){ var p=peoOf(slug,cat); if(!p) return null;
 // selected PEO's carriers. N.on = {network_key:true}. N.sel = the last one switched on (drives the carrier auto-open only).
 function onKeys(){ return Object.keys(N.on).filter(function(k){ return N.on[k]; }); }
 function keyAllowed(key){ var p=peoOf(N.peo); if(!p) return false; return (p.carriers||[]).some(function(c){ return !N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return (x.map_key||x.network_key)===key&&x.mapped; }); }); }
+// v3.92 (owner 2026-09-29 10:09: "the exception should be if its the same carrier so we can understand their full breadth of coverage"):
+// the NET_MAX_ON cap applies ACROSS carriers; any number of one carrier's own networks may be on together.
+function keyCarrier(k){ var p=peoOf(N.peo); if(!p) return null; for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if((c.networks||[]).some(function(x){ return (x.map_key||x.network_key)===k; })) return c.carrier; } return null; }
+function capHit(k){ var on=onKeys(); if(on.length<NET_MAX_ON) return false; var c=keyCarrier(k); return !(c&&on.every(function(o){ return keyCarrier(o)===c; })); }
 function pruneOn(){ onKeys().forEach(function(k){ if(!keyAllowed(k)) delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; }
 function selAllowed(){ return !!N.sel&&keyAllowed(N.sel); }
 function netVisible(n){ return !!N.on[n.network_key] && N.tiers[n.tier]!==false; }
@@ -3028,7 +3060,7 @@ function renderList(){
     var row=document.createElement('div'); row.className='netpeo'+(open?' open':'');
     if(open&&row.style&&row.style.setProperty){ var ph=peoHex(p.family_slug); row.style.setProperty('--peo-rgb',hexRgb(ph)); row.style.setProperty('--peo-lt',hexRgb(ph,0.62)); }   // v3.89
     var html='<label class="netrow netpeohd"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b>'+(open?'<span class="netpeosel">Selected PEO</span>':'')+'</div>'+
-      '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+(open&&onKeys().length?' · '+onKeys().length+' of '+NET_MAX_ON+' layers on':'')+'</div></div></label>'+
+      '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+(open&&onKeys().length?' · '+onKeys().length+' layer'+(onKeys().length>1?'s':'')+' on':'')+'</div></div></label>'+
       (open&&N.note?'<div class="netpend" style="color:#f0b25c">'+esc(N.note)+'</div>':'')+
       // v3.91 (owner 2026-09-29 08:31): "clear all selections" for THIS PEO only - switches off every layer that belongs to its carriers
       (open&&onKeys().length?'<div class="netclearrow"><button type="button" class="netclear" title="Switch off every network layer of '+esc(p.peo)+'">Clear all selections</button></div>':'');
@@ -3101,9 +3133,9 @@ function renderList(){
     [].forEach.call(row.querySelectorAll('input.netptall'),function(cb){ cb.indeterminate=cb.getAttribute('data-some')==='1';
       cb.onclick=function(e){ e.stopPropagation(); };
       cb.onchange=function(){ var keys=JSON.parse(cb.getAttribute('data-keys')||'[]');
-        if(cb.checked){ var add=keys.filter(function(k){ return !N.on[k]; }), room=Math.max(0,NET_MAX_ON-onKeys().length);
+        if(cb.checked){ var add=keys.filter(function(k){ return !N.on[k]; }), c0=keyCarrier(keys[0]), same=onKeys().concat(keys).every(function(o){ return keyCarrier(o)===c0; }), room=same?add.length:Math.max(0,NET_MAX_ON-onKeys().length);   // v3.92: one carrier, no cap
           add.slice(0,room).forEach(function(k){ N.on[k]=true; N.sel=k; });
-          N.note=add.length>room?NET_MAX_ON+' layers max — '+(add.length-room)+' of this group left off':null; }
+          N.note=add.length>room?NET_MAX_ON+' layers max across carriers — '+(add.length-room)+' of this group left off':null; }
         else { keys.forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; }
         renderList(); ensureData(); redraw(); }; });
     var clr=row.querySelector('.netclear'); if(clr){ clr.onclick=function(e){ e.preventDefault(); e.stopPropagation();
@@ -3112,7 +3144,7 @@ function renderList(){
     row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.on={}; N.note=null; N.sel=firstMapped(p.family_slug); if(N.sel) N.on[N.sel]=true; renderCarriers(); renderList(); ensureData(); redraw(); };
     [].forEach.call(row.querySelectorAll('.netcar-h'),function(h){ h.onclick=function(){ var ck=h.getAttribute('data-car'); if(N.car===ck){ N.car=''; renderList(); return; } N.car=ck; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){
-      if(r.checked){ if(onKeys().length>=NET_MAX_ON){ r.checked=false; N.note=NET_MAX_ON+' layers max — switch one off first'; renderList(); return; } N.on[r.value]=true; N.sel=r.value; }
+      if(r.checked){ if(capHit(r.value)){ r.checked=false; N.note=NET_MAX_ON+' layers max across carriers — switch one off first (one carrier\'s own networks have no cap)'; renderList(); return; } N.on[r.value]=true; N.sel=r.value; }
       else { delete N.on[r.value]; N.sel=onKeys().slice(-1)[0]||null; }
       N.note=null; renderList(); ensureData(); redraw(); }; });
     box.appendChild(row);
