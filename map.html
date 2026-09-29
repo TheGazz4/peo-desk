@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.99 (2026-09-29, Instance B, owner 12:41 "lets install this" on the default-display brainstorm): the lead carrier (largest plan
+            share) starts on; another carrier joins the default only within 10 share points of the leader; layers of any non-lead carrier
+            draw striped; header lists mapped carriers left off ("Also on this plan ... switch on to compare").
      v3.98 (2026-09-29, Instance B, owner 11:32: "the default box checked for each carrier on their most widespread PPO network by
             default. this goes for all carriers"): selecting a PEO switches on one layer per mapped carrier - the carrier's PPO with the
             most contracted clinicians (no PPO -> its most robust network), carriers in plan-share order up to the cross-carrier cap.
@@ -556,7 +559,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.98 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.99 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3065,9 +3068,21 @@ function carrierDefault(c,cat){ var best=null, bestV=-1, bestPPO=false;
     var v=(m.clinicians||0)+(m.hospitals||0)/1000, ppo=/^ppo$/i.test(x.plan_type||'');
     if((ppo&&!bestPPO)||(ppo===bestPPO&&v>bestV)){ best=k; bestV=v; bestPPO=ppo; } });
   return best; }
+// v3.99 (owner 2026-09-29 12:41 "lets install this", on the brainstorm): ONE clear picture first. The lead carrier (largest share of the
+// plan) starts on; another carrier joins the default only when it is within NET_DEFAULT_SHARE_GAP share points of the leader (a true
+// co-lead, like ADP's UHC 37% / Aetna 35%). Any layer from a carrier other than the lead draws STRIPED, so two rosters read as layered,
+// never as mixed paint; the header names the carriers left off ("also on this plan - switch on to compare").
+var NET_DEFAULT_SHARE_GAP=10;
 function defaultOn(slug,cat){ var p=peoOf(slug,cat); N.on={}; N.sel=null; if(!p) return;
-  var n=0; for(var i=0;i<(p.carriers||[]).length&&n<NET_MAX_ON;i++){ var c=p.carriers[i]; if(N.carriersOff[c.carrier]) continue;
-    var k=carrierDefault(c,cat); if(k&&!N.on[k]){ N.on[k]=true; if(!N.sel) N.sel=k; n++; } } }
+  var cs=(p.carriers||[]).filter(function(c){ return !N.carriersOff[c.carrier]; }).slice().sort(function(a,b){ return (b.share_pct||0)-(a.share_pct||0); });
+  var lead=null, n=0;
+  for(var i=0;i<cs.length&&n<NET_MAX_ON;i++){ var c=cs[i], k=carrierDefault(c,cat); if(!k||N.on[k]) continue;
+    if(lead==null) lead=c.share_pct||0; else if((c.share_pct||0)<lead-NET_DEFAULT_SHARE_GAP) break;
+    N.on[k]=true; if(!N.sel) N.sel=k; n++; } }
+function leadCarrier(){ var ks=onKeys(); return ks.length?keyCarrier(ks[0]):null; }
+function alsoOnPlan(p){ var on={}; onKeys().forEach(function(k){ on[keyCarrier(k)]=true; });
+  return (p.carriers||[]).filter(function(c){ return !on[c.carrier]&&!N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return x.mapped; }); })
+    .sort(function(a,b){ return (b.share_pct||0)-(a.share_pct||0); }).slice(0,3); }
 function firstMapped(slug,cat){ var p=peoOf(slug,cat); if(!p) return null;
   for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if(N.carriersOff[c.carrier]) continue;
     for(var j=0;j<(c.networks||[]).length;j++){ var x=c.networks[j]; if(x.mapped&&(x.map_key||x.network_key)) return x.map_key||x.network_key; } }
@@ -3112,6 +3127,7 @@ function renderList(){
     var html='<label class="netrow netpeohd"><input type="radio" name="netpeo" '+(open?'checked':'')+'><div class="netmeta"><div><b>'+esc(p.peo)+'</b>'+(open?'<span class="netpeosel">Selected PEO</span>':'')+'</div>'+
       '<div class="netmut">'+cars.length+' carrier'+(cars.length>1?'s':'')+' on its latest filing · '+(ready?ready+' network map'+(ready>1?'s':'')+' ready':'no network map yet')+(open&&onKeys().length?' · '+onKeys().length+' layer'+(onKeys().length>1?'s':'')+' on':'')+'</div></div></label>'+
       (open&&N.note?'<div class="netpend" style="color:#f0b25c">'+esc(N.note)+'</div>':'')+
+      (open&&onKeys().length&&alsoOnPlan(p).length?'<div class="netpend" title="Carriers on this PEO\'s plan with a network map that is not switched on">Also on this plan: '+alsoOnPlan(p).map(function(c){ return esc(shortCarrier(c.carrier))+(c.share_pct!=null?' ('+c.share_pct+'%)':''); }).join(' · ')+' — switch on to compare</div>':'')+   // v3.99
       // v3.91 (owner 2026-09-29 08:31): "clear all selections" for THIS PEO only - switches off every layer that belongs to its carriers
       (open&&onKeys().length?'<div class="netclearrow"><button type="button" class="netclear" title="Switch off every network layer of '+esc(p.peo)+'">Clear all selections</button></div>':'');
     // v3.60 (owner 2026-09-28, Instance B): Insured line per carrier (WSE | Total, "~" = estimated side) and ONE card per
@@ -3245,11 +3261,11 @@ function drawNet(){
   if(!S.map||!N.cat||N.view==='off'){ legend(); return; }
   var z=S.map.getZoom(), scale=256*Math.pow(2,z), ctr=S.map.getCenter(), cx=mercX(ctr.lng()), cy=mercY(ctr.lat());
   N.frame={W:W,H:H,z:z,scale:scale,cx:cx,cy:cy};
-  var heat=N.view==='heat'||N.view==='both', pins=N.view==='pins'||N.view==='both';
+  var heat=N.view==='heat'||N.view==='both', pins=N.view==='pins'||N.view==='both', lead=leadCarrier();   // v3.99
   N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     var col=netHex(n), rp=ramp(col);
-    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]) drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy); }
+    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]) drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy,lead!=null&&keyCarrier(n.network_key)!==lead); }   // v3.99: other carriers draw striped
     else if(heat&&N.layers[n.network_key]) drawHeat(N.layers[n.network_key],rp,W,H,z,scale,cx,cy,col);
   });
   if(pins) N.cat.networks.forEach(function(n){
@@ -3262,7 +3278,7 @@ function drawNet(){
 // Every ZIP's in-network clinician count is dropped at that ZIP's centre (no 14 sq mi cells, no 12-mile catchment), then a
 // kernel that tightens with zoom (~50 mi nationally, ~2-3 km at street zoom) turns it into clinicians per sq km.
 // Colour and opacity both follow log10(in-network clinicians per sq km): 0.003 -> invisible, 30+ -> deepest.
-function drawDensity(P,rp,W,H,z,scale,cx,cy){
+function drawDensity(P,rp,W,H,z,scale,cx,cy,hatch){
   if(!P||!P.mx) return;
   var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy))), pxKm=scale/(40075.017*Math.cos(lat));
   var spx=Math.max(8*Math.pow(2,0.45*(z-4.6)),1.2*pxKm);
@@ -3298,6 +3314,10 @@ function drawDensity(P,rp,W,H,z,scale,cx,cy){
   if(heatClip(W,H,cx,cy,scale)) nctx.clip('evenodd');
   nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality='high';
   nctx.drawImage(off,0,0,ow,oh,0,0,ow*G,oh*G);
+  if(hatch){   // v3.99: a second carrier's layer is striped (diagonal gaps cut out of the heat) so it reads as layered over the lead carrier
+    nctx.globalCompositeOperation='destination-out'; nctx.strokeStyle='rgba(0,0,0,.72)'; nctx.lineWidth=7;
+    nctx.beginPath(); for(var q=-H;q<W+H;q+=18){ nctx.moveTo(q,0); nctx.lineTo(q+H,H); } nctx.stroke();
+    nctx.globalCompositeOperation='source-over'; }
   nctx.restore();
 }
 function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
@@ -3456,6 +3476,7 @@ function legend(){
   if(!vis.length){ lg.style.display='none'; return; }
   var html='';   // v3.94: no preview banner - density is the one view
   var pp=peoOf(N.peo); if(pp) html+='<div class="netmut" style="margin-bottom:3px">'+esc(pp.peo)+'\'s plan rides:</div>';
+  var ld=leadCarrier(); if(ld&&vis.some(function(n){ return keyCarrier(n.network_key)!==ld; })) html+='<div class="netmut" style="margin-bottom:3px">Solid = '+esc(shortCarrier(ld))+' (lead carrier) · striped = another carrier, layered on top</div>';   // v3.99
   vis.forEach(function(n){
     var rp=ramp(netHex(n));
     html+='<div class="lgrow"><i class="netsw" style="background:'+netHex(n)+'"></i><b>'+n.network_name+'</b> <span class="nettier">'+n.tier+'</span></div>'+
