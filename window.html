@@ -305,6 +305,8 @@
 
   /* new drops show up on their own */
   setInterval(function(){ if(key() && !document.hidden) load(); }, 15000);
+  // live panes (slug contains ":live") re-read every 5 seconds so a controlled release can be watched as it happens (instanceB 2241)
+  setInterval(function(){ if(key() && !document.hidden && state.mode==="pane" && state.pane && /:live/.test(state.pane.pane_slug) && state.selIdx<0) fetchPane(); }, 5000);
   load();
 })();
 </script>
