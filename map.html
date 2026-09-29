@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.96 (2026-09-29, Instance B, owner 11:09: "this little gray triangle needs to be more prominent ... or is there a better way to just
+            display as auto indented?"): every plan-type group under an opened carrier starts expanded (all networks visible at once);
+            the caret is larger, in the PEO colour, and only collapses a group; crumb reads "· all networks shown".
+            Owner 11:10: the ring icon in the "Former only" button moves to the right of the words.
      v3.95 (2026-09-29, Instance B, owner 11:04: "a place to account for including/ excluding Franchises ... put that toggle here"):
             Franchises seg (Include | Exclude | Only) under Multi-location; 2250 bakes fr[] (companies.is_franchise, ruled franchise_systems)
             onto the detail wave; URL fr=none|only; state card count "Franchise locations".
@@ -546,7 +550,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.95 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.96 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -578,7 +582,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="seg" id="co-seg"><button id="co-0" class="on" title="No carve-out filter - every client shows">Off</button><button id="co-1" title="Only Workers Comp Carve Out clients">Workers Comp</button><button id="co-2" title="Only Benefits Carve Out clients">Benefits</button><button id="co-3" title="Workers Comp Carve Out and Benefits Carve Out clients together">Both</button></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical</h2>
-          <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO users (ringed pins)">Both</button><button id="hist-2" title="Former PEO users only (ringed pins) — current pins hidden"><svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="flex:none;vertical-align:-2px;margin-right:4px"><circle cx="6.5" cy="6.5" r="4.6" fill="rgba(255,255,255,.35)" stroke="#ffa81e" stroke-width="2"/><circle cx="6.5" cy="6.5" r="1.15" fill="#ffa81e"/></svg>Former only</button></div>
+          <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO users (ringed pins)">Both</button><button id="hist-2" title="Former PEO users only (ringed pins) — current pins hidden">Former only<svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="flex:none;vertical-align:-2px;margin-left:4px"><circle cx="6.5" cy="6.5" r="4.6" fill="rgba(255,255,255,.35)" stroke="#ffa81e" stroke-width="2"/><circle cx="6.5" cy="6.5" r="1.15" fill="#ffa81e"/></svg></button></div>
         </div>
         <details id="moreopts" style="margin-top:10px">
           <summary style="cursor:pointer;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">More options</summary>
@@ -2970,7 +2974,7 @@ function buildSection(){
         '.netcrumb{font-size:10.5px;letter-spacing:.03em;color:var(--muted,#8a90a0);margin:2px 0 4px}'+
         '.netpt{display:flex;align-items:center;gap:7px;padding:5px 4px;margin:1px 0;border-radius:6px;cursor:pointer;user-select:none;font-size:12.5px}'+
         '.netpt:hover{background:rgba(var(--peo-rgb,155,79,208),.10)}.netpt.open{background:rgba(var(--peo-rgb,155,79,208),.16)}.netpt b{color:var(--ink,#fff)}'+
-        '.netptc{width:10px;color:var(--muted,#8a90a0);font-size:10px}.netpt .netmut{margin-left:2px}.netpton{color:rgb(var(--peo-lt,217,184,245));font-weight:600}'+
+        '.netptc{width:14px;color:rgb(var(--peo-lt,217,184,245));font-size:12px;font-weight:700}.netpt .netmut{margin-left:2px}.netpton{color:rgb(var(--peo-lt,217,184,245));font-weight:600}'+
         '.netpt input{margin:0;cursor:pointer}.nettree3{margin:0 0 4px 14px;padding-left:10px;border-left:1px dashed rgba(var(--peo-rgb,155,79,208),.35)}'+
         '.netsame{color:rgb(var(--peo-lt,195,174,224))}.netpct{opacity:.75}'+
         '.netclearrow{margin:2px 0 6px 30px}.netclear{font:inherit;font-size:10.5px;letter-spacing:.03em;padding:2px 9px;border-radius:9px;cursor:pointer;color:rgb(var(--peo-lt,217,184,245));background:transparent;border:1px solid rgba(var(--peo-rgb,155,79,208),.55)}.netclear:hover{background:rgba(var(--peo-rgb,155,79,208),.18);color:#fff}';   // v3.91
@@ -3142,12 +3146,14 @@ function renderList(){
         var PT_ORD=['HMO','EPO','POS','PPO','Behavioral','Other','Unidentified'], grp={}, gks=[];   // v3.90
         order.forEach(function(k){ var t=cards[k].plan_type||'Other'; if(!grp[t]){ grp[t]=[]; gks.push(t); } grp[t].push(k); });
         gks.sort(function(a,b){ return PT_ORD.indexOf(a)-PT_ORD.indexOf(b); });
-        var openPt=(N.pt[ck]&&grp[N.pt[ck]])?N.pt[ck]:'';
-        html+='<div class="nettree"><div class="netcrumb">'+esc(p.peo)+' › '+esc(shortCarrier(c.carrier))+(openPt?' › '+esc(PT_NAME[openPt]||openPt):'')+'</div>';
+        // v3.96 (owner 2026-09-29 11:09 "i dont want the user to think we failed to account for some networks because they dont know to expand"):
+        // every plan-type group starts OPEN (auto-indented, all networks visible); the caret only collapses one. N.pt[ck] = {type:true} for the collapsed ones.
+        var closed=(N.pt[ck]&&typeof N.pt[ck]==='object')?N.pt[ck]:{};
+        html+='<div class="nettree"><div class="netcrumb">'+esc(p.peo)+' › '+esc(shortCarrier(c.carrier))+' · all networks shown</div>';
         if(gks.length===1){ grp[gks[0]].forEach(function(k){ html+=cardHtml(k); }); html+='</div>'; return; }   // one plan type: skip the level
         gks.forEach(function(t){
           var keys=[], on=0; grp[t].forEach(function(k){ var x=cards[k]; if(x.mapped){ var mk=x.map_key||x.network_key; if(keys.indexOf(mk)<0){ keys.push(mk); if(N.on[mk]) on++; } } });
-          var op=openPt===t, all=keys.length>0&&on===keys.length;
+          var op=!closed[t], all=keys.length>0&&on===keys.length;
           html+='<div class="netpt'+(op?' open':'')+'" data-car="'+esc(ck)+'" data-pt="'+esc(t)+'" title="'+esc(PT_HINT[t]||'')+'"><span class="netptc">'+(op?'▾':'▸')+'</span>'+
             (keys.length?'<input type="checkbox" class="netptall" data-keys="'+esc(JSON.stringify(keys))+'" data-some="'+(on&&!all?'1':'0')+'" '+(all?'checked':'')+' title="Switch every '+esc(PT_NAME[t]||t)+' network on or off">':'')+
             '<b>'+esc(PT_NAME[t]||t)+'</b><span class="netmut">'+grp[t].length+' network'+(grp[t].length>1?'s':'')+(on?' · <span class="netpton">'+on+' on</span>':'')+'</span></div>';
@@ -3158,7 +3164,7 @@ function renderList(){
     }
     row.innerHTML=html;
     [].forEach.call(row.querySelectorAll('.netpt'),function(h){ h.onclick=function(e){ if(e.target&&e.target.classList&&e.target.classList.contains('netptall')) return;
-      var ck=h.getAttribute('data-car'), t=h.getAttribute('data-pt'); N.pt[ck]=(N.pt[ck]===t?'':t); renderList(); }; });
+      var ck=h.getAttribute('data-car'), t=h.getAttribute('data-pt'); if(!N.pt[ck]||typeof N.pt[ck]!=='object') N.pt[ck]={}; N.pt[ck][t]=!N.pt[ck][t]; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input.netptall'),function(cb){ cb.indeterminate=cb.getAttribute('data-some')==='1';
       cb.onclick=function(e){ e.stopPropagation(); };
       cb.onchange=function(){ var keys=JSON.parse(cb.getAttribute('data-keys')||'[]');
