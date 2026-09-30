@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.108 (owner 2026-09-30 06:40): Anthem is a Blue licensee, so every Anthem plan sits under Blue Cross Blue Shield (member/broker view); each network names its Blue plan (Anthem BCBS, Anthem Blue Cross, BCBS of Michigan, Regence, HMSA).
      v3.107 (owner 20:52): only the carrier title says "Blue Cross Blue Shield"; plan names read "BCBS of <state>".
      v3.106 (owner 20:44): a network listed under Blue Cross Blue Shield shows only there (was also under Anthem, so green); "Blue Cross Blue Shield" spelled out everywhere.
      v3.105 (owner 20:36): every Blue carrier row of a PEO is ONE "Blue Cross Blue Shield" carrier; its networks are grouped by market (state) with a select-all per market.
@@ -569,7 +570,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.107 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.108 · 2026-09-30</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3051,7 +3052,7 @@ function loadCatalog(){
 // v3.100 (owner 2026-09-29 13:16 "when these selections are on we need to name them just like Aetna does ... UHC should say UHC National
 // PPO"): the legend and hover always lead with the carrier, so two carriers on at once can never be confused.
 function legendName(n){ var c=shortCarrier(n.carrier||''), nm=String(n.network_name||''); if(!c) return nm;
-  if(c==='Anthem'&&keyCarrier(n.network_key)===BCBS_NAME) c='BCBS';   // v3.106/107: an Anthem-filed network the plan lists under Blue Cross Blue Shield is named "BCBS ..."
+  if(c==='Anthem'){ var st=/\(([A-Z]{2})\)/.exec(nm); st=st?st[1]:''; c=st==='CA'?'Anthem Blue Cross':st==='NY'?'Anthem (Empire) BCBS':'Anthem BCBS'; }   // v3.108: the Blue plan name a member sees
   var cl=c.toLowerCase(), nl=nm.toLowerCase(); if(nl.indexOf(cl)>=0||(cl==='unitedhealthcare'&&/\buhc\b/.test(nl))||(cl==='anthem'&&/elevance|anthem/.test(nl))) return nm;
   return (c==='UnitedHealthcare'?'UHC':c)+' '+nm; }
 function shortCarrier(c){ if(c===BCBS_NAME) return BCBS_NAME; return String(c||'').replace(' (other plan)','').replace('Elevance / Anthem','Anthem').replace(/^Blue Cross Blue Shield of /,'BCBS of ').replace(/^Blue Cross Blue Shield$/,'BCBS').replace(/^Point32Health.*/,'Harvard Pilgrim').replace(/^HMSA.*/,'HMSA').replace(/^Health Care Service Corp.*/,'BCBS TX/IL/OK/NM/MT'); }   // v3.107: only the carrier title is spelled out ("Blue Cross Blue Shield"); plan names use "BCBS of <state>"
@@ -3062,22 +3063,35 @@ var BCBS_NAME='Blue Cross Blue Shield';
 function marketOf(x){ var r=String(x.region||'').trim(); if(/^[A-Z]{2}$/.test(r)) return r;
   var m=/\(([A-Z]{2})\)/.exec(String(x.card_title||'')+' '+String(x.network||'')); if(m) return m[1];
   return r&&!/^national$/i.test(r)?r:'Other markets'; }
+// v3.108 (owner 2026-09-30 06:40: "I would want to display how members and brokers see it"): Anthem IS a Blue Cross Blue Shield licensee (Elevance holds the Blue
+// licence in CA, CO, CT, GA, IN, KY, ME, MO, NV, NH, NY, OH, VA, WI), so every Anthem plan now sits under the one Blue Cross Blue Shield title with the other Blues,
+// and each network names the Blue plan a member would see on the card ("Anthem BCBS", "Anthem Blue Cross" in CA, "BCBS of Michigan", "Regence", "HMSA" ...).
+function isBlueCarrier(c){ return carrierHex(c.carrier)===BLUE_HEX||/anthem|elevance|empire/i.test(c.carrier||''); }
+function blueBrand(x,c){ var k=String(x.map_key||x.network_key||''), st=marketOf(x), nm=String(x.network||x.card_title||''), fam=k.split('__')[0];
+  if(/^anthem/.test(fam)||(!k&&/anthem|elevance/i.test(c.carrier||''))) return st==='CA'?'Anthem Blue Cross':st==='NY'?'Anthem (Empire) BCBS':'Anthem BCBS';
+  if(/^asuris/i.test(nm)) return 'Asuris';
+  var T={hmsa:'HMSA',regence:'Regence',wellmark:'Wellmark',premera:'Premera',highmark:'Highmark',capital:'Capital Blue Cross',independence:'Independence Blue Cross',horizon:'Horizon BCBS',carefirst:'CareFirst',excellus:'Excellus',triple:'Triple-S',florida:'Florida Blue'};
+  for(var t in T){ if(fam.indexOf(t)===0) return T[t]; }
+  var m=/^blue_cross_(?:and_)?blue_shield_of_(.+)$/.exec(fam)||/^bcbs_(.+)$/.exec(fam); if(m) return 'BCBS of '+m[1].split('_').map(function(w){ return w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
+  m=/^blue_(cross|shield)_of_(.+)$/.exec(fam); if(m) return 'Blue '+m[1].charAt(0).toUpperCase()+m[1].slice(1)+' of '+m[2].split('_').map(function(w){ return w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
+  if(fam) return fam.split('_').map(function(w){ return w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
+  var s=shortCarrier(c.carrier); return (s&&s!==BCBS_NAME&&s!=='BCBS')?s:''; }
 function mergeBlues(cat){
   ((cat&&cat.peos)||[]).forEach(function(p){
-    var cs=p.carriers||[], blues=cs.filter(function(c){ return carrierHex(c.carrier)===BLUE_HEX; });
+    var cs=p.carriers||[], blues=cs.filter(isBlueCarrier);
     if(!blues.length) return;
-    var m={carrier:BCBS_NAME, carrier_family:'bcbs', networks:[], lives:0, share_pct:null, pair_status:null, blue_parts:[]}, prior=0, priorAll=true, wse=0, tot=0, insAll=true;
+    var m={carrier:BCBS_NAME, carrier_family:'bcbs', networks:[], lives:0, share_pct:null, pair_status:null, blue_parts:[]}, prior=0, priorAll=true, wse=0, tot=0, insAll=true, wseEst=false, totEst=false;
     blues.forEach(function(c){
-      (c.networks||[]).forEach(function(x){ var y={}; for(var q in x) y[q]=x[q]; y.market=marketOf(x); m.networks.push(y); });
+      (c.networks||[]).forEach(function(x){ var y={}; for(var q in x) y[q]=x[q]; y.market=marketOf(x); y.blue_brand=blueBrand(x,c); m.networks.push(y); });
       m.lives+=(+c.lives||0); if(c.share_pct!=null) m.share_pct=(m.share_pct||0)+(+c.share_pct);
       if(c.insured_prior!=null) prior+=(+c.insured_prior); else priorAll=false;
-      var r=/([\d,]+)\s*WSE\s*\|\s*~?([\d,]+)\s*total/.exec(c.insured||''); if(r){ wse+=+r[1].replace(/,/g,''); tot+=+r[2].replace(/,/g,''); } else if(c.insured||c.lives) insAll=false;
+      var r=/(~?)([\d,]+)\s*WSE\s*\|\s*(~?)([\d,]+)\s*total/.exec(c.insured||''); if(r){ wse+=+r[2].replace(/,/g,''); tot+=+r[4].replace(/,/g,''); if(r[1]) wseEst=true; if(r[3]) totEst=true; } else if(c.insured||c.lives) insAll=false;
       if(c.schedule_a_year&&(!m.schedule_a_year||c.schedule_a_year>m.schedule_a_year)){ m.schedule_a_year=c.schedule_a_year; m.insured_basis_reason=c.insured_basis_reason||m.insured_basis_reason; }
       m.blue_parts.push(c.carrier); });
-    if(insAll&&wse) m.insured=wse.toLocaleString()+' WSE | ~'+tot.toLocaleString()+' total';
+    if(insAll&&wse) m.insured=(wseEst?'~':'')+wse.toLocaleString()+' WSE | '+(totEst?'~':'')+tot.toLocaleString()+' total';   // v3.108: keep the ~ on the estimated side
     if(priorAll&&prior>0){ m.insured_prior=prior; m.insured_change_pct=Math.round((m.lives-prior)/prior*1000)/10; }
     m.pair_status=m.networks.length?'network named':(blues[0].pair_status||null);
-    var out=[], at=-1, idx=0; cs.forEach(function(c){ if(carrierHex(c.carrier)===BLUE_HEX){ if(at<0){ at=out.length; out.push(m); } } else out.push(c); });
+    var out=[], at=-1, idx=0; cs.forEach(function(c){ if(isBlueCarrier(c)){ if(at<0){ at=out.length; out.push(m); } } else out.push(c); });
     out=out.map(function(c,i){ return {c:c,i:i}; }).sort(function(a,b){ var d=(b.c.share_pct||0)-(a.c.share_pct||0); return d||a.i-b.i; }).map(function(o){ return o.c; });
     // v3.106 (owner 20:44: "still green for the blue networks ... still stuck on one anthem"): Anthem's own file also lists the Blue-named Georgia/Wisconsin plans, so the same
     // network sat under BOTH carriers and took the first one's colour (green) and name. A network the plan lists under Blue Cross Blue Shield now shows only there.
@@ -3217,13 +3231,13 @@ function renderList(){
           var m=x.mapped?netMeta(mk):null;
           if(m){ var sel=!!N.on[mk], dim=N.tiers[m.tier]===false;
             html+='<label class="netrow netind'+(dim?' dim':'')+'" title="Named in '+esc(p.peo)+'\'s '+esc(x.plan_year||'')+' plan documents · '+x.docs+' document'+(x.docs>1?'s':'')+' · verified '+fmtDate(x.verified_on)+'"><input type="checkbox" name="netsel" value="'+esc(mk)+'" '+(sel?'checked':'')+' title="'+(sel?'Switch this network\'s layer off':'Switch this network\'s layer on')+'"><i class="netsw" style="background:'+netHex(m)+'"></i>'+
-              '<div class="netmeta"><div>'+esc(x.card_title||m.network_name)+' <span class="nettier">'+esc(m.tier)+'</span>'+tag+where+ins+'</div>'+named+others+
+              '<div class="netmeta"><div>'+(c.carrier_family==='bcbs'&&x.blue_brand?esc(x.blue_brand)+' ':'')+esc(x.card_title||m.network_name)+' <span class="nettier">'+esc(m.tier)+'</span>'+tag+where+ins+'</div>'+named+others+   // v3.108: the Blue plan a member sees
               '<div class="netmut">'+(m.clinicians||0).toLocaleString()+' clinicians · '+(m.hospitals||0).toLocaleString()+' hospitals · '+m.states_covered+' state'+(m.states_covered==1?'':'s')+' covered</div>'+   // v3.85: always shown
               (sel?
                 '<div class="netmut" title="Carrier network file '+fmtDate(m.data_as_of)+' · provider registry '+fmtDate(m.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(m.data_as_of,m.registry_as_of)+' · updates monthly</div>'+
                 (N.layers[mk]&&!N.layers[mk].n?'<div class="netmut">Map is being built from the carrier\'s file, check back shortly</div>':''):'')+
               '</div></label>';
-          } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+ins+named+' · map not built yet</div>';
+          } else html+='<div class="netpend" title="'+esc(x.status||'')+'">'+(c.carrier_family==='bcbs'&&x.blue_brand&&(x.card_title||x.network||'').indexOf(x.blue_brand)<0?esc(x.blue_brand)+' ':'')+esc(x.card_title||x.network)+(x.tier?' <span class="nettier">'+esc(x.tier)+'</span>':'')+tag+where+ins+named+' · map not built yet</div>';
           return html; };
         // v3.83 (owner 2026-09-28 16:39): progressive tree - click 1 carrier, click 2 plan type, click 3 network on/off
         // v3.100 (owner 2026-09-29 13:24 "why would HMO be listed before PPO with Insperity ... this goes for all peo's and all carriers"):
