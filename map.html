@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.106 (owner 20:44): a network listed under Blue Cross Blue Shield shows only there (was also under Anthem, so green); "Blue Cross Blue Shield" spelled out everywhere.
      v3.105 (owner 20:36): every Blue carrier row of a PEO is ONE "Blue Cross Blue Shield" carrier; its networks are grouped by market (state) with a select-all per market.
      v3.104 (owner 20:26): every Blue layer is the one deep blue, even when its filing family is Anthem (colour follows the carrier the PEO lists it under); no sister-lightness shift for Blues.
      v3.103 (owner 20:22): Clear all selections switches off every layer that is on (Anthem sister networks were left behind).
@@ -567,7 +568,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.105 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.106 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3049,9 +3050,10 @@ function loadCatalog(){
 // v3.100 (owner 2026-09-29 13:16 "when these selections are on we need to name them just like Aetna does ... UHC should say UHC National
 // PPO"): the legend and hover always lead with the carrier, so two carriers on at once can never be confused.
 function legendName(n){ var c=shortCarrier(n.carrier||''), nm=String(n.network_name||''); if(!c) return nm;
+  if(c==='Anthem'&&keyCarrier(n.network_key)===BCBS_NAME) c='Blue Cross Blue Shield';   // v3.106: an Anthem-filed network the plan lists under Blue Cross Blue Shield is named that
   var cl=c.toLowerCase(), nl=nm.toLowerCase(); if(nl.indexOf(cl)>=0||(cl==='unitedhealthcare'&&/\buhc\b/.test(nl))||(cl==='anthem'&&/elevance|anthem/.test(nl))) return nm;
   return (c==='UnitedHealthcare'?'UHC':c)+' '+nm; }
-function shortCarrier(c){ if(c===BCBS_NAME) return 'Blue Cross Blue Shield (BCBS)'; return String(c||'').replace(' (other plan)','').replace('Elevance / Anthem','Anthem').replace(/^Blue Cross Blue Shield of /,'BCBS ').replace(/^Blue Cross Blue Shield/,'Blue plans').replace(/^Point32Health.*/,'Harvard Pilgrim').replace(/^HMSA.*/,'HMSA').replace(/^Health Care Service Corp.*/,'BCBS TX/IL/OK/NM/MT'); }
+function shortCarrier(c){ return String(c||'').replace(' (other plan)','').replace('Elevance / Anthem','Anthem').replace(/^Point32Health.*/,'Harvard Pilgrim').replace(/^HMSA.*/,'HMSA').replace(/^Health Care Service Corp.*/,'Blue Cross Blue Shield TX/IL/OK/NM/MT'); }   // v3.106: always spelled out, never "BCBS" or "Blue plans"
 // v3.105 (owner 2026-09-29 20:36: "all blues and their respective state/markets should show under one BCBS title. Then we can select the market from there"):
 // every Blue carrier row of a PEO (BCBS other plan, BCBSM, HCSC, HMSA, Regence/Asuris, Premera, Highmark ...) is folded into ONE "Blue Cross Blue Shield"
 // carrier; inside it the networks are grouped by MARKET (state) instead of plan type, each market with its own select-all box. Anthem/Elevance stays its own carrier.
@@ -3076,6 +3078,10 @@ function mergeBlues(cat){
     m.pair_status=m.networks.length?'network named':(blues[0].pair_status||null);
     var out=[], at=-1, idx=0; cs.forEach(function(c){ if(carrierHex(c.carrier)===BLUE_HEX){ if(at<0){ at=out.length; out.push(m); } } else out.push(c); });
     out=out.map(function(c,i){ return {c:c,i:i}; }).sort(function(a,b){ var d=(b.c.share_pct||0)-(a.c.share_pct||0); return d||a.i-b.i; }).map(function(o){ return o.c; });
+    // v3.106 (owner 20:44: "still green for the blue networks ... still stuck on one anthem"): Anthem's own file also lists the Blue-named Georgia/Wisconsin plans, so the same
+    // network sat under BOTH carriers and took the first one's colour (green) and name. A network the plan lists under Blue Cross Blue Shield now shows only there.
+    var bk={}; m.networks.forEach(function(x){ var k=x.map_key||x.network_key; if(k) bk[k]=1; });
+    out.forEach(function(c){ if(c===m||!c.networks) return; var keep=c.networks.filter(function(x){ var k=x.map_key||x.network_key; return !(k&&bk[k]); }); if(keep.length&&keep.length!==c.networks.length) c.networks=keep; });
     p.carriers=out; });
   return cat; }
 function renderCarriers(){
