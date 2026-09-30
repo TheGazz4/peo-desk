@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.103 (owner 20:22): Clear all selections switches off every layer that is on (Anthem sister networks were left behind).
      v3.102 (owner 20:19): Blue Cross / Blue Shield plans share one deep blue (#1c3fc2), fading with strength like every other carrier; Anthem keeps green.
      v3.101 (owner 18:19): legend rows sorted most robust -> least (contracted clinicians, then hospitals) like the network list, not catalogue/alphabetical order.
      v3.100b (owner 13:24): networks without a built map now rank most robust -> least (national/regional/local reach, then PPO>POS>EPO>HMO), so PPO no longer sits below HMO.
@@ -564,7 +565,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.102 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.103 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3231,8 +3232,9 @@ function renderList(){
         else { keys.forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; }
         renderList(); ensureData(); redraw(); }; });
     var clr=row.querySelector('.netclear'); if(clr){ clr.onclick=function(e){ e.preventDefault(); e.stopPropagation();
-      var mine={}; (p.carriers||[]).forEach(function(c){ (c.networks||[]).forEach(function(x){ var k=x.map_key||x.network_key; if(k) mine[k]=1; }); });
-      onKeys().forEach(function(k){ if(mine[k]) delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; renderList(); ensureData(); redraw(); }; }
+      // v3.103 (owner 2026-09-29 20:22: "clear all selections isn't clearing some of the anthem plans"): only one PEO is open at a time, so every layer that is on
+      // belongs to it - clear them all, not just the ones found by walking this PEO's catalogue rows (a folded card's sister keys were missed).
+      onKeys().forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; renderList(); ensureData(); redraw(); }; }
     row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.note=null; defaultOn(p.family_slug); renderCarriers(); renderList(); ensureData(); redraw(); };
     [].forEach.call(row.querySelectorAll('.netcar-h'),function(h){ h.onclick=function(){ var ck=h.getAttribute('data-car'); if(N.car===ck){ N.car=''; renderList(); return; } N.car=ck; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){
