@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.110 (owner 2026-09-30 09:16): the States section is collapsible (click its heading) and starts collapsed; the state buttons, All/None and the hint hide with it. Filtering is unaffected.
      v3.109 (owner 2026-09-30 09:06): the PEOs list is collapsible (click its heading) and starts collapsed; the PEO Headquarters control now defaults to Off (was Top 25) and Reset returns to Off. Links write hl=top / hl=all; hl=0 still reads as Off.
      v3.108 (owner 2026-09-30 06:40): Anthem is a Blue licensee, so every Anthem plan sits under Blue Cross Blue Shield (member/broker view); each network names its Blue plan (Anthem BCBS, Anthem Blue Cross, BCBS of Michigan, Regence, HMSA).
      v3.107 (owner 20:52): only the carrier title says "Blue Cross Blue Shield"; plan names read "BCBS of <state>".
@@ -365,6 +366,12 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #peo-sec.collapsed{flex:none!important;min-height:0!important}
 #peo-sec.collapsed>h2{margin-bottom:0}
 #peo-sec.collapsed>#peo-search,#peo-sec.collapsed>.btnrow,#peo-sec.collapsed>#peo-list{display:none}
+/* v3.110 (owner 2026-09-30 09:16): the States section collapses the same way and starts collapsed */
+#st-sec>h2{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}
+#st-sec>h2 .pcaret{display:inline-block;width:10px;color:var(--muted);transition:transform .15s}
+#st-sec.collapsed>h2 .pcaret{transform:rotate(-90deg)}
+#st-sec.collapsed>h2{margin-bottom:0}
+#st-sec.collapsed>*:not(h2){display:none}
 .peo-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
 .peo-row:hover{background:rgba(99,144,238,.08)}
 .peo-row .vis{width:13px;height:13px;margin:0;flex:none;accent-color:var(--accent);cursor:pointer}
@@ -578,7 +585,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.109 · 2026-09-30</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.110 · 2026-09-30</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -618,8 +625,8 @@ body.panel-drag{cursor:col-resize;user-select:none}
           <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
         </details>
       </div>
-      <div class="sec">
-        <h2>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
+      <div class="sec collapsed" id="st-sec">
+        <h2 id="st-h" role="button" tabindex="0" aria-expanded="false" title="Show or hide the states"><span class="pcaret">▾</span>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
         <div id="states"></div>
         <div class="btnrow"><button id="st-all">All</button><button id="st-none">None</button></div>
         <div style="font-size:10.5px;color:var(--muted);margin-top:6px">double-click a state for its market share</div>
@@ -1833,6 +1840,11 @@ function syncHqSeg(){
   el.onclick=function(){ S.hqLogos=(k==='off'?false:k); syncHqSeg(); scheduleDraw(); writeUrl(); }; });
 // v3.109 (owner 2026-09-30): the PEOs list collapses under its heading and starts collapsed.
 (function(){ var sec=$('peo-sec'), h=$('peo-h'); if(!sec||!h) return;
+  function tog(){ var c=sec.classList.toggle('collapsed'); h.setAttribute('aria-expanded', c?'false':'true'); }
+  h.onclick=tog; h.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tog(); } };
+})();
+// v3.110 (owner 2026-09-30 09:16): the States section collapses under its heading and starts collapsed.
+(function(){ var sec=$('st-sec'), h=$('st-h'); if(!sec||!h) return;
   function tog(){ var c=sec.classList.toggle('collapsed'); h.setAttribute('aria-expanded', c?'false':'true'); }
   h.onclick=tog; h.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tog(); } };
 })();
