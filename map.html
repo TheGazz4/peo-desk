@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.114 (owner 2026-09-30, Instance B): the isolate tag is labelled "PEO to PEO" (was Switcher); the flash card / hover on those pins reads "Switcher: <from PEO> -----> <to PEO>".
      v3.113 (owner 2026-09-30, Instance B): Historical header now reads "Historical PEO User"; new fourth choice "Switcher" isolates ONLY the PEO switchers (kind = Switched, company moved from one PEO to another). Current / Both / Former only still include switchers where they belong. URL hist=3. Display-only; both feeds unchanged.
      v3.112 (2026-09-30, Instance B lead): RESTORE + MERGE. The 10:02 and 10:10 network commits were built from a stale v3.108 copy and dropped v3.109 (PEO list collapsible, HQ default Off), v3.110 (States collapsible) and v3.111 (Data feed switch). All three are restored and both network changes are kept (regional-network lift, tighter blur, base tint, pin dim, Hawaii / Alaska / US jump buttons). ANY CHAT EDITING THIS FILE: re-read the live file first and patch it; never commit from an older copy.
      v3.111 (owner 2026-09-30 09:17, Instance B lead): DATA FEED switch at the top of the panel - Original (the 1.0 shelf, server map-data) or Keystone (the Keystone 2.0 shelf, server map-data-ks). One feed at a time, never both; the choice is remembered in this browser and rides in Copy view link (feed=keystone). Nothing else on the page changes: both servers return the same payloads. Default = Original.
@@ -590,7 +591,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.113 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.114 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -626,7 +627,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="seg" id="co-seg"><button id="co-0" class="on" title="No carve-out filter - every client shows">Off</button><button id="co-1" title="Only Workers Comp Carve Out clients">Workers Comp</button><button id="co-2" title="Only Benefits Carve Out clients">Benefits</button><button id="co-3" title="Workers Comp Carve Out and Benefits Carve Out clients together">Both</button></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical PEO User</h2>
-          <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO users (ringed pins)">Both</button><button id="hist-2" title="Former PEO users only (ringed pins) — current pins hidden">Former only<svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="flex:none;vertical-align:-2px;margin-left:4px"><circle cx="6.5" cy="6.5" r="4.6" fill="rgba(255,255,255,.35)" stroke="#ffa81e" stroke-width="2"/><circle cx="6.5" cy="6.5" r="1.15" fill="#ffa81e"/></svg></button><button id="hist-3" title="Only PEO switchers - companies that moved from one PEO to another (current pins hidden)">Switcher</button></div>
+          <div class="seg"><button id="hist-0" class="on" title="Current PEO users only — the default view">Current</button><button id="hist-1" title="Current PEO users plus former PEO users (ringed pins)">Both</button><button id="hist-2" title="Former PEO users only (ringed pins) — current pins hidden">Former only<svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="flex:none;vertical-align:-2px;margin-left:4px"><circle cx="6.5" cy="6.5" r="4.6" fill="rgba(255,255,255,.35)" stroke="#ffa81e" stroke-width="2"/><circle cx="6.5" cy="6.5" r="1.15" fill="#ffa81e"/></svg></button><button id="hist-3" title="Only companies that moved from one PEO to another (current pins hidden)">PEO to PEO</button></div>
         </div>
         <details id="moreopts" style="margin-top:10px">
           <summary style="cursor:pointer;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">More options</summary>
@@ -1603,7 +1604,7 @@ function tipHist(i,e){
   var hd=S.histData; if(!hd) return;
   var sl=hd.fams[hd.fis[i]]||'unattributed';
   var when=hd.asof[i]?(' ~'+hd.asof[i]):'';
-  var line2=(hd.kind[i]===0&&hd.toS[i])?('Switched to '+esc(famDisp(hd.toS[i]))+when):(HKIND[hd.kind[i]]||'Departed')+when;
+  var line2=(hd.kind[i]===0&&hd.toS[i])?('Switcher: '+esc(famDisp(sl))+' -----&gt; '+esc(famDisp(hd.toS[i]))+when):(HKIND[hd.kind[i]]||'Departed')+when;
   tipShow('<b>'+esc(hd.names[i]||'—')+'</b> <span class="mut">· FORMER client</span><br>'+
     '<span style="color:'+(S.colors.family[sl]||OTHER)+';font-weight:650">'+esc(famDisp(sl))+'</span><br>'+
     esc((hd.cities[i]||'')+(hd.cities[i]?', ':'')+(hd.sts[i]||''))+'<br>'+
@@ -2156,7 +2157,7 @@ function openCard(p,slug,history){
   var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(fpr&&fpr.ws?'policy expired — not a current renewal':basisWord(p.renewal_month_basis))+')':'unknown';
   var histRows='';
   (history||[]).forEach(function(ev){
-    var what=ev.hist_kind==='switched'?('Switched '+esc(famDisp(ev.from_family))+' → '+esc(famDisp(ev.to_family_slug||'?'))):
+    var what=ev.hist_kind==='switched'?('Switcher: '+esc(famDisp(ev.from_family))+' -----&gt; '+esc(famDisp(ev.to_family_slug||'?'))):
       ((ev.hist_kind==='departed_confirmed'?'Departed (confirmed) from ':'Departed (assumed) from ')+esc(famDisp(ev.from_family)));
     histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+'</div>';
   });
