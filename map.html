@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.101 (owner 18:19): legend rows sorted most robust -> least (contracted clinicians, then hospitals) like the network list, not catalogue/alphabetical order.
      v3.100b (owner 13:24): networks without a built map now rank most robust -> least (national/regional/local reach, then PPO>POS>EPO>HMO), so PPO no longer sits below HMO.
      v3.100 (2026-09-29, Instance B, owner 13:16: "UHC should say UHC National PPO to make sure the user knows its displaying 2
             different carriers"): legend and hover names lead with the carrier (UHC National PPO, Aetna Choice POS II ...).
@@ -562,7 +563,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.100 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.101 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3489,6 +3490,10 @@ function legend(){
   if(!N.cat||N.view==='off'){ lg.style.display='none'; return; }
   var vis=(N.cat.networks||[]).filter(netVisible);
   if(!vis.length){ lg.style.display='none'; return; }
+  // v3.101 (owner 2026-09-29 "accurately reflected according to the data"): legend rows follow the same rule as the network list
+  // (owner 11:25: most robust to least robust): contracted clinicians (then hospitals) from the carrier's own filed network file, biggest first.
+  var lgR=function(n){ return (n.clinicians||0)+(n.hospitals||0)/1000; };
+  vis=vis.slice().sort(function(a,b){ var d=lgR(b)-lgR(a); return d||String(legendName(a)).localeCompare(String(legendName(b))); });
   var html='';   // v3.94: no preview banner - density is the one view
   var pp=peoOf(N.peo); if(pp) html+='<div class="netmut" style="margin-bottom:3px">'+esc(pp.peo)+'\'s plan rides:</div>';
   var ld=leadCarrier(); if(ld&&vis.some(function(n){ return keyCarrier(n.network_key)!==ld; })) html+='<div class="netmut" style="margin-bottom:3px">Solid = '+esc(shortCarrier(ld))+' (lead carrier) · striped = another carrier, layered on top</div>';   // v3.99
