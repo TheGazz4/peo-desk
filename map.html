@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.111 (owner 2026-09-30 09:17, Instance B lead): DATA FEED switch at the top of the panel - Original (the 1.0 shelf, server map-data) or Keystone (the Keystone 2.0 shelf, server map-data-ks). One feed at a time, never both; the choice is remembered in this browser and rides in Copy view link (feed=keystone). Nothing else on the page changes: both servers return the same payloads. Default = Original.
      v3.110 (owner 2026-09-30 09:16): the States section is collapsible (click its heading) and starts collapsed; the state buttons, All/None and the hint hide with it. Filtering is unaffected.
      v3.109 (owner 2026-09-30 09:06): the PEOs list is collapsible (click its heading) and starts collapsed; the PEO Headquarters control now defaults to Off (was Top 25) and Reset returns to Off. Links write hl=top / hl=all; hl=0 still reads as Off.
      v3.108 (owner 2026-09-30 06:40): Anthem is a Blue licensee, so every Anthem plan sits under Blue Cross Blue Shield (member/broker view); each network names its Blue plan (Anthem BCBS, Anthem Blue Cross, BCBS of Michigan, Regence, HMSA).
@@ -585,7 +586,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.110 · 2026-09-30</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.111 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -595,6 +596,10 @@ body.panel-drag{cursor:col-resize;user-select:none}
   </header>
   <div id="main">
     <div id="panel">
+      <div class="sec" id="feedsec">
+        <h2>Data feed</h2>
+        <div class="seg" id="feed-seg"><button id="feed-old" class="on" title="The original map data (product 1.0)">Original</button><button id="feed-ks" title="Keystone 2.0: every company rebuilt through the Data Door and matched under the Keystone rules. States come online one at a time, so the count grows as each state clears.">Keystone</button></div>
+      </div>
       <div class="sec">
         <h2>View by</h2>
         <div class="seg"><button id="g-brand" class="on">PEO specific</button><button id="g-family">Family brand</button></div>
@@ -677,11 +682,24 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <script>
 'use strict';
 // ------------------------- config -------------------------
-var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-data';
+// v3.111 (owner 2026-09-30): DATA FEED. 'old' = the 1.0 shelf (map-data); 'keystone' = the Keystone 2.0 shelf (map-data-ks).
+// A feed= link wins and is remembered; otherwise the last choice in this browser; otherwise Original. One feed per page load.
+var FEED=(function(){ var f=null;
+  try{ var u=new URLSearchParams(location.search).get('feed'); if(u==='keystone'||u==='old'){ f=u; try{ localStorage.setItem('map_feed',u); }catch(_){} } }catch(_){}
+  if(!f){ try{ f=localStorage.getItem('map_feed'); }catch(_){} }
+  return f==='keystone'?'keystone':'old'; })();
+var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/'+(FEED==='keystone'?'map-data-ks':'map-data');
 var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
 var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE';
 var OTHER='#71808b';
 var $=function(id){return document.getElementById(id)};
+(function(){ var o=$('feed-old'), k=$('feed-ks'); if(!o||!k) return;   // v3.111 feed switch: pick -> remember -> reload on that feed
+  o.className=FEED==='keystone'?'':'on'; k.className=FEED==='keystone'?'on':'';
+  var st=$('feed-stamp'); if(st&&FEED==='keystone'){ st.textContent='Keystone feed'; st.style.display=''; }
+  function go(f){ if(f===FEED) return; try{ localStorage.setItem('map_feed',f); }catch(_){}
+    try{ var u=new URL(location.href); u.searchParams.set('feed',f); location.replace(u.toString()); }catch(_){ location.reload(); } }
+  o.onclick=function(){ go('old'); }; k.onclick=function(){ go('keystone'); };
+})();
 var STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'D.C.',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',PR:'Puerto Rico',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',VI:'Virgin Islands',GU:'Guam'};
 var STATE_CENTROIDS={AL:[32.8,-86.8],AK:[64.0,-152.0],AZ:[34.2,-111.6],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.3,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.1,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[47.0,-109.6],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.5,-79.4],ND:[47.4,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[43.9,-120.6],PA:[40.9,-77.8],PR:[18.2,-66.4],RI:[41.7,-71.6],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.8,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.5],WV:[38.6,-80.6],WI:[44.6,-89.7],WY:[43.0,-107.6],VI:[18.34,-64.9],GU:[13.44,144.79]};
 var MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -2204,6 +2222,7 @@ function buildUrl(){
   try{
     var p=new URLSearchParams(); var sel=selMap();
     p.set('grain',S.grain);
+    if(FEED==='keystone') p.set('feed','keystone');   // v3.111
     var off=catRows().filter(function(r){return sel[r.slug]===false}).map(function(r){return r.slug});
     var on=catRows().filter(function(r){return sel[r.slug]!==false}).map(function(r){return r.slug});
     if(on.length<=40) p.set('on',on.join(',')); else if(off.length<=40) p.set('off',off.join(','));
