@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.116 (owner 2026-09-30, Instance B): Historical PEO User is now three independent toggles - Current Users, Former Users, PEO to PEO - any combination (Former Users already includes every PEO-to-PEO mover, so PEO to PEO shows locked on while Former Users is on). A switcher pin takes the colour and name of its most recent PEO; its flash card shows the old PEO in its colour, a gradient arrow, then the new PEO in its colour. URL hv=c|f|p letters (old hist=1/2/3 links still read).
      v3.115 (owner 2026-09-30, Instance B): Historical PEO User control re-laid as a 2x2 of plain words - Current Users | Former Users | Current + Former | PEO to PEO - with a one-line "what you are seeing" under it. PEO to PEO is never held out of the others: a company that switched PEOs shows as a current user at its new PEO and as a former user at its old one.
      v3.114 (owner 2026-09-30, Instance B): the isolate tag is labelled "PEO to PEO" (was Switcher); the flash card / hover on those pins reads "Switcher: [from PEO] to [to PEO]" (the arrow is drawn on the card; it is spelled out here because a dash-dash-greater-than inside this comment closes the comment and spills these notes onto the page).
      v3.113 (owner 2026-09-30, Instance B): Historical header now reads "Historical PEO User"; new fourth choice "Switcher" isolates ONLY the PEO switchers (kind = Switched, company moved from one PEO to another). Current / Both / Former only still include switchers where they belong. URL hist=3. Display-only; both feeds unchanged.
@@ -360,7 +361,8 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 .seg button{flex:1;background:none;border:0;color:var(--ink2);padding:7px 0;font-size:12.5px;cursor:pointer}
 .seg button.on{background:var(--accent);color:#0b1220;font-weight:650}
 #hist-seg{flex-wrap:wrap}
-#hist-seg button{flex:1 1 50%;padding:7px 4px;box-shadow:inset 0 0 0 .5px var(--border)}
+#hist-seg button{flex:1 1 33%;padding:7px 4px;box-shadow:inset 0 0 0 .5px var(--border)}
+#hist-seg button.lock{opacity:.75;cursor:default}
 #hist-help{margin-top:6px;font-size:11.5px;color:var(--muted);line-height:1.35}
 .btnrow{display:flex;gap:6px;margin-top:8px}
 .btnrow button,.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:6px;padding:4px 9px;font-size:11.5px;cursor:pointer}
@@ -595,7 +597,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.115 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.116 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -631,7 +633,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div class="seg" id="co-seg"><button id="co-0" class="on" title="No carve-out filter - every client shows">Off</button><button id="co-1" title="Only Workers Comp Carve Out clients">Workers Comp</button><button id="co-2" title="Only Benefits Carve Out clients">Benefits</button><button id="co-3" title="Workers Comp Carve Out and Benefits Carve Out clients together">Both</button></div>
         <div id="histsec" style="display:none">
           <h2 style="margin-top:10px" title="Departure and switch events — every ring pin carries its as-of date. Default off.">Historical PEO User</h2>
-          <div class="seg" id="hist-seg"><button id="hist-0" class="on" title="Today's PEO users only - the default view">Current Users</button><button id="hist-2" title="Former PEO users only (ringed pins) - current pins hidden">Former Users<svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="flex:none;vertical-align:-2px;margin-left:4px"><circle cx="6.5" cy="6.5" r="4.6" fill="rgba(255,255,255,.35)" stroke="#ffa81e" stroke-width="2"/><circle cx="6.5" cy="6.5" r="1.15" fill="#ffa81e"/></svg></button><button id="hist-1" title="Today's PEO users plus former PEO users (ringed pins)">Current + Former</button><button id="hist-3" title="Only companies that moved from one PEO to another (ringed pins)">PEO to PEO</button></div>
+          <div class="seg" id="hist-seg"><button id="hist-0" class="on" title="Today's PEO users">Current Users</button><button id="hist-2" title="Former PEO users (ringed pins), including PEO-to-PEO movers">Former Users<svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true" style="flex:none;vertical-align:-2px;margin-left:4px"><circle cx="6.5" cy="6.5" r="4.6" fill="rgba(255,255,255,.35)" stroke="#ffa81e" stroke-width="2"/><circle cx="6.5" cy="6.5" r="1.15" fill="#ffa81e"/></svg></button><button id="hist-3" title="Companies that moved from one PEO to another (ringed pins)">PEO to PEO</button></div>
           <div id="hist-help">Showing today's PEO users only.</div>
         </div>
         <details id="moreopts" style="margin-top:10px">
@@ -719,7 +721,7 @@ var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark backgro
 var S={
   grain:'brand', placement:'address', msOnly:false, mlOnly:false, fran:'all', minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:false, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
-  hist:false, histSw:false, histData:null, histLoading:false, flags:{},
+  hist:false, histSw:false, hCur:true, hFor:false, hP2P:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
   sel:{family:null,brand:null}, states:{},
   beaconsOn:false, beacons:[],
@@ -819,7 +821,7 @@ function boot(){
     S.flags=S.catalog.flags||{};
     if(S.flags.historical_layer){
       $('histsec').style.display='block';
-      if(S.hist){ setHistMode(S.histSw?3:(S.histOnly?2:1)); }
+      if(S.hist){ setHistView(S.hCur,S.hFor,S.hP2P); }
     } else { S.hist=false; }
     buildStatePanel(); buildPeoPanel(); updateStats();
     startPinLoads(); scheduleDraw();
@@ -1225,7 +1227,7 @@ function draw(){
     for(var hi=0;hi<hd.n;hi++){
       if(S.histSw&&hd.kind[hi]!==0) continue;   // Switcher: only PEO-to-PEO moves
       var hst=hd.sts[hi]; if(hst&&S.states[hst]===false) continue;
-      var hsl=hd.fams[hd.fis[hi]]||'unattributed';
+      var hsl=hPeo(hd,hi);   // a switcher pin takes its most recent PEO
       if(sel[hsl]===false) continue;
       var hx=(HMX[hi]-cx)*scale+W/2, hy=(HMY[hi]-cy)*scale+H/2;
       if(hx<-14||hx>W+14||hy<-14||hy>H+14) continue;
@@ -1604,14 +1606,21 @@ function tipPeoLine(d,i,slug){
   return '<span style="color:'+colorOf(slug)+';font-weight:650">'+esc(dispOf(slug))+'</span>';
 }
 var HKIND=['Switched','Departed — confirmed open market','Departed — ASSUMED (pending confirmation)'];
+// most recent PEO of a historical pin: the new PEO for a switcher, otherwise the PEO that was left
+function hPeo(hd,i){ return (hd.kind[i]===0&&hd.toS[i])?hd.toS[i]:(hd.fams[hd.fis[i]]||'unattributed'); }
+var SWN=0;
+function swArrow(c1,c2){ var id='swg'+(++SWN);
+  return '<svg width="38" height="12" viewBox="0 0 38 12" aria-hidden="true" style="vertical-align:-2px;margin:0 7px"><defs><linearGradient id="'+id+'" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="'+c1+'"/><stop offset="1" stop-color="'+c2+'"/></linearGradient></defs><path d="M2 6H34M28 1.5L34.5 6L28 10.5" fill="none" stroke="url(#'+id+')" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+function peoSw(from,to){ var c1=S.colors.family[from]||OTHER, c2=S.colors.family[to]||OTHER;
+  return '<span style="color:'+c1+';font-weight:650">'+esc(famDisp(from))+'</span>'+swArrow(c1,c2)+'<span style="color:'+c2+';font-weight:650">'+esc(famDisp(to||'?'))+'</span>'; }
 function famDisp(s){ return S.displays.family[s]||s; }
 function tipHist(i,e){
   var hd=S.histData; if(!hd) return;
-  var sl=hd.fams[hd.fis[i]]||'unattributed';
+  var sl=hPeo(hd,i), isSw=!!(hd.kind[i]===0&&hd.toS[i]), frm=hd.fams[hd.fis[i]]||'unattributed';
   var when=hd.asof[i]?(' ~'+hd.asof[i]):'';
-  var line2=(hd.kind[i]===0&&hd.toS[i])?('Switcher: '+esc(famDisp(sl))+' -----&gt; '+esc(famDisp(hd.toS[i]))+when):(HKIND[hd.kind[i]]||'Departed')+when;
-  tipShow('<b>'+esc(hd.names[i]||'—')+'</b> <span class="mut">· FORMER client</span><br>'+
-    '<span style="color:'+(S.colors.family[sl]||OTHER)+';font-weight:650">'+esc(famDisp(sl))+'</span><br>'+
+  var line2=isSw?('Switched'+when):(HKIND[hd.kind[i]]||'Departed')+when;
+  tipShow('<b>'+esc(hd.names[i]||'—')+'</b> <span class="mut">· '+(isSw?'Switcher':'FORMER client')+'</span><br>'+
+    (isSw?peoSw(frm,sl):('<span style="color:'+(S.colors.family[sl]||OTHER)+';font-weight:650">'+esc(famDisp(sl))+'</span>'))+'<br>'+
     esc((hd.cities[i]||'')+(hd.cities[i]?', ':'')+(hd.sts[i]||''))+'<br>'+
     line2+'<br>'+
     '<span class="mut">click for details</span>',e);
@@ -1621,7 +1630,7 @@ function onClick(e){
   var h=pick(e); if(!h) return;
   if(h.kind==='hist'){
     var hd2=S.histData; if(!hd2) return;
-    var hsl2=hd2.fams[hd2.fis[h.i]]||'unattributed';
+    var hsl2=hPeo(hd2,h.i);
     var cid=hd2.cids[h.i];
     if(cid) api({mode:'company',id:cid}).then(function(r){ if(r.company) openCard(r.company,hsl2,r.history); });
     return;
@@ -1880,18 +1889,25 @@ function syncHqSeg(){
 // HISTORICAL VIEW (Gazz 2026-09-14): current / both / former only. Current-only is the default —
 // former PEO users never show unless asked for. "Former only" hides the current pins entirely so the
 // departure book can be read on its own.
-function setHistMode(m){
-  S.histMode=m; S.hist=(m>0); S.histOnly=(m===2||m===3); S.histSw=(m===3);
-  ['hist-0','hist-1','hist-2','hist-3'].forEach(function(id,i){ var bt=$(id); if(bt) bt.className=(i===m?'on':''); });
+function setHistView(c,f,p){
+  if(!c&&!f&&!p) c=true;
+  S.hCur=!!c; S.hFor=!!f; S.hP2P=!!p;
+  S.hist=!!(f||p); S.histOnly=S.hist&&!c; S.histSw=S.hist&&p&&!f;
+  S.histMode=(c&&!f&&!p)?0:((c&&f)?1:(f?2:3));
+  var b0=$('hist-0'), b2=$('hist-2'), b3=$('hist-3');
+  if(b0) b0.className=c?'on':'';
+  if(b2) b2.className=f?'on':'';
+  if(b3){ b3.className=(p||f)?('on'+(f?' lock':'')):''; b3.title=f?'Included in Former Users - every PEO-to-PEO mover is also a former user':'Companies that moved from one PEO to another (ringed pins)'; }
+  var hh=$('hist-help');
+  if(hh) hh.textContent=(c&&f)?'Showing today\'s PEO users plus all former PEO users (ringed pins), including PEO-to-PEO movers.':(f?'Showing former PEO users only (ringed pins), including PEO-to-PEO movers.':((c&&p)?'Showing today\'s PEO users plus ringed pins for companies that moved from one PEO to another.':(p?'Showing only companies that moved from one PEO to another (ringed pins).':'Showing today\'s PEO users only.')));
   if(S.hist) loadHist();
-  var hh=$('hist-help'); if(hh) hh.textContent=['Showing today\'s PEO users only.','Showing today\'s PEO users plus former PEO users (ringed pins).','Showing former PEO users only (ringed pins).','Showing only companies that moved from one PEO to another (ringed pins). They also appear under Current Users and Former Users.'][m]||'';
   bump(); scheduleDraw(); updateStats(); writeUrl();
   try{ computeViewLegend(); }catch(_){}
 }
-$('hist-0').onclick=function(){ setHistMode(0); };
-$('hist-1').onclick=function(){ setHistMode(1); };
-$('hist-2').onclick=function(){ setHistMode(2); };
-$('hist-3').onclick=function(){ setHistMode(3); };
+function setHistMode(m){ setHistView(m===0||m===1, m===1||m===2, m===3); }
+$('hist-0').onclick=function(){ setHistView(!S.hCur,S.hFor,S.hP2P); };
+$('hist-2').onclick=function(){ setHistView(S.hCur,!S.hFor,S.hP2P); };
+$('hist-3').onclick=function(){ if(S.hFor) return; setHistView(S.hCur,S.hFor,!S.hP2P); };
 $('g-family').onclick=function(){ switchGrain('family') };
 $('g-brand').onclick=function(){ switchGrain('brand') };
 function switchGrain(g){
@@ -2163,7 +2179,7 @@ function openCard(p,slug,history){
   var ren=p.wc_renewal_month?MONTHS[p.wc_renewal_month]+' ('+esc(fpr&&fpr.ws?'policy expired — not a current renewal':basisWord(p.renewal_month_basis))+')':'unknown';
   var histRows='';
   (history||[]).forEach(function(ev){
-    var what=ev.hist_kind==='switched'?('Switcher: '+esc(famDisp(ev.from_family))+' -----&gt; '+esc(famDisp(ev.to_family_slug||'?'))):
+    var what=ev.hist_kind==='switched'?('Switcher: '+peoSw(ev.from_family,ev.to_family_slug)):
       ((ev.hist_kind==='departed_confirmed'?'Departed (confirmed) from ':'Departed (assumed) from ')+esc(famDisp(ev.from_family)));
     histRows+='<div class="note" style="margin-top:4px">'+what+(ev.asof?(' ~'+esc(ev.asof)):'')+'</div>';
   });
@@ -2252,7 +2268,7 @@ function buildUrl(){
     var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }).sort(); if(svo.join(',')!=='0,2,3,4,5') p.set('svoff',svo.length?svo.join(','):'none');   // v3.69: default (PEO only) is not written
     var eo=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(eo.length) p.set('eoff',eo.join(','));
     if(S.lens==='health') p.set('lens','hea'); else if(S.lens==='wc') p.set('lens','wc');
-    if(S.hist) p.set('hist', S.histSw?'3':(S.histOnly?'2':'1'));
+    if(S.hist) p.set('hv', (S.hCur?'c':'')+(S.hFor?'f':'')+(S.hP2P?'p':''));
     if(S.map){ var c=S.map.getCenter(); p.set('z',S.map.getZoom().toFixed(1)); p.set('c',c.lat().toFixed(4)+','+c.lng().toFixed(4)); }
     return location.origin+location.pathname+'?'+p.toString();
   }catch(e){ return location.href; }
@@ -2278,9 +2294,12 @@ function readUrl(){
     var lz=p.get('lens');
     if(lz==='hea'||lz==='ren'){ S.lens='health'; syncLensButtons(); renderLensLegend(); }   // legacy lens=ren links now mean the primary (health) renewal lens
     else if(lz==='wc'){ S.lens='wc'; syncLensButtons(); renderLensLegend(); }
-    if(p.get('hist')==='1'){ S.hist=true; S.histOnly=false; S.histSw=false; }
-    else if(p.get('hist')==='3'){ S.hist=true; S.histOnly=true; S.histSw=true; }
-    else if(p.get('hist')==='2'){ S.hist=true; S.histOnly=true; S.histSw=false; }   // honored only if the flag renders the toggle (boot)
+    var hv=p.get('hv');
+    if(hv&&/^[cfp]+$/.test(hv)){ S.hCur=hv.indexOf('c')>=0; S.hFor=hv.indexOf('f')>=0; S.hP2P=hv.indexOf('p')>=0; }
+    else if(p.get('hist')==='1'){ S.hCur=true; S.hFor=true; S.hP2P=false; }
+    else if(p.get('hist')==='2'){ S.hCur=false; S.hFor=true; S.hP2P=false; }
+    else if(p.get('hist')==='3'){ S.hCur=false; S.hFor=false; S.hP2P=true; }
+    S.hist=!!(S.hFor||S.hP2P); S.histOnly=S.hist&&!S.hCur; S.histSw=S.hist&&S.hP2P&&!S.hFor;   // honored only if the flag renders the toggle (boot)
     S._urlZ=parseFloat(p.get('z')); S._urlC=(p.get('c')||'').split(',').map(Number);
   }catch(e){}
 }
@@ -2326,7 +2345,7 @@ function computeViewLegend(){
     for(var hj=0;hj<hd.n;hj++){
       if(S.histSw&&hd.kind[hj]!==0) continue;
       if(hd.sts[hj]&&S.states[hd.sts[hj]]===false) continue;
-      if(sel[hd.fams[hd.fis[hj]]]===false) continue;
+      if(sel[hPeo(hd,hj)]===false) continue;
       if(HMX[hj]<x1||HMX[hj]>x2||HMY[hj]<y1||HMY[hj]>y2) continue;
       histN++;
     }
@@ -2472,7 +2491,7 @@ function stStats(st){
     }
   }
   if(S.hist&&S.histData){ var hd=S.histData;
-    for(var j=0;j<hd.n;j++){ if(hd.sts[j]!==st) continue; if(S.histSw&&hd.kind[j]!==0) continue; if(sel[hd.fams[hd.fis[j]]]===false) continue; o.hist++; } }
+    for(var j=0;j<hd.n;j++){ if(hd.sts[j]!==st) continue; if(S.histSw&&hd.kind[j]!==0) continue; if(sel[hPeo(hd,j)]===false) continue; o.hist++; } }
   o.top=Object.keys(counts).map(function(x){return [x,counts[x]]}).sort(function(a,b){return b[1]-a[1]});
   var hq={}; (S.beacons||[]).forEach(function(b){ if(b.kind==='hq'&&b.state===st) hq[b.family_slug]=b.peo_display||famDisp(b.family_slug); });
   o.hq=Object.keys(hq).map(function(k){return hq[k]}).sort();
@@ -2838,7 +2857,7 @@ function tblPaintInner(){
     $('tbl-what').textContent='';
     $('tbl-cov').innerHTML='';
     $('tbl-head').innerHTML='';
-    $('tbl-body').innerHTML='<tr><td class="empty" colspan="10">The table lists current PEO users. Switch Historical PEO User to Current Users or Current + Former to use it.</td></tr>';
+    $('tbl-body').innerHTML='<tr><td class="empty" colspan="10">The table lists current PEO users. Turn Current Users on (under Historical PEO User) to use it.</td></tr>';
     $('tbl-foot').innerHTML='';
     return;
   }
