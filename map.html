@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.117 (owner 2026-09-30, Instance B): a one-line plain-words note under each option control (Carve Outs, Franchises, Confidence, Renewal heat, PEO Headquarters, View by, Pin placement) that says what the selected option is showing, the same way Historical PEO User does. Notes follow the selected button, including when a saved link sets it.
      v3.116 (owner 2026-09-30, Instance B): Historical PEO User is now three independent toggles - Current Users, Former Users, PEO to PEO - any combination (Former Users already includes every PEO-to-PEO mover, so PEO to PEO shows locked on while Former Users is on). A switcher pin takes the colour and name of its most recent PEO; its flash card shows the old PEO in its colour, a gradient arrow, then the new PEO in its colour. URL hv=c|f|p letters (old hist=1/2/3 links still read).
      v3.115 (owner 2026-09-30, Instance B): Historical PEO User control re-laid as a 2x2 of plain words - Current Users | Former Users | Current + Former | PEO to PEO - with a one-line "what you are seeing" under it. PEO to PEO is never held out of the others: a company that switched PEOs shows as a current user at its new PEO and as a former user at its old one.
      v3.114 (owner 2026-09-30, Instance B): the isolate tag is labelled "PEO to PEO" (was Switcher); the flash card / hover on those pins reads "Switcher: [from PEO] to [to PEO]" (the arrow is drawn on the card; it is spelled out here because a dash-dash-greater-than inside this comment closes the comment and spills these notes onto the page).
@@ -363,6 +364,7 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #hist-seg{flex-wrap:wrap}
 #hist-seg button{flex:1 1 33%;padding:7px 4px;box-shadow:inset 0 0 0 .5px var(--border)}
 #hist-seg button.lock{opacity:.75;cursor:default}
+.seghelp{margin-top:6px;font-size:11.5px;color:var(--muted);line-height:1.35}
 #hist-help{margin-top:6px;font-size:11.5px;color:var(--muted);line-height:1.35}
 .btnrow{display:flex;gap:6px;margin-top:8px}
 .btnrow button,.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--ink2);border-radius:6px;padding:4px 9px;font-size:11.5px;cursor:pointer}
@@ -597,7 +599,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.116 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.117 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1908,6 +1910,26 @@ function setHistMode(m){ setHistView(m===0||m===1, m===1||m===2, m===3); }
 $('hist-0').onclick=function(){ setHistView(!S.hCur,S.hFor,S.hP2P); };
 $('hist-2').onclick=function(){ setHistView(S.hCur,!S.hFor,S.hP2P); };
 $('hist-3').onclick=function(){ if(S.hFor) return; setHistView(S.hCur,S.hFor,!S.hP2P); };
+// one-line "what you are seeing" note under each option control; follows the selected button
+(function(){
+  var H={
+    'g-brand':{'g-brand':'Every PEO brand is its own entry, in its own color.','g-family':'Brands are grouped under their parent PEO family.'},
+    'lens-peo':{'lens-peo':'Pins use each PEO\'s own color.','lens-hea':'Pins are colored by how soon the health and benefits renewal comes up.','lens-wc':'Pins are colored by how soon the workers\' comp renewal comes up.'},
+    'hql-off':{'hql-off':'No PEO logos are shown at headquarters.','hql-top':'HQ logos shown for the 25 PEOs with the most clients on the map.','hql-all':'HQ logos shown for every PEO on the map.'},
+    'fr-all':{'fr-all':'Showing every client, franchise locations included.','fr-none':'Franchise locations are hidden.','fr-only':'Showing franchise locations only.'},
+    'src-0':{'src-0':'Showing every pin, verified or not.','src-1':'Showing only pins whose PEO attribution is verified.','src-2':'Showing only pins whose PEO attribution was independently confirmed a second way.'},
+    'co-0':{'co-0':'Carve Outs off: every client shows, carve-out or not.','co-1':'Showing only clients that keep their own workers\' comp policy.','co-2':'Showing only clients that run their own health plan instead of the PEO\'s.','co-3':'Showing clients with their own workers\' comp, their own health plan, or both.'},
+    'pm-addr':{'pm-addr':'Pins sit at the exact street address where we have it, otherwise the ZIP area.','pm-zip':'Every pin sits at the center of its ZIP area.'}
+  };
+  Object.keys(H).forEach(function(first){
+    var b=$(first); if(!b||!b.parentNode) return;
+    var seg=b.parentNode, map=H[first], note=document.createElement('div'); note.className='seghelp';
+    seg.parentNode.insertBefore(note, seg.nextSibling);
+    function upd(){ var t=''; Object.keys(map).forEach(function(id){ var x=$(id); if(x&&x.className.split(' ').indexOf('on')>=0) t=map[id]; }); note.textContent=t; }
+    try{ new MutationObserver(upd).observe(seg,{attributes:true,attributeFilter:['class'],subtree:true}); }catch(_){}
+    upd();
+  });
+})();
 $('g-family').onclick=function(){ switchGrain('family') };
 $('g-brand').onclick=function(){ switchGrain('brand') };
 function switchGrain(g){
