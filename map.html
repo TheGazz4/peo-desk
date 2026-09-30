@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.112 (2026-09-30, Instance B lead): RESTORE + MERGE. The 10:02 and 10:10 network commits were built from a stale v3.108 copy and dropped v3.109 (PEO list collapsible, HQ default Off), v3.110 (States collapsible) and v3.111 (Data feed switch). All three are restored and both network changes are kept (regional-network lift, tighter blur, base tint, pin dim, Hawaii / Alaska / US jump buttons). ANY CHAT EDITING THIS FILE: re-read the live file first and patch it; never commit from an older copy.
+     v3.111 (owner 2026-09-30 09:17, Instance B lead): DATA FEED switch at the top of the panel - Original (the 1.0 shelf, server map-data) or Keystone (the Keystone 2.0 shelf, server map-data-ks). One feed at a time, never both; the choice is remembered in this browser and rides in Copy view link (feed=keystone). Nothing else on the page changes: both servers return the same payloads. Default = Original.
+     v3.110 (owner 2026-09-30 09:16): the States section is collapsible (click its heading) and starts collapsed; the state buttons, All/None and the hint hide with it. Filtering is unaffected.
+     v3.109 (owner 2026-09-30 09:06): the PEOs list is collapsible (click its heading) and starts collapsed; the PEO Headquarters control now defaults to Off (was Top 25) and Reset returns to Off. Links write hl=top / hl=all; hl=0 still reads as Off.
      v3.110 (owner 2026-09-30): outlying/regional networks (Hawaii, Alaska, small states) - tighter blur, base tint, client pins dim, Hawaii/Alaska/US jump buttons, ticking a regional network zooms to it.
      v3.109 (owner 2026-09-30): regional networks (<=400 points, e.g. Kaiser Hawaii) are lifted so their islands/cities show on the density heat.
      v3.108 (owner 2026-09-30 06:40): Anthem is a Blue licensee, so every Anthem plan sits under Blue Cross Blue Shield (member/broker view); each network names its Blue plan (Anthem BCBS, Anthem Blue Cross, BCBS of Michigan, Regence, HMSA).
@@ -359,6 +363,19 @@ header a{color:var(--accent);text-decoration:none;font-size:12px}
 #peo-az.on{border-color:var(--accent);color:var(--ink);background:rgba(94,145,255,.18);font-style:normal}
 #peo-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);padding:6px 8px;font-size:12.5px;margin-bottom:8px}
 #peo-list{overflow-y:auto;flex:1;padding:4px 6px}
+/* v3.109 (owner 2026-09-30): the PEOs list collapses under its heading and starts collapsed */
+#peo-sec>h2{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}
+#peo-sec>h2 .pcaret{display:inline-block;width:10px;color:var(--muted);transition:transform .15s}
+#peo-sec.collapsed>h2 .pcaret{transform:rotate(-90deg)}
+#peo-sec.collapsed{flex:none!important;min-height:0!important}
+#peo-sec.collapsed>h2{margin-bottom:0}
+#peo-sec.collapsed>#peo-search,#peo-sec.collapsed>.btnrow,#peo-sec.collapsed>#peo-list{display:none}
+/* v3.110 (owner 2026-09-30 09:16): the States section collapses the same way and starts collapsed */
+#st-sec>h2{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}
+#st-sec>h2 .pcaret{display:inline-block;width:10px;color:var(--muted);transition:transform .15s}
+#st-sec.collapsed>h2 .pcaret{transform:rotate(-90deg)}
+#st-sec.collapsed>h2{margin-bottom:0}
+#st-sec.collapsed>*:not(h2){display:none}
 .peo-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none}
 .peo-row:hover{background:rgba(99,144,238,.08)}
 .peo-row .vis{width:13px;height:13px;margin:0;flex:none;accent-color:var(--accent);cursor:pointer}
@@ -572,7 +589,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.110 · 2026-09-30</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.112 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -582,13 +599,17 @@ body.panel-drag{cursor:col-resize;user-select:none}
   </header>
   <div id="main">
     <div id="panel">
+      <div class="sec" id="feedsec">
+        <h2>Data feed</h2>
+        <div class="seg" id="feed-seg"><button id="feed-old" class="on" title="The original map data (product 1.0)">Original</button><button id="feed-ks" title="Keystone 2.0: every company rebuilt through the Data Door and matched under the Keystone rules. States come online one at a time, so the count grows as each state clears.">Keystone</button></div>
+      </div>
       <div class="sec">
         <h2>View by</h2>
         <div class="seg"><button id="g-brand" class="on">PEO specific</button><button id="g-family">Family brand</button></div>
         <h2 style="margin-top:10px" title="Colors every pin by how soon its renewal month comes up — health/benefits is the trigger event that matters; WC is secondary. Off = each PEO's brand color.">Renewal heat</h2>
         <div class="seg"><button id="lens-peo" class="on">Off</button><button id="lens-hea" title="Health/benefits renewal — the trigger event that matters">Health</button><button id="lens-wc" title="Workers' comp renewal (secondary)">WC</button></div>
         <h2 style="margin-top:10px" title="Each PEO's logo shown as a pin at its headquarters; ★ stands in while a logo is missing">PEO Headquarters</h2>
-        <div class="seg" id="hql-seg" title="Top 25 = the 25 largest PEOs on the map (by clients) show their HQ logo; All = every PEO HQ logo; Off = none"><button id="hql-off">Off</button><button id="hql-top" class="on">Top 25</button><button id="hql-all">All</button></div><input type="checkbox" id="hqlogo-on" checked style="display:none">
+        <div class="seg" id="hql-seg" title="Top 25 = the 25 largest PEOs on the map (by clients) show their HQ logo; All = every PEO HQ logo; Off = none"><button id="hql-off" class="on">Off</button><button id="hql-top">Top 25</button><button id="hql-all">All</button></div><input type="checkbox" id="hqlogo-on" style="display:none">
         <label class="chk" title="A PEO's own administrative offices ◆ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <label class="chk" title="Only clients observed at 2+ locations (distinct city/state — own address, branch locations, WC filings) or in 2+ states"><input type="checkbox" id="ml-only"> Multi-location clients only</label>
@@ -612,8 +633,8 @@ body.panel-drag{cursor:col-resize;user-select:none}
           <div class="seg"><button id="pm-addr" class="on">Actual address</button><button id="pm-zip">ZIP area</button></div>
         </details>
       </div>
-      <div class="sec">
-        <h2>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
+      <div class="sec collapsed" id="st-sec">
+        <h2 id="st-h" role="button" tabindex="0" aria-expanded="false" title="Show or hide the states"><span class="pcaret">▾</span>States <span id="st-count" style="color:var(--muted);font-weight:400"></span></h2>
         <div id="states"></div>
         <div class="btnrow"><button id="st-all">All</button><button id="st-none">None</button></div>
         <div style="font-size:10.5px;color:var(--muted);margin-top:6px">double-click a state for its market share</div>
@@ -623,8 +644,8 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <div id="vl-total">move the map…</div>
         <div id="viewlegend"></div>
       </div>
-      <div class="sec" style="flex:1;display:flex;flex-direction:column;min-height:120px;border-bottom:0">
-        <h2>PEOs <span id="peo-count" style="color:var(--muted);font-weight:400"></span></h2>
+      <div class="sec collapsed" id="peo-sec" style="flex:1;display:flex;flex-direction:column;min-height:120px;border-bottom:0">
+        <h2 id="peo-h" role="button" tabindex="0" aria-expanded="false" title="Show or hide the PEO list"><span class="pcaret">▾</span>PEOs <span id="peo-count" style="color:var(--muted);font-weight:400"></span></h2>
         <input id="peo-search" placeholder="Search PEOs…">
         <div class="btnrow" style="margin:0 0 6px"><button id="peo-all">All</button><button id="peo-none">None</button><button id="peo-az" aria-pressed="false" title="Sort A–Z (click again for biggest first)">abc…</button></div>
         <div id="peo-list"></div>
@@ -664,11 +685,24 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <script>
 'use strict';
 // ------------------------- config -------------------------
-var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/map-data';
+// v3.111 (owner 2026-09-30): DATA FEED. 'old' = the 1.0 shelf (map-data); 'keystone' = the Keystone 2.0 shelf (map-data-ks).
+// A feed= link wins and is remembered; otherwise the last choice in this browser; otherwise Original. One feed per page load.
+var FEED=(function(){ var f=null;
+  try{ var u=new URLSearchParams(location.search).get('feed'); if(u==='keystone'||u==='old'){ f=u; try{ localStorage.setItem('map_feed',u); }catch(_){} } }catch(_){}
+  if(!f){ try{ f=localStorage.getItem('map_feed'); }catch(_){} }
+  return f==='keystone'?'keystone':'old'; })();
+var EP='https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/'+(FEED==='keystone'?'map-data-ks':'map-data');
 var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXNnZmxyeHhyc3NqbnRyZm10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMjY3MTMsImV4cCI6MjA3OTYwMjcxM30.TwkqPgQ8C9q4_S4C9Xu3-WEyIdoMUHdbRWcUHBOy2c8';
 var GMAPS_KEY='AIzaSyBaC3M23-rFPIDfK6CONFkaMpREPz_4_rE';
 var OTHER='#71808b';
 var $=function(id){return document.getElementById(id)};
+(function(){ var o=$('feed-old'), k=$('feed-ks'); if(!o||!k) return;   // v3.111 feed switch: pick -> remember -> reload on that feed
+  o.className=FEED==='keystone'?'':'on'; k.className=FEED==='keystone'?'on':'';
+  var st=$('feed-stamp'); if(st&&FEED==='keystone'){ st.textContent='Keystone feed'; st.style.display=''; }
+  function go(f){ if(f===FEED) return; try{ localStorage.setItem('map_feed',f); }catch(_){}
+    try{ var u=new URL(location.href); u.searchParams.set('feed',f); location.replace(u.toString()); }catch(_){ location.reload(); } }
+  o.onclick=function(){ go('old'); }; k.onclick=function(){ go('keystone'); };
+})();
 var STATE_NAMES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'D.C.',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',PR:'Puerto Rico',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',VI:'Virgin Islands',GU:'Guam'};
 var STATE_CENTROIDS={AL:[32.8,-86.8],AK:[64.0,-152.0],AZ:[34.2,-111.6],AR:[34.9,-92.4],CA:[37.2,-119.3],CO:[39.0,-105.5],CT:[41.6,-72.7],DE:[39.0,-75.5],DC:[38.9,-77.0],FL:[28.6,-82.4],GA:[32.6,-83.4],HI:[20.3,-156.4],ID:[44.4,-114.6],IL:[40.0,-89.2],IN:[39.9,-86.3],IA:[42.1,-93.5],KS:[38.5,-98.4],KY:[37.5,-85.3],LA:[31.0,-92.0],ME:[45.4,-69.2],MD:[39.0,-76.8],MA:[42.3,-71.8],MI:[44.3,-85.4],MN:[46.3,-94.3],MS:[32.7,-89.7],MO:[38.4,-92.5],MT:[47.0,-109.6],NE:[41.5,-99.8],NV:[39.3,-116.6],NH:[43.7,-71.6],NJ:[40.2,-74.7],NM:[34.4,-106.1],NY:[42.9,-75.5],NC:[35.5,-79.4],ND:[47.4,-100.5],OH:[40.3,-82.8],OK:[35.6,-97.5],OR:[43.9,-120.6],PA:[40.9,-77.8],PR:[18.2,-66.4],RI:[41.7,-71.6],SC:[33.9,-80.9],SD:[44.4,-100.2],TN:[35.8,-86.4],TX:[31.5,-99.3],UT:[39.3,-111.7],VT:[44.1,-72.7],VA:[37.5,-78.9],WA:[47.4,-120.5],WV:[38.6,-80.6],WI:[44.6,-89.7],WY:[43.0,-107.6],VI:[18.34,-64.9],GU:[13.44,144.79]};
 var MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -676,7 +710,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'brand', placement:'address', msOnly:false, mlOnly:false, fran:'all', minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:'top', logoImgs:{}, logoLil:{},
+  grain:'brand', placement:'address', msOnly:false, mlOnly:false, fran:'all', minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:false, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -1479,7 +1513,7 @@ function resetAll(){
   var q=$('peo-search'); if(q) q.value='';
   // v3.87: the rest of the panel, back to page defaults
   try{ switchGrain('brand'); }catch(_){}                                    // view by: PEO specific
-  S.hqLogos='top'; try{ syncHqSeg(); }catch(_){}                            // headquarters: Top 25
+  S.hqLogos=false; try{ syncHqSeg(); }catch(_){}                            // headquarters: Off (the default since v3.109)
   S.beaconsOn=false; if($('beacons-on')) $('beacons-on').checked=false;
   S.hqCand=false;
   PEO_SORT='count'; try{ localStorage.setItem('peo_sort','count'); }catch(_){} try{ syncAzBtn(); }catch(_){}
@@ -1825,6 +1859,16 @@ function syncHqSeg(){
 }
 ['off','top','all'].forEach(function(k){ var el=$('hql-'+k); if(!el) return;
   el.onclick=function(){ S.hqLogos=(k==='off'?false:k); syncHqSeg(); scheduleDraw(); writeUrl(); }; });
+// v3.109 (owner 2026-09-30): the PEOs list collapses under its heading and starts collapsed.
+(function(){ var sec=$('peo-sec'), h=$('peo-h'); if(!sec||!h) return;
+  function tog(){ var c=sec.classList.toggle('collapsed'); h.setAttribute('aria-expanded', c?'false':'true'); }
+  h.onclick=tog; h.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tog(); } };
+})();
+// v3.110 (owner 2026-09-30 09:16): the States section collapses under its heading and starts collapsed.
+(function(){ var sec=$('st-sec'), h=$('st-h'); if(!sec||!h) return;
+  function tog(){ var c=sec.classList.toggle('collapsed'); h.setAttribute('aria-expanded', c?'false':'true'); }
+  h.onclick=tog; h.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tog(); } };
+})();
 // HISTORICAL VIEW (Gazz 2026-09-14): current / both / former only. Current-only is the default —
 // former PEO users never show unless asked for. "Former only" hides the current pins entirely so the
 // departure book can be read on its own.
@@ -2181,6 +2225,7 @@ function buildUrl(){
   try{
     var p=new URLSearchParams(); var sel=selMap();
     p.set('grain',S.grain);
+    if(FEED==='keystone') p.set('feed','keystone');   // v3.111
     var off=catRows().filter(function(r){return sel[r.slug]===false}).map(function(r){return r.slug});
     var on=catRows().filter(function(r){return sel[r.slug]!==false}).map(function(r){return r.slug});
     if(on.length<=40) p.set('on',on.join(',')); else if(off.length<=40) p.set('off',off.join(','));
@@ -2188,7 +2233,7 @@ function buildUrl(){
     if(stOff.length&&stOff.length<=55) p.set('stoff',stOff.join(','));
     if(S.beaconsOn) p.set('b','1');
     if(S.placement==='zip') p.set('pm','zip');
-    if(S.hqLogos==='all') p.set('hl','all'); else if(!S.hqLogos) p.set('hl','0');   // v3.64: default = Top 25 HQ logos (owner 2026-09-23)
+    if(S.hqLogos==='all') p.set('hl','all'); else if(S.hqLogos==='top') p.set('hl','top');   // v3.109: default = HQ logos Off (owner 2026-09-30); Top 25 / All ride in the link
     if(S.msOnly) p.set('ms','1');
     if(S.mlOnly) p.set('ml','1');
     if(S.fran!=='all') p.set('fr',S.fran);
@@ -2211,7 +2256,7 @@ function readUrl(){
     else if(p.get('off')){ p.get('off').split(',').forEach(function(s){ sel[s]=false; }); }
     if(p.get('stoff')) p.get('stoff').split(',').forEach(function(s){ if(s in S.states) S.states[s]=false; });
     if(p.get('pm')==='zip'){ S.placement='zip'; $('pm-addr').className=''; $('pm-zip').className='on'; }
-    if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
+    if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='top'){ S.hqLogos='top'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('ml')==='1'){ S.mlOnly=true; $('ml-only').checked=true; }
     if(p.get('fr')==='none'||p.get('fr')==='only'){ S.fran=p.get('fr'); syncFranButtons(); }
