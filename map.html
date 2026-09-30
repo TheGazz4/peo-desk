@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.118 (owner 2026-09-30, Instance B): every remaining toggle and selection now says what it is refining - Data feed, Relationship chips, Employees chips, the three checkboxes (Administrative Beacons, Multi-state, Multi-location), the PEOs list, States, and Network strength view. One muted line under each, kept current by a light 0.5s refresh so saved links, Reset and All/None buttons are all reflected.
      v3.117 (owner 2026-09-30, Instance B): a one-line plain-words note under each option control (Carve Outs, Franchises, Confidence, Renewal heat, PEO Headquarters, View by, Pin placement) that says what the selected option is showing, the same way Historical PEO User does. Notes follow the selected button, including when a saved link sets it.
      v3.116 (owner 2026-09-30, Instance B): Historical PEO User is now three independent toggles - Current Users, Former Users, PEO to PEO - any combination (Former Users already includes every PEO-to-PEO mover, so PEO to PEO shows locked on while Former Users is on). A switcher pin takes the colour and name of its most recent PEO; its flash card shows the old PEO in its colour, a gradient arrow, then the new PEO in its colour. URL hv=c|f|p letters (old hist=1/2/3 links still read).
      v3.115 (owner 2026-09-30, Instance B): Historical PEO User control re-laid as a 2x2 of plain words - Current Users | Former Users | Current + Former | PEO to PEO - with a one-line "what you are seeing" under it. PEO to PEO is never held out of the others: a company that switched PEOs shows as a current user at its new PEO and as a former user at its old one.
@@ -599,7 +600,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.117 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.118 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -1929,6 +1930,34 @@ $('hist-3').onclick=function(){ if(S.hFor) return; setHistView(S.hCur,S.hFor,!S.
     try{ new MutationObserver(upd).observe(seg,{attributes:true,attributeFilter:['class'],subtree:true}); }catch(_){}
     upd();
   });
+})();
+// v3.118: "what this is refining" line under the remaining toggles/selections (chips, checkboxes, PEO list, States, feed, network view)
+(function(){
+  function onId(ids,map){ var t=''; ids.forEach(function(id){ var x=$(id); if(x&&x.className.split(' ').indexOf('on')>=0) t=map[id]; }); return t; }
+  function cbx(id,on,off){ var x=$(id); return x?(x.checked?on:off):''; }
+  function listNote(allTxt,noneTxt,shown,hidden){
+    if(!hidden.length) return allTxt; if(!shown.length) return noneTxt;
+    return shown.length<=3?('Showing only: '+shown.join(', ')+'.'):('Hidden: '+hidden.join(', ')+'.'); }
+  var E=[
+    {k:'feed', a:function(){return $('feed-seg');}, t:function(){ return onId(['feed-old','feed-ks'],{'feed-old':'Using the original map data (product 1.0).','feed-ks':'Using Keystone 2.0 data: companies rebuilt through the Data Door. States come online one at a time, so the count grows as each clears.'}); }},
+    {k:'svc', a:function(){return $('svc-chips');}, t:function(){ var shown=[],hidden=[]; SVC_ORDER.forEach(function(k){ (S.svcOff[k]?hidden:shown).push(SVC[k].name); }); return listNote('Showing every relationship type.','Every type is hidden - no pins show.',shown,hidden); }},
+    {k:'emp', a:function(){return $('emp-chips');}, t:function(){ var shown=[],hidden=[]; EMP_BANDS.forEach(function(b,i){ (S.empOff[i]?hidden:shown).push(b); }); return listNote('Showing every company size, including no count yet.','Every size is hidden - no pins show.',shown,hidden).replace('Showing only: ','Showing only sizes: ').replace('Hidden: ','Hidden sizes: '); }},
+    {k:'bea', a:function(){var x=$('beacons-on'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('beacons-on','Showing each PEO\'s administrative offices as colored diamonds.','Administrative offices are hidden.'); }},
+    {k:'ms', a:function(){var x=$('ms-only'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ms-only','Showing only clients seen operating in 2 or more states.','Showing clients of any footprint.'); }},
+    {k:'ml', a:function(){var x=$('ml-only'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ml-only','Showing only clients seen at 2 or more locations.','Showing clients at any number of locations.'); }},
+    {k:'peo', a:function(){var x=$('peo-all'); return x?x.parentNode:null;}, t:function(){ var m=selMap(), ks=Object.keys(m), on=ks.filter(function(k){return m[k]===true;}).length; if(!ks.length) return ''; return on===ks.length?('All '+ks.length+' PEOs are on.'):(on===0?'No PEOs are on - no pins show.':('Showing '+on+' of '+ks.length+' PEOs - the rest are hidden.')); }},
+    {k:'st', a:function(){var x=$('st-all'); return x?x.parentNode:null;}, t:function(){ var ks=Object.keys(S.states), on=ks.filter(function(k){return S.states[k];}).length; if(!ks.length) return ''; return on===ks.length?('All '+ks.length+' states are on.'):(on===0?'No states are on - no pins show.':('Showing '+on+' of '+ks.length+' states - the rest are hidden.')); }},
+    {k:'net', a:function(){return $('netview');}, t:function(){ var r=document.querySelector('#netview button.on'); var v=r?r.getAttribute('data-v'):'off'; return ({off:'Network view is off.',heat:'Showing colored areas where more doctors and hospitals are contracted into the plan networks switched on below.',pins:'Showing each contracted doctor and hospital as a pin for the networks switched on below.',both:'Showing the colored areas and each contracted doctor and hospital as pins for the networks switched on below.'})[v]||''; }}
+  ];
+  function tick(){
+    E.forEach(function(en){ try{
+      var a=en.a(); if(!a||!a.parentNode) return;
+      var note=a.nextSibling; if(!(note&&note.getAttribute&&note.getAttribute('data-hn')===en.k)){
+        note=document.createElement('div'); note.className='seghelp'; note.setAttribute('data-hn',en.k); a.parentNode.insertBefore(note,a.nextSibling); }
+      var t=en.t(); if(note.textContent!==t) note.textContent=t;
+    }catch(_){} });
+  }
+  tick(); setInterval(tick,500);
 })();
 $('g-family').onclick=function(){ switchGrain('family') };
 $('g-brand').onclick=function(){ switchGrain('brand') };
