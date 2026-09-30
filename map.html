@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.104 (owner 20:26): every Blue layer is the one deep blue, even when its filing family is Anthem (colour follows the carrier the PEO lists it under); no sister-lightness shift for Blues.
      v3.103 (owner 20:22): Clear all selections switches off every layer that is on (Anthem sister networks were left behind).
      v3.102 (owner 20:19): Blue Cross / Blue Shield plans share one deep blue (#1c3fc2), fading with strength like every other carrier; Anthem keeps green.
      v3.101 (owner 18:19): legend rows sorted most robust -> least (contracted clinicians, then hospitals) like the network list, not catalogue/alphabetical order.
@@ -565,7 +566,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.103 · 2026-09-29</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.104 · 2026-09-29</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3119,7 +3120,11 @@ function hslToHex(h,s,l){ s/=100; l/=100; var c=(1-Math.abs(2*l-1))*s, x=c*(1-Ma
 function peoHex(slug){ var b=(S.colors.brand||{})[slug], f=(S.colors.family||{})[slug]; return b||f||'#9b4fd0'; }
 function hexRgb(hex,mix){ var r=parseInt(hex.substr(1,2),16),g=parseInt(hex.substr(3,2),16),b=parseInt(hex.substr(5,2),16); mix=mix||0;
   return [r,g,b].map(function(v){ return Math.round(v+(255-v)*mix); }).join(','); }
-function netHex(n){ var base=carrierHex(n.carrier);
+function netHex(n){
+  // v3.104 (owner 2026-09-29 20:26: "not all plans for the Blues are the matching deep blue"): a layer takes the colour of the carrier the PEO's plan lists it under
+  // (e.g. Anthem Georgia under "Blue Cross Blue Shield (other plan)" is a Blue), not its own filing family; every Blue layer is exactly the one deep blue
+  // (strength fades through the ramp), with no sister-lightness shift.
+  var base=carrierHex(keyCarrier(n.network_key)||n.carrier); if(base===BLUE_HEX) return base;
   var sib=onKeys().filter(function(k){ var m=netMeta(k); return m&&carrierKey(m.carrier)===carrierKey(n.carrier); }).sort();
   var i=sib.indexOf(n.network_key); if(i<=0) return base;
   // v3.88 (owner 2026-09-28 17:19: "the heatmap should take on the color of the carrier - Aetna is purple, United is blue"): the carrier's HUE
