@@ -219,7 +219,7 @@
     var f = frames[id];
     if (!f) {
       f = document.createElement("iframe");
-      f.src = r.file + (DEEP[id] && clientParam() ? "#id=" + clientParam() : "");
+      f.src = r.file + "?t=" + Date.now() + (DEEP[id] && clientParam() ? "#id=" + clientParam() : "");   /* 2026-09-30 (owner "fix the cache"): always ask for the newest copy of a surface, never a browser-saved one */
       f.title = r.label;
       f.setAttribute("allow", "clipboard-write");
       loading.classList.add("show");
