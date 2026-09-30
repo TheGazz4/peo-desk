@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.119 (owner 2026-09-30 16:54, Instance B): new checkbox "Include records with International HQ" (on by default, so the map is unchanged). Off hides companies whose headquarters is outside the US (their US locations still map otherwise). Both servers bake the flag (key ih; migration 9020); the Keystone feed carries no HQ country yet, so it flags none. URL ih=0 when off.
      v3.118 (owner 2026-09-30, Instance B): every remaining toggle and selection now says what it is refining - Data feed, Relationship chips, Employees chips, the three checkboxes (Administrative Beacons, Multi-state, Multi-location), the PEOs list, States, and Network strength view. One muted line under each, kept current by a light 0.5s refresh so saved links, Reset and All/None buttons are all reflected.
      v3.117 (owner 2026-09-30, Instance B): a one-line plain-words note under each option control (Carve Outs, Franchises, Confidence, Renewal heat, PEO Headquarters, View by, Pin placement) that says what the selected option is showing, the same way Historical PEO User does. Notes follow the selected button, including when a saved link sets it.
      v3.116 (owner 2026-09-30, Instance B): Historical PEO User is now three independent toggles - Current Users, Former Users, PEO to PEO - any combination (Former Users already includes every PEO-to-PEO mover, so PEO to PEO shows locked on while Former Users is on). A switcher pin takes the colour and name of its most recent PEO; its flash card shows the old PEO in its colour, a gradient arrow, then the new PEO in its colour. URL hv=c|f|p letters (old hist=1/2/3 links still read).
@@ -600,7 +601,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.118 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.119 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -624,6 +625,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <label class="chk" title="A PEO's own administrative offices ◆ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <label class="chk" title="Only clients observed at 2+ locations (distinct city/state — own address, branch locations, WC filings) or in 2+ states"><input type="checkbox" id="ml-only"> Multi-location clients only</label>
+        <label class="chk" title="Companies whose headquarters is outside the United States. On = they show (as today); off = they are hidden."><input type="checkbox" id="ih-on" checked> Include records with International HQ</label>
         <h2 style="margin-top:10px" title="Franchise locations (Servpro, Hampton Inn, The Joint …) — flagged from the ruled franchise-systems list. Include = show every pin; Exclude = hide franchise locations; Only = franchise locations alone.">Franchises</h2>
         <div class="seg"><button id="fr-all" class="on" title="Show every client, franchise or not">Include</button><button id="fr-none" title="Hide franchise locations">Exclude</button><button id="fr-only" title="Show franchise locations only">Only</button></div>
         <h2 style="margin-top:10px" title="How confident we are in the PEO shown on each pin. Cross-verified = independently confirmed.">Confidence</h2>
@@ -724,7 +726,7 @@ var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark backgro
 var S={
   grain:'brand', placement:'address', msOnly:false, mlOnly:false, fran:'all', minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:false, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
-  hist:false, histSw:false, hCur:true, hFor:false, hP2P:false, histData:null, histLoading:false, flags:{},
+  hist:false, histSw:false, ihOn:true, hCur:true, hFor:false, hP2P:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
   sel:{family:null,brand:null}, states:{},
   beaconsOn:false, beacons:[],
@@ -1520,6 +1522,7 @@ function resetAll(){
   S.wcoOnly=false; S.bcoOnly=false; try{ syncCoSeg(); }catch(_){}
   S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
   S.mlOnly=false; if($('ml-only')) $('ml-only').checked=false;
+  S.ihOn=true; if($('ih-on')) $('ih-on').checked=true;
   S.fran='all'; try{ syncFranButtons(); }catch(_){}
   S.placement='address'; try{ syncPlacementButtons(); }catch(_){}
   setHistMode(0);
@@ -1944,6 +1947,7 @@ $('hist-3').onclick=function(){ if(S.hFor) return; setHistView(S.hCur,S.hFor,!S.
     {k:'emp', a:function(){return $('emp-chips');}, t:function(){ var shown=[],hidden=[]; EMP_BANDS.forEach(function(b,i){ (S.empOff[i]?hidden:shown).push(b); }); return listNote('Showing every company size, including no count yet.','Every size is hidden - no pins show.',shown,hidden).replace('Showing only: ','Showing only sizes: ').replace('Hidden: ','Hidden sizes: '); }},
     {k:'bea', a:function(){var x=$('beacons-on'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('beacons-on','Showing each PEO\'s administrative offices as colored diamonds.','Administrative offices are hidden.'); }},
     {k:'ms', a:function(){var x=$('ms-only'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ms-only','Showing only clients seen operating in 2 or more states.','Showing clients of any footprint.'); }},
+    {k:'ih', a:function(){var x=$('ih-on'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ih-on','Including companies headquartered outside the US (their US locations map).','Hiding companies headquartered outside the US.'); }},
     {k:'ml', a:function(){var x=$('ml-only'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ml-only','Showing only clients seen at 2 or more locations.','Showing clients at any number of locations.'); }},
     {k:'peo', a:function(){var x=$('peo-all'); return x?x.parentNode:null;}, t:function(){ var m=selMap(), ks=Object.keys(m), on=ks.filter(function(k){return m[k]===true;}).length; if(!ks.length) return ''; return on===ks.length?('All '+ks.length+' PEOs are on.'):(on===0?'No PEOs are on - no pins show.':('Showing '+on+' of '+ks.length+' PEOs - the rest are hidden.')); }},
     {k:'st', a:function(){var x=$('st-all'); return x?x.parentNode:null;}, t:function(){ var ks=Object.keys(S.states), on=ks.filter(function(k){return S.states[k];}).length; if(!ks.length) return ''; return on===ks.length?('All '+ks.length+' states are on.'):(on===0?'No states are on - no pins show.':('Showing '+on+' of '+ks.length+' states - the rest are hidden.')); }},
@@ -1959,6 +1963,7 @@ $('hist-3').onclick=function(){ if(S.hFor) return; setHistView(S.hCur,S.hFor,!S.
   }
   tick(); setInterval(tick,500);
 })();
+$('ih-on').onchange=function(){ S.ihOn=this.checked; bump(); scheduleDraw(); updateStats(); writeUrl(); try{ computeViewLegend(); }catch(_){} };
 $('g-family').onclick=function(){ switchGrain('family') };
 $('g-brand').onclick=function(){ switchGrain('brand') };
 function switchGrain(g){
@@ -2059,7 +2064,7 @@ function coLines(dd,i){ if(!dd) return ''; var s='';
   if(dd.bco&&dd.bco[i]) s+='<b style="color:#4fb3a9">Benefits Carve Out</b> <span class="mut">(runs its own health plan)</span><br>';
   return s; }
 function coOf(cid){ for(var st in S.pinData){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.ids) continue; var j=dd.ids.indexOf(String(cid)); if(j>=0) return {dd:dd,i:j}; } return null; }
-function svcOk(dd,i){ if(!coOk(dd,i)) return false; if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
+function svcOk(dd,i){ if(!S.ihOn&&dd&&dd.ih&&dd.ih[i]) return false; if(!coOk(dd,i)) return false; if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
 // v3.69 (owner 2026-09-24: "I want the default map to load only with PEO"): Relationship chips start with PEO on, the rest off.
 function svcDefaultOff(){ return {0:true,2:true,3:true,4:true,5:true}; }
 function svcOkRel(dd,i){ if(!dd||!dd.sv) return true; var v=dd.sv[i]; if(v===6) return !(S.svcOff[6]&&S.svcOff[1]&&S.svcOff[2]); return !S.svcOff[v]; }
@@ -2314,6 +2319,7 @@ function buildUrl(){
     if(S.msOnly) p.set('ms','1');
     if(S.mlOnly) p.set('ml','1');
     if(S.fran!=='all') p.set('fr',S.fran);
+    if(!S.ihOn) p.set('ih','0');
     if(S.minSrc) p.set('src',String(S.minSrc));
     if(S.wcoOnly) p.set('wco','1'); if(S.bcoOnly) p.set('bco','1');
     var svo=Object.keys(S.svcOff).filter(function(k){ return S.svcOff[k]; }).sort(); if(svo.join(',')!=='0,2,3,4,5') p.set('svoff',svo.length?svo.join(','):'none');   // v3.69: default (PEO only) is not written
@@ -2336,6 +2342,7 @@ function readUrl(){
     if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='top'){ S.hqLogos='top'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('ml')==='1'){ S.mlOnly=true; $('ml-only').checked=true; }
+    if(p.get('ih')==='0'){ S.ihOn=false; if($('ih-on')) $('ih-on').checked=false; }
     if(p.get('fr')==='none'||p.get('fr')==='only'){ S.fran=p.get('fr'); syncFranButtons(); }
     if(p.get('wco')==='1') S.wcoOnly=true; if(p.get('bco')==='1') S.bcoOnly=true; syncCoSeg();
     if(p.get('src')==='1'||p.get('src')==='2'){ S.minSrc=Number(p.get('src')); syncSrcButtons(); }
@@ -2935,6 +2942,7 @@ function tblPaintInner(){
   var emh=Object.keys(S.empOff).filter(function(k){ return S.empOff[k]; }); if(emh.length) bits.push('hiding employees '+emh.map(function(k){ return EMP_BANDS[k]; }).join(', '));
   if(S.msOnly) bits.push('multi-state only');
   if(S.mlOnly) bits.push('multi-location only');
+  if(!S.ihOn) bits.push('no international-HQ companies');
   if(S.fran==='none') bits.push('franchises excluded'); if(S.fran==='only') bits.push('franchises only');
   if(S.hist) bits.push('current users only (former records are on the map, not here)');
   $('tbl-what').textContent='· '+bits.join(' · ')+' · ignores pan and zoom';
