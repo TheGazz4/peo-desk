@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.110 (owner 2026-09-30): outlying/regional networks (Hawaii, Alaska, small states) - tighter blur, base tint, client pins dim, Hawaii/Alaska/US jump buttons, ticking a regional network zooms to it.
      v3.109 (owner 2026-09-30): regional networks (<=400 points, e.g. Kaiser Hawaii) are lifted so their islands/cities show on the density heat.
      v3.108 (owner 2026-09-30 06:40): Anthem is a Blue licensee, so every Anthem plan sits under Blue Cross Blue Shield (member/broker view); each network names its Blue plan (Anthem BCBS, Anthem Blue Cross, BCBS of Michigan, Regence, HMSA).
      v3.107 (owner 20:52): only the carrier title says "Blue Cross Blue Shield"; plan names read "BCBS of <state>".
@@ -571,7 +572,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.109 · 2026-09-30</span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.110 · 2026-09-30</span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2972,6 +2973,7 @@ function buildSection(){
    '<h2 title="Where the doctors and hospitals contracted into the carrier network behind each PEO\'s health plan actually practise. Deeper colour = more contracted clinicians nearby.">Network strength · PEO health plans</h2>'+
    '<div class="seg" id="netview"><button data-v="off" class="on">Off</button><button data-v="heat">Heat</button><button data-v="pins">Pins</button><button data-v="both">Both</button></div>'+
    '<div id="netbody" style="display:none">'+
+     '<div class="seg" id="netjump" title="Jump the map to an area"><button data-j="us">Continental US</button><button data-j="hi">Hawaii</button><button data-j="ak">Alaska</button></div>'+
      '<div class="netsub">Carrier</div><div id="netcarriers" class="netchips"></div>'+
      '<div class="netsub" title="Pick a PEO, open a carrier, then switch each of its networks on or off (up to 4 layers at once, from any of its carriers). Each carrier keeps its colour; sister networks of one carrier get their own shade. The heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
      '<div class="netsub">Plan reach</div><div class="netchips" id="nettiers">'+
@@ -3002,6 +3004,7 @@ function buildSection(){
         '.netclearrow{margin:2px 0 6px 30px}.netclear{font:inherit;font-size:10.5px;letter-spacing:.03em;padding:2px 9px;border-radius:9px;cursor:pointer;color:rgb(var(--peo-lt,217,184,245));background:transparent;border:1px solid rgba(var(--peo-rgb,155,79,208),.55)}.netclear:hover{background:rgba(var(--peo-rgb,155,79,208),.18);color:#fff}';   // v3.91
       document.head.appendChild(sti); }
   $n('netview').addEventListener('click',function(e){ var v=e.target&&e.target.dataset.v; if(!v) return; setView(v); });
+  $n('netjump').addEventListener('click',function(e){ var j=e.target&&e.target.dataset.j; if(j) netJump(j); });
   // v3.52 (owner 2026-09-23): sleek hover explanations on the Heat method choices (replaces the plain browser title tooltips)
   (function(){
     if(!document.getElementById('nettipcss')){ var st=document.createElement('style'); st.id='nettipcss';
@@ -3293,7 +3296,7 @@ function renderList(){
     row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.note=null; defaultOn(p.family_slug); renderCarriers(); renderList(); ensureData(); redraw(); };
     [].forEach.call(row.querySelectorAll('.netcar-h'),function(h){ h.onclick=function(){ var ck=h.getAttribute('data-car'); if(N.car===ck){ N.car=''; renderList(); return; } N.car=ck; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){
-      if(r.checked){ if(capHit(r.value)){ r.checked=false; N.note=NET_MAX_ON+' layers max across carriers — switch one off first (one carrier\'s own networks have no cap)'; renderList(); return; } N.on[r.value]=true; N.sel=r.value; }
+      if(r.checked){ if(capHit(r.value)){ r.checked=false; N.note=NET_MAX_ON+' layers max across carriers — switch one off first (one carrier\'s own networks have no cap)'; renderList(); return; } N.on[r.value]=true; N.sel=r.value; N.fitKey=r.value; if(N.pts[r.value]&&fitNet(r.value)) N.fitKey=null; }
       else { delete N.on[r.value]; N.sel=onKeys().slice(-1)[0]||null; }
       N.note=null; renderList(); ensureData(); redraw(); }; });
     box.appendChild(row);
@@ -3307,7 +3310,7 @@ function ensureData(){
     if((N.view==='heat'||N.view==='both')&&!N.layers[k]&&!N.loading['h'+k]){ N.loading['h'+k]=1;
       netFetch({mode:'layer',network_key:k}).then(function(L){ prepLayer(L); N.layers[k]=L; renderList(); redraw(); }).catch(function(){}).then(function(){ delete N.loading['h'+k]; }); }
     if((N.view==='pins'||N.view==='both'||(N.method==='dens'&&N.view==='heat'))&&!N.pts[k]&&!N.loading['p'+k]){ N.loading['p'+k]=1;
-      netFetch({mode:'points',network_key:k}).then(function(P){ prepPts(P); N.pts[k]=P; redraw(); }).catch(function(){}).then(function(){ delete N.loading['p'+k]; }); }
+      netFetch({mode:'points',network_key:k}).then(function(P){ prepPts(P); N.pts[k]=P; if(N.fitKey===k){ N.fitKey=null; fitNet(k); } redraw(); }).catch(function(){}).then(function(){ delete N.loading['p'+k]; }); }
   });
 }
 function prepLayer(L){
@@ -3333,10 +3336,11 @@ function drawNet(){
   if(ncv.width!==Math.round(W*dpr)||ncv.height!==Math.round(H*dpr)){ ncv.width=Math.round(W*dpr); ncv.height=Math.round(H*dpr); ncv.style.width=W+'px'; ncv.style.height=H+'px'; }
   nctx.setTransform(dpr,0,0,dpr,0,0); nctx.clearRect(0,0,W,H);
   N.hitsP=[]; N.frame=null;
-  if(!S.map||!N.cat||N.view==='off'){ legend(); return; }
+  if(!S.map||!N.cat||N.view==='off'){ pinDim(false); legend(); return; }
   var z=S.map.getZoom(), scale=256*Math.pow(2,z), ctr=S.map.getCenter(), cx=mercX(ctr.lng()), cy=mercY(ctr.lat());
   N.frame={W:W,H:H,z:z,scale:scale,cx:cx,cy:cy};
-  var heat=N.view==='heat'||N.view==='both', pins=N.view==='pins'||N.view==='both', lead=leadCarrier();   // v3.99
+  var heat=N.view==='heat'||N.view==='both', pins=N.view==='pins'||N.view==='both', lead=leadCarrier();
+  pinDim(heat&&!!N.sel);   // v3.110: client pins step back while a network heat layer is on   // v3.99
   N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     var col=netHex(n), rp=ramp(col);
@@ -3353,12 +3357,36 @@ function drawNet(){
 // Every ZIP's in-network clinician count is dropped at that ZIP's centre (no 14 sq mi cells, no 12-mile catchment), then a
 // kernel that tightens with zoom (~50 mi nationally, ~2-3 km at street zoom) turns it into clinicians per sq km.
 // Colour and opacity both follow log10(in-network clinicians per sq km): 0.003 -> invisible, 30+ -> deepest.
+// v3.110 (owner 2026-09-30: Kaiser Hawaii "better but probably not as obvious as it should be ... special display considerations for outlying areas like Hawaii and Alaska?"):
+// a REGIONAL network (<=400 mapped points, or a footprint no wider than ~700 km - an island chain, a small state) gets four aids so it can actually be seen:
+//  1. a tighter blur (<=15 km) so each island fills with colour instead of leaking over open water; 2. the v3.109 lift; 3. a light base tint over everywhere it has any
+//  in-network ZIP (so a thin island still reads as covered); 4. client pins dim while heat is on, 'Hawaii / Alaska / US' jump buttons, and ticking a regional network zooms to it.
+function netBox(P){
+  if(P._bx!==undefined) return P._bx;
+  var la=[],ln=[]; for(var i=0;i<P.n;i++){ if(P.k[i]===1) continue; var a=+P.lat[i], b=+P.lng[i]; if(isFinite(a)&&isFinite(b)){ la.push(a); ln.push(b); } }
+  if(la.length<2){ P._bx=null; return null; }
+  var ms=la.slice().sort(function(x,y){return x-y;})[la.length>>1], mn=ln.slice().sort(function(x,y){return x-y;})[ln.length>>1], kl=111*Math.cos(ms*Math.PI/180);
+  var s=90,n=-90,w=180,e=-180,c=0;
+  for(var j=0;j<la.length;j++){ if(Math.abs(la[j]-ms)*111>900||Math.abs(ln[j]-mn)*kl>900) continue; c++; if(la[j]<s)s=la[j]; if(la[j]>n)n=la[j]; if(ln[j]<w)w=ln[j]; if(ln[j]>e)e=ln[j]; }   // a stray mis-geocoded ZIP cannot stretch the box
+  P._bx=c>=2?{s:s,n:n,w:w,e:e,c:c,diag:Math.sqrt(Math.pow((n-s)*111,2)+Math.pow((e-w)*kl,2))}:null; return P._bx;
+}
+function netSmall(P){ if(!P||!P.n) return false; if(P._sm===undefined){ var b=netBox(P); P._sm=P.n<=400||(!!b&&b.diag<=700); } return P._sm; }
+function pinDim(on){ var pc=$n('pincanvas'); if(pc) pc.style.opacity=on?'0.55':''; }
+function fitNet(k){
+  var P=N.pts[k]; if(!P||!netSmall(P)||!S.map||typeof google==='undefined') return false;
+  var b=netBox(P); if(!b) return false;
+  S.map.fitBounds(new google.maps.LatLngBounds({lat:b.s,lng:b.w},{lat:b.n,lng:b.e}),{top:80,right:80,bottom:80,left:80});
+  google.maps.event.addListenerOnce(S.map,'idle',function(){ if(S.map.getZoom()>10) S.map.setZoom(10); });
+  return true;
+}
+var NET_JUMP={us:[24.3,-125.5,49.6,-66.5],hi:[18.8,-160.4,22.3,-154.7],ak:[54.5,-168,71.5,-140]};
+function netJump(j){ var r=NET_JUMP[j]; if(!r||!S.map||typeof google==='undefined') return; S.map.fitBounds(new google.maps.LatLngBounds({lat:r[0],lng:r[1]},{lat:r[2],lng:r[3]}),{top:20,right:20,bottom:20,left:20}); }
 function drawDensity(P,rp,W,H,z,scale,cx,cy,hatch){
   if(!P||!P.mx) return;
   var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy))), pxKm=scale/(40075.017*Math.cos(lat));
-  var spx=Math.max(8*Math.pow(2,0.45*(z-4.6)),1.2*pxKm);
+  var small=netSmall(P), spx=Math.max(8*Math.pow(2,0.45*(z-4.6)),1.2*pxKm); if(small) spx=Math.max(1.2*pxKm,Math.min(spx,15*pxKm));
   var G=Math.max(3,Math.min(16,Math.round(spx/5))), sig=spx/G;
-  var pad=Math.ceil(3*sig)+2, ow=Math.ceil(W/G), oh=Math.ceil(H/G), gw=ow+2*pad, gh=oh+2*pad, n=gw*gh;
+  var pad=Math.ceil(3*sig*(small?1.8:1))+2, ow=Math.ceil(W/G), oh=Math.ceil(H/G), gw=ow+2*pad, gh=oh+2*pad, n=gw*gh;
   if(!HB.A||HB.A.length<n){ HB.A=new Float32Array(n); HB.B=new Float32Array(n); HB.T=new Float32Array(n); }
   var A=HB.A; A.fill(0,0,n);
   var sg=scale/G;
@@ -3376,13 +3404,19 @@ function drawDensity(P,rp,W,H,z,scale,cx,cy,hatch){
   var d=HB.img.data, pal=heatPalette(rp), k2=(pxKm/G)*(pxKm/G);   // grid px^2 per km^2
   // v3.109 (owner 2026-09-30: Kaiser Hawaii "i dont believe its reflecting correctly"): a regional network (one HMO's service area, a few hundred ZIPs) tops out at a
   // few clinicians per sq km, so against the national scale its islands/cities washed out. Networks of <=400 points are lifted (max 12x) so their busiest spot reads strong.
-  var bst=1;
-  if(P.n<=400){ var pk=0; for(var yy=0;yy<oh;yy++){ var rr=(yy+pad)*gw+pad; for(var xx=0;xx<ow;xx++){ if(A[rr+xx]>pk) pk=A[rr+xx]; } }
+  var bst=1, Bp=null, pinv=0;
+  if(small){   // base tint: presence of any in-network ZIP, blurred wider than the density so a thin island still reads as covered
+    Bp=HB.B; Bp.fill(0,0,gw*gh); pinv=2*Math.PI*Math.pow(1.8*sig,2)/0.35;
+    for(var j2=0;j2<P.n;j2++){ var gx2=(P.mx[j2]-cx)*sg+ow/2+pad, gy2=(P.my[j2]-cy)*sg+oh/2+pad; if(gx2<0||gy2<0||gx2>=gw-1||gy2>=gh-1) continue;
+      var x2=gx2|0, y2=gy2|0, fx2=gx2-x2, fy2=gy2-y2, i2=y2*gw+x2;
+      Bp[i2]+=(1-fx2)*(1-fy2); Bp[i2+1]+=fx2*(1-fy2); Bp[i2+gw]+=(1-fx2)*fy2; Bp[i2+gw+1]+=fx2*fy2; }
+    gaussBlur(Bp,HB.T,gw,gh,sig*1.8); }
+  if(small){ var pk=0; for(var yy=0;yy<oh;yy++){ var rr=(yy+pad)*gw+pad; for(var xx=0;xx<ow;xx++){ if(A[rr+xx]>pk) pk=A[rr+xx]; } }
     pk*=k2; if(pk>0&&pk<10) bst=Math.min(12,10/pk); }
   for(var y=0;y<oh;y++){
     var row=(y+pad)*gw+pad, p=y*ow*4;
     for(var x=0;x<ow;x++,p+=4){
-      var dens=A[row+x]*k2*bst; if(dens<0.003){ d[p+3]=0; continue; }
+      var dens=A[row+x]*k2*bst; if(Bp){ var fl=Bp[row+x]*pinv; if(fl>0.05){ fl=Math.min(1,fl)*0.6; if(fl>dens) dens=fl; } } if(dens<0.003){ d[p+3]=0; continue; }
       var L10=Math.log(dens)/Math.LN10;
       var I=Math.round(Math.max(0,Math.min(100,(L10+1.5)*100/3))*2.55)*4;
       var c2=Math.min(1,Math.max(0,(L10+2.5)/2)), cov=c2*c2*(3-2*c2);
@@ -3567,7 +3601,7 @@ function legend(){
       '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div>'+
       '<div class="lgscale"><span>Few</span><span>Some</span><span>Many</span><span>Most</span></div>'+
       '<div class="netmut" title="Carrier network file '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(n.data_as_of,n.registry_as_of)+' · updates monthly</div>';
-    if(N.frame&&N.view!=='pins') html+='<div class="netmut">Heat blends the ~'+Math.max(1,Math.round(heatSpan(N.frame.z,N.frame.cy,N.frame.scale).km*2*0.621))+' mi around each spot at this zoom (zoom in for street-level detail)</div>';
+    if(N.frame&&N.view!=='pins') html+='<div class="netmut">Heat blends the ~'+Math.max(1,Math.round(Math.min(heatSpan(N.frame.z,N.frame.cy,N.frame.scale).km,netSmall(N.pts[n.network_key])?15:1e9)*2*0.621))+' mi around each spot at this zoom (zoom in for street-level detail)</div>';
     if(N.loading['h'+n.network_key]||N.loading['p'+n.network_key]) html+='<div class="netmut">loading…</div>';
   });
   html+='<div class="netmut" style="margin-top:4px">Deeper colour = more of this network\'s contracted clinicians practising nearby (clinicians per sq mi, from the carrier\'s own federal network file). Each network is drawn on the same scale.</div>';
