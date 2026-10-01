@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.125 (owner 2026-10-01 14:30, Instance B claim 486: "can you put a select all button at the top by each carrier's name? also for some reason i cant select anymore
+            bcbs plans here. it feels like its limited or the map is unresponsive to it"): the limit is now 4 CARRIERS at once, with any number of each carrier's
+            own plans (was 4 plan layers across carriers - Aetna + 3 Georgia Blue plans = 4 silently refused the next Blue tick). Every carrier header carries a
+            "Select all" / "Clear" button for all of that carrier's mapped plans (all Blue companies count as one Blue Cross Blue Shield). A refused tick now
+            shows a message on the map itself, not only at the top of the list. The legend scrolls when many plans are on.
      v3.124 (owner 2026-10-01 14:20/14:22, Instance B claim 485, on the swipe preview: "i like this - make the carriers more prominent / easy to see: also list the plans
             right under the carriers ... Lets install this" + "make sure the aetna and united are colored in the same carrier color at the top"): SWIPE DIVIDER replaces
             the v3.99 stripes. When network heat layers from 2+ carriers are on, a draggable vertical line splits the map: the lead carrier's layers show LEFT of it,
@@ -577,6 +582,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 @media (max-width:760px){ #tablepane .thd input{width:140px} #tablepane .cov{display:none} }
 /* v3.42 network strength layer (renewal_intel 5024) */
 #netcanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
+#nettoast{position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:40;background:rgba(18,19,24,.95);color:#f0b25c;border:1px solid #f0b25c;border-radius:8px;padding:8px 14px;font:600 13px system-ui;box-shadow:0 4px 16px rgba(0,0,0,.5);display:none;max-width:70%;text-align:center}
 #swipe{position:absolute;top:0;bottom:0;width:22px;margin-left:-11px;z-index:6;cursor:ew-resize;display:none;touch-action:none;outline:none}
 #swipe .ln{position:absolute;left:10px;top:0;bottom:0;width:2px;background:#e8e8ea;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 #swipe .kn{position:absolute;left:-4px;top:50%;width:30px;height:30px;margin-top:-15px;border-radius:50%;background:#e8e8ea;color:#1e1f24;font:700 14px/30px system-ui;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.5)}
@@ -606,7 +612,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 .netplan{font-size:11.5px;color:var(--ink2)}
 .netlbl{font-size:10px;color:#e8b04a}
 .netmut{font-size:10.5px;color:var(--muted)}
-#netlegend{position:absolute;left:12px;bottom:26px;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 11px;max-width:300px;font-size:12px;color:var(--ink2);display:none;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#netlegend{position:absolute;left:12px;bottom:26px;z-index:30;max-height:calc(100% - 140px);overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 11px;max-width:300px;font-size:12px;color:var(--ink2);display:none;box-shadow:0 6px 24px rgba(0,0,0,.4)}
 #netlegend .lgbar{height:9px;border-radius:5px;margin:5px 0 2px}
 #netlegend .lgscale{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
 /* v3.47 PEO-first network picker */
@@ -624,7 +630,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.124 · 2026-10-01</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.125 · 2026-10-01</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3137,7 +3143,7 @@ function buildSection(){
    '<div id="netbody" style="display:none">'+
      '<div class="seg" id="netjump" title="Jump the map to an area"><button data-j="us">Continental US</button><button data-j="hi">Hawaii</button><button data-j="ak">Alaska</button></div>'+
      '<div class="netsub">Carrier</div><div id="netcarriers" class="netchips"></div>'+
-     '<div class="netsub" title="Pick a PEO, open a carrier, then switch each of its networks on or off (up to 4 layers at once, from any of its carriers). Each carrier keeps its colour; sister networks of one carrier get their own shade. The heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
+     '<div class="netsub" title="Pick a PEO, open a carrier, then switch each of its networks on or off (up to 4 carriers at once, any number of each carrier\'s plans). Each carrier keeps its colour; sister networks of one carrier get their own shade. The heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
      '<div class="netsub">Plan reach</div><div class="netchips" id="nettiers">'+
        '<span class="netchip on" data-t="national">National</span><span class="netchip on" data-t="regional">Regional</span><span class="netchip on" data-t="local">Local</span></div>'+
      '<div class="netsub">Joint ventures</div><div class="netchips" id="netjvchips">'+
@@ -3147,6 +3153,7 @@ function buildSection(){
   if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec,anchor); else $n('panel').appendChild(sec);
     if(!document.getElementById('netinscss')){ var sti=document.createElement('style'); sti.id='netinscss';
       sti.textContent='.netinsrow{margin:-2px 0 4px 22px;font-size:11.5px;line-height:1.4}.netins{color:var(--ink,#fff);font-weight:600}.netlbl-ok{background:rgba(29,158,117,.22);color:#9fe1cb}.netlbl-sa{background:rgba(55,138,221,.22);color:#b5d4f4}'+
+        '.netcarall{margin-left:8px;font:inherit;font-size:10.5px;letter-spacing:.03em;padding:1px 9px;border-radius:9px;cursor:pointer;color:var(--ink,#fff);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.28);white-space:nowrap}.netcarall:hover{background:rgba(255,255,255,.14)}.netcarall.on{border-color:#f0b25c;color:#f0b25c}'+
         '.netcar-h{cursor:pointer;user-select:none}.netcar-h:hover b{text-decoration:underline}.netcaret{margin-left:auto;padding-left:8px;color:var(--muted,#8a90a0);font-weight:700}.netcar-h.open .netcaret{color:var(--ink,#fff)}'+
         /* v3.62 (owner 2026-09-28): the selected PEO must be unmistakable */
         /* v3.89 (owner 2026-09-28 17:29): the selected PEO's frame wears the PEO's own map colour (ADP red, TriNet violet ...);
@@ -3329,7 +3336,13 @@ function keyAllowed(key){ if(jvHidden(key)) return false; var p=peoOf(N.peo); if
 // v3.92 (owner 2026-09-29 10:09: "the exception should be if its the same carrier so we can understand their full breadth of coverage"):
 // the NET_MAX_ON cap applies ACROSS carriers; any number of one carrier's own networks may be on together.
 function keyCarrier(k){ var p=peoOf(N.peo); if(!p) return null; for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if((c.networks||[]).some(function(x){ return (x.map_key||x.network_key)===k; })) return c.carrier; } return null; }
-function capHit(k){ var on=onKeys(); if(on.length<NET_MAX_ON) return false; var c=keyCarrier(k); return !(c&&on.every(function(o){ return keyCarrier(o)===c; })); }
+// v3.125 (owner 2026-10-01 14:30): the cap counts CARRIERS, not plan layers - up to NET_MAX_ON carriers on at once, any number of each one's own plans
+// (all Blue companies are one carrier here, folded by mergeBlues).
+function onCarriers(extra){ var s={}; onKeys().concat(extra||[]).forEach(function(k){ var c=keyCarrier(k); if(c) s[c]=1; }); return Object.keys(s); }
+function capHit(k){ return onCarriers([k]).length>NET_MAX_ON; }
+var CAP_MSG=NET_MAX_ON+' carriers max at once — switch one carrier off first (any number of one carrier\'s own plans can be on)';
+function netToast(msg){ var t=$n('nettoast'); if(!t){ t=document.createElement('div'); t.id='nettoast'; $n('mapwrap').appendChild(t); }
+  t.textContent=msg; t.style.display='block'; clearTimeout(netToast._t); netToast._t=setTimeout(function(){ t.style.display='none'; },4500); }
 function pruneOn(){ onKeys().forEach(function(k){ if(!keyAllowed(k)) delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; }
 function selAllowed(){ return !!N.sel&&keyAllowed(N.sel); }
 function netVisible(n){ return !!N.on[n.network_key] && N.tiers[n.tier]!==false && !(n.jv&&!N.jv); }
@@ -3383,8 +3396,11 @@ function renderList(){
         var ck=c.carrier_family||c.carrier, copen=N.car===ck;
         var keys={}, nc=0, nm=0; (c.networks||[]).forEach(function(x){ var k=x.card_key||x.network_key||x.network; if(!keys[k]){ keys[k]=1; nc++; } if(x.mapped) nm++; });
         var brief=!(c.networks||[]).length?'network not identified':(nm?nc+' network'+(nc>1?'s':'')+' · map ready':nc+' network'+(nc>1?'s':'')+' · map not built');
+        var allK=[]; (c.networks||[]).forEach(function(x){ if(!x.mapped) return; var mk=x.map_key||x.network_key; if(mk&&netMeta(mk)&&allK.indexOf(mk)<0) allK.push(mk); });   // v3.125
+        var allOn=allK.length>0&&allK.every(function(k){ return N.on[k]; });
+        var allBtn=allK.length>1?'<button type="button" class="netcarall'+(allOn?' on':'')+'" data-keys="'+esc(JSON.stringify(allK))+'" title="'+(allOn?'Switch off every ':'Switch on every ')+esc(shortCarrier(c.carrier))+' plan with a map ('+allK.length+')">'+(allOn?'Clear':'Select all')+'</button>':'';
         html+='<div class="netcar netcar-h'+(copen?' open':'')+'" data-car="'+esc(ck)+'" title="'+(copen?'Click to condense':'Click to open this carrier')+'"><i class="netsw" style="background:'+carrierHex(c.carrier)+'"></i><b>'+esc(shortCarrier(c.carrier))+'</b>'+
-          '<span class="netmut">'+(c.share_pct!=null?c.share_pct+'% of the plan':'')+(copen?(c.schedule_a_year?' · plan yr '+c.schedule_a_year:''):' · '+brief)+'</span><span class="netcaret">'+(copen?'−':'+')+'</span></div>';
+          '<span class="netmut">'+(c.share_pct!=null?c.share_pct+'% of the plan':'')+(copen?(c.schedule_a_year?' · plan yr '+c.schedule_a_year:''):' · '+brief)+'</span>'+allBtn+'<span class="netcaret">'+(copen?'−':'+')+'</span></div>';
         if(!copen) return;
         var ins=c.insured?'<span class="netins" title="'+esc(c.insured_basis_reason||'')+'">Insured '+esc(c.insured)+'</span>':'<span class="netmut">'+(c.lives||0).toLocaleString()+' insured</span>';
         var chg=(c.insured_change_pct!=null&&c.insured_prior!=null)?' <span class="netmut" title="Prior plan year: '+(+c.insured_prior).toLocaleString()+'">'+(c.insured_change_pct>0?'+':'')+c.insured_change_pct+'% vs prior yr</span>':'';
@@ -3458,9 +3474,9 @@ function renderList(){
     [].forEach.call(row.querySelectorAll('input.netptall'),function(cb){ cb.indeterminate=cb.getAttribute('data-some')==='1';
       cb.onclick=function(e){ e.stopPropagation(); };
       cb.onchange=function(){ var keys=JSON.parse(cb.getAttribute('data-keys')||'[]');
-        if(cb.checked){ var add=keys.filter(function(k){ return !N.on[k]; }), c0=keyCarrier(keys[0]), same=onKeys().concat(keys).every(function(o){ return keyCarrier(o)===c0; }), room=same?add.length:Math.max(0,NET_MAX_ON-onKeys().length);   // v3.92: one carrier, no cap
-          add.slice(0,room).forEach(function(k){ N.on[k]=true; N.sel=k; });
-          N.note=add.length>room?NET_MAX_ON+' layers max across carriers — '+(add.length-room)+' of this group left off':null; }
+        if(cb.checked){ var add=keys.filter(function(k){ return !N.on[k]; });   // v3.125: carrier cap, not a layer cap
+          if(onCarriers(add).length>NET_MAX_ON){ N.note=CAP_MSG; netToast(CAP_MSG); }
+          else { add.forEach(function(k){ N.on[k]=true; N.sel=k; }); N.note=null; } }
         else { keys.forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; }
         renderList(); ensureData(); redraw(); }; });
     var clr=row.querySelector('.netclear'); if(clr){ clr.onclick=function(e){ e.preventDefault(); e.stopPropagation();
@@ -3468,9 +3484,17 @@ function renderList(){
       // belongs to it - clear them all, not just the ones found by walking this PEO's catalogue rows (a folded card's sister keys were missed).
       onKeys().forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; renderList(); ensureData(); redraw(); }; }
     row.querySelector('input[name=netpeo]').onchange=function(){ N.peo=p.family_slug; N.car=null; N.note=null; defaultOn(p.family_slug); renderCarriers(); renderList(); ensureData(); redraw(); };
+    [].forEach.call(row.querySelectorAll('button.netcarall'),function(b){ b.onclick=function(e){ e.preventDefault(); e.stopPropagation();   // v3.125: Select all / Clear per carrier
+      var keys=JSON.parse(b.getAttribute('data-keys')||'[]'), allOn=keys.every(function(k){ return N.on[k]; });
+      if(allOn){ keys.forEach(function(k){ delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; N.note=null; }
+      else { var add=keys.filter(function(k){ return !N.on[k]; });
+        if(onCarriers(add).length>NET_MAX_ON){ N.note=CAP_MSG; netToast(CAP_MSG); renderList(); return; }
+        add.forEach(function(k){ N.on[k]=true; }); N.sel=add[add.length-1]||N.sel; N.note=null;
+        var ck=b.closest('.netcar-h'); if(ck) N.car=ck.getAttribute('data-car'); }
+      renderList(); ensureData(); redraw(); }; });
     [].forEach.call(row.querySelectorAll('.netcar-h'),function(h){ h.onclick=function(){ var ck=h.getAttribute('data-car'); if(N.car===ck){ N.car=''; renderList(); return; } N.car=ck; renderList(); }; });
     [].forEach.call(row.querySelectorAll('input[name=netsel]'),function(r){ r.onchange=function(){
-      if(r.checked){ if(capHit(r.value)){ r.checked=false; N.note=NET_MAX_ON+' layers max across carriers — switch one off first (one carrier\'s own networks have no cap)'; renderList(); return; } N.on[r.value]=true; N.sel=r.value; N.fitKey=r.value; if(N.pts[r.value]&&fitNet(r.value)) N.fitKey=null; }
+      if(r.checked){ if(capHit(r.value)){ r.checked=false; N.note=CAP_MSG; netToast(CAP_MSG); renderList(); return; } N.on[r.value]=true; N.sel=r.value; N.fitKey=r.value; if(N.pts[r.value]&&fitNet(r.value)) N.fitKey=null; }
       else { delete N.on[r.value]; N.sel=onKeys().slice(-1)[0]||null; }
       N.note=null; renderList(); ensureData(); redraw(); }; });
     box.appendChild(row);
