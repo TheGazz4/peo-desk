@@ -757,7 +757,7 @@
   var NEWS = { rows: [], group: "", q: "" };
   function nfItem(r, showPeo) {
     var peos = (r.peos || []).map(function (p) { return '<a href="#peo=' + esc(p.slug) + '">' + esc(p.name) + '</a>'; }).join(", ");
-    var link = r.source_url ? '<a href="' + esc(bsLoc(r.source_url, r.locator)) + '" target="_blank" rel="noopener">' + esc(r.title) + ' ↗</a>' : esc(r.title);
+    var link = r.source_url ? '<a href="' + esc(bsLoc(r.source_url, r.locator)) + '" target="_blank" rel="noopener">' + esc(r.title) + ' ↗</a>' : ((r.peos || []).length ? '<a href="#peo=' + esc(r.peos[0].slug) + '">' + esc(r.title) + '</a>' : esc(r.title));   /* v1.15: Form 5500 items have no outside link (owner: do not send users to EFAST); the headline opens the PEO own page */
     return '<div class="nf"><div class="nfd">' + esc(bsDay(r.happened_on)) + '</div><div><span class="nfk">' + esc(NF_KIND[r.kind] || r.kind) + '</span>' + (showPeo && peos ? peos + ' · ' : "") + link +
       (r.headline_fact ? '<div><b>' + esc(r.headline_fact) + '</b></div>' : "") +
       (r.why ? '<div class="nfw">' + esc(r.why) + '</div>' : "") +
