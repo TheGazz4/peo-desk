@@ -99,6 +99,9 @@
   .nf .nfd { color: var(--ink-2); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .nfk { display: inline-block; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); margin-right: 6px; }
   .nfw { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .nft { font-weight: 600; }
+  .nfr { white-space: nowrap; font-weight: 600; }
+  .nfp { color: var(--ink-2); font-size: 12px; margin-top: 3px; }
   .offh { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-muted); font-weight: 600; margin: 14px 0 6px; }
   .bsb-unknown { border-color: var(--serious); color: var(--serious); }
   .bsnet { margin: 0 0 4px; }
@@ -786,12 +789,22 @@
   var NF_KIND = { annual_report: "Annual report", quarterly_report: "Quarterly report", earnings: "Results", "5500_filing": "5500 filing", acquisition: "Acquisition", rebrand: "Rebrand", leadership: "Leadership", certification: "Certification", regulation: "Regulation", carrier_network: "Carrier network", carrier_market: "Carrier market", carrier_rates: "Carrier rates", carrier_change: "Carrier change", napeo: "NAPEO", esac: "ESAC", irs_cpeo: "IRS CPEO program", other: "Other" };
   var NEWS = { rows: [], group: "", q: "" };
   function nfItem(r, showPeo) {
-    var peos = (r.peos || []).map(function (p) { return '<a href="#peo=' + esc(p.slug) + '">' + esc(p.name) + '</a>'; }).join(", ");
-    var link = r.source_url ? '<a href="' + esc(bsLoc(r.source_url, r.locator)) + '" target="_blank" rel="noopener">' + esc(r.title) + ' ↗</a>' : ((r.peos || []).length ? '<a href="#peo=' + esc(r.peos[0].slug) + '">' + esc(r.title) + '</a>' : esc(r.title));   /* v1.15: Form 5500 items have no outside link (owner: do not send users to EFAST); the headline opens the PEO own page */
-    return '<div class="nf"><div class="nfd">' + esc(bsDay(r.happened_on)) + '</div><div><span class="nfk">' + esc(NF_KIND[r.kind] || r.kind) + '</span>' + (showPeo && peos ? peos + ' · ' : "") + link +
+    /* v1.27 (Instance B 2026-10-01, owner: "where is the link to the article if the user wanted to read it in full?"):
+       headline first, a plain "Read the full article ↗" / "Read the source ↗" link on the source line of every item that has one,
+       PEO tags moved to their own line (duplicate names shown once). Form 5500 items still have no outside link (owner rule): the
+       headline opens the PEO's own page. */
+    var seen = {}, plist = (r.peos || []).filter(function (p) { var k = String(p.name || "").toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true; });
+    var peos = plist.map(function (p) { return '<a href="#peo=' + esc(p.slug) + '">' + esc(p.name) + '</a>'; }).join(", ");
+    var url = r.source_url ? bsLoc(r.source_url, r.locator) : "";
+    var head = url ? '<a class="nft" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a>'
+      : (plist.length ? '<a class="nft" href="#peo=' + esc(plist[0].slug) + '">' + esc(r.title) + '</a>' : '<span class="nft">' + esc(r.title) + '</span>');
+    var RW = { "News article": "Read the full article", "Federal filing": "Open the filing", "State filing": "Open the filing", "Industry association": "Read the release", "Published by the PEO": "Read the announcement", "Carrier document": "Read the statement" };
+    var read = url ? ' · <a class="nfr" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(RW[r.source_kind] || "Read the source") + ' ↗</a>' : "";
+    return '<div class="nf"><div class="nfd">' + esc(bsDay(r.happened_on)) + '</div><div><div><span class="nfk">' + esc(NF_KIND[r.kind] || r.kind) + '</span>' + head + '</div>' +
       (r.headline_fact ? '<div><b>' + esc(noConf(r.headline_fact)) + '</b></div>' : "") +
       (r.why ? '<div class="nfw">' + esc(noConf(r.why)) + '</div>' : "") +
-      '<div class="mut">' + esc(r.source_name || r.source_kind || "") + ((r.states || []).length ? ' · ' + esc(r.states.join(", ")) : "") + (r.audience === "owner" ? ' · <span class="bsb bsb-market">owner only</span>' : "") + '</div></div></div>';
+      '<div class="mut">' + esc(r.source_name || r.source_kind || "") + ((r.states || []).length ? ' · ' + esc(r.states.join(", ")) : "") + read + (r.audience === "owner" ? ' · <span class="bsb bsb-market">owner only</span>' : "") + '</div>' +
+      (showPeo && peos ? '<div class="nfp">PEOs: ' + peos + '</div>' : "") + '</div></div>';
   }
   function drawNews(slug, tok) {
     sql("select * from industry_news_feed_list(90, '" + slug + "', null)", "recent news", 30000)
@@ -810,7 +823,7 @@
     $("peo").value = "";
     $("main").innerHTML = '<div class="title"><h2>Industry News Feed</h2><span class="meta">every PEO · last 90 days · newest first</span></div>' +
       '<p class="blurb">Reports, filings, deals, leadership, carrier news, and anything from NAPEO, ESAC or the IRS Certified PEO Program that touches PEOs. Every item links to its source.</p>' +
-      '<div class="upbar"><label>Show <select id="nfGroup"><option value="">everything</option><option value="reports">annual and quarterly reports</option><option value="filings">5500 filings</option><option value="deals">acquisitions and rebrands</option><option value="people">leadership and certification</option><option value="carriers">carriers</option><option value="bodies">NAPEO, ESAC and IRS CPEO</option><option value="rules">regulation</option></select></label> ' +
+      '<div class="upbar"><label>Show <select id="nfGroup"><option value="">Everything</option><option value="reports">Annual and Quarterly Reports</option><option value="filings">5500 Filings</option><option value="deals">Acquisitions and Rebrands</option><option value="people">Leadership and Certification</option><option value="carriers">Carriers</option><option value="bodies">NAPEO, ESAC and IRS CPEO</option><option value="rules">Regulation</option></select></label> ' +
       '<input id="nfQ" type="search" placeholder="Filter by PEO or word…"></div><section id="nfBody"><div class="empty">Loading…</div></section>';
     $("nfGroup").value = NEWS.group;
     $("nfGroup").onchange = function () { NEWS.group = this.value; loadNews(); };
