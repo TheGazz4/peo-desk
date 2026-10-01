@@ -750,7 +750,7 @@
         if (tok !== loadToken) return;
         var box = $("intelWinLoss"); if (!box) return;
         var j = (res.rows && res.rows[0] && res.rows[0].j) || {}, h = '<h3>Where it wins and loses clients</h3>';
-        var rt = j.retention && j.retention.display ? ['Client retention, most recent known', j.retention.display, j.retention.note || ""] : null;
+        var rt = j.retention && j.retention.display ? ['Client retention', j.retention.value || j.retention.display, j.retention.detail || j.retention.note || ""] : null;   /* v1.18: plain headline and one plain line (2317) */
         if (!j.has_data || (!(j.wins || []).length && !(j.losses || []).length)) {
           box.innerHTML = h + (rt ? '<div class="bstiles"><div class="bstile"><span class="k">' + esc(rt[0]) + '</span><b>' + esc(rt[1]) + '</b><div>' + esc(rt[2]) + '</div></div></div>' : "") + '<div class="empty">No client moves to or from other PEOs on record for this PEO yet.</div>'; return; }
         var net = Number(j.wins_total || 0) - Number(j.losses_total || 0), left = j.left_no_new_peo || {};
@@ -764,7 +764,7 @@
           '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px">' +
           '<div><h4>Wins clients from</h4>' + wlTable(j.wins || [], "PEO", "Lost back") + '</div>' +
           '<div><h4>Loses clients to</h4>' + wlTable(j.losses || [], "PEO", "Won back") + '</div></div>' +
-          '<div class="mut" style="margin-top:8px">Counts are client companies seen moving between PEOs in the 401(k) plan lists and state workers’ comp records we hold. They are floors, not totals. Top 10 each way. Last worked out ' + esc(bsDay(j.computed_at)) + '.</div>';
+          '<div class="mut" style="margin-top:8px">Counts are client companies seen moving between PEOs.</div>';
         box.innerHTML = h;
       })
       .catch(function (e) { if (tok !== loadToken) return; var box = $("intelWinLoss"); if (box) box.innerHTML = '<h3>Where it wins and loses clients</h3><div class="empty">Could not load: ' + esc(e.message) + '</div>'; });
