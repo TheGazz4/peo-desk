@@ -749,7 +749,7 @@
       .then(function (res) {
         if (tok !== loadToken) return;
         var box = $("intelWinLoss"); if (!box) return;
-        var j = (res.rows && res.rows[0] && res.rows[0].j) || {}, h = '<h3>Where it wins and loses clients</h3>';
+        var j = (res.rows && res.rows[0] && res.rows[0].j) || {}, pn = (document.querySelector("#main .title h2") || {}).textContent || "", h = '<h3>Where ' + (pn ? esc(pn) : 'it') + ' wins and loses clients</h3>';   /* v1.19: the PEO name in the heading */
         var rt = j.retention && j.retention.display ? ['Client retention', j.retention.value || j.retention.display, j.retention.detail || j.retention.note || ""] : null;   /* v1.18: plain headline and one plain line (2317) */
         if (!j.has_data || (!(j.wins || []).length && !(j.losses || []).length)) {
           box.innerHTML = h + (rt ? '<div class="bstiles"><div class="bstile"><span class="k">' + esc(rt[0]) + '</span><b>' + esc(rt[1]) + '</b><div>' + esc(rt[2]) + '</div></div></div>' : "") + '<div class="empty">No client moves to or from other PEOs on record for this PEO yet.</div>'; return; }
