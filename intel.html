@@ -1072,9 +1072,9 @@
         '<p class="rank">' + esc(rankTxt) + "</p>" +
         '<table class="calc"><tr><td>How it is calculated</td><td>' + esc(wseTxt) + " ÷ " + esc(cliTxt) + "</td></tr>" +
         (w.clients_basis === "our_records" ? '<tr><td>Caveat</td><td>We may not see every client, so the true average can be lower than shown.</td></tr>' : "") +
-        (w.believable && w.firm ? "<tr><td>Among all PEOs</td><td>Between #" + w.range_rank_best + " and #" + w.range_rank_worst + " of " + w.believable_n + " PEOs with a believable figure (most of them are estimates)</td></tr>" : "") +
-        (wt.median != null ? "<tr><td>Typical</td><td>" + n1(wt.median) + " " + esc(peerWord(wt.group).replace(/^typical /, "")) +
-          (wt.p25 != null ? " (middle half " + n1(wt.p25) + "–" + n1(wt.p75) + ")" : "") + " · industry survey FY2024</td></tr>" : "") +
+        (w.believable && w.firm ? "<tr><td>Against every PEO</td><td>Somewhere between #" + w.range_rank_best + " and #" + w.range_rank_worst + " of " + w.believable_n + " PEOs, largest average client first. Most of the others are estimates, so we cannot pin it down further.</td></tr>" : "") +
+        (wt.median != null ? "<tr><td>" + esc(peerWord(wt.group).charAt(0).toUpperCase() + peerWord(wt.group).slice(1)) + "</td><td>" + n1(wt.median) + " employees per client" +
+          (wt.p25 != null ? " (most fall between " + n1(wt.p25) + " and " + n1(wt.p75) + ")" : "") + ". Industry verified stats, FY2024.</td></tr>" : "") +   /* v1.21: plain wording, says what the typical figure is and where it comes from */
         "</table>";
     } else {
       p += '<p class="muted">Needs an employee count and at least 25 clients behind the figure.</p>';
@@ -1091,7 +1091,7 @@
         line = n0(c.clients_seen) + " current clients in our records vs " + n0(c.clients_expected) + (c.filed_qualifier === "more_than" ? "+" : "") + " the PEO reports (" + monYr(c.filed_as_of) + ").";
         if (c.over_100) line += " We show more than it reports, so some of ours have likely left.";
       } else {
-        line = n0(c.clients_seen) + " current clients in our records vs about " + n0(c.clients_expected) + " expected for its size (" + n0(c.wse_used) + " employees ÷ " + n1(c.typical_wse_per_client) + " per client, " + peerWord(c.peer_group) + ").";
+        line = n0(c.clients_seen) + " current clients in our records vs about " + n0(c.clients_expected) + " expected for its size (" + n0(c.wse_used) + " employees ÷ " + n1(c.typical_wse_per_client) + " employees per client, " + peerWord(c.peer_group) + ").";
         if (c.over_100) line += " We see more than a typical PEO its size would have: its clients may be smaller than typical, or its size figure is low.";
       }
       p += '<div class="tile" style="max-width:520px"><div class="v">' + esc(big) + '</div><div class="d">' + esc(line) + "</div></div>";
