@@ -564,9 +564,9 @@
     var box = $("profOffer"); if (!box || !BS_LAST || BS_LAST.slug !== slug) return;
     var j = BS_LAST.j, R = j.research || null, smap = bsSrcMap(R), fb = j.filed_benefits || [], off = (R && R.offerings) || [];
     if (!fb.length && !off.length) { box.innerHTML = ""; return; }
-    function card(k, text, foot) { return '<div class="ln st-yes"><span class="k">' + esc(k) + '</span><div>' + esc(text) + '</div><div class="mut">' + foot + '</div></div>'; }
-    function oc(o) { return card(o.name, o.detail, bsBasis(o.basis) + ' ' + esc(o.as_of || "") + ' · ' + bsSrc(smap, o.source, o)); }
-    var ben = fb.map(function (f) { return card(BS_LINE[f.line] || f.line, (f.carriers || []).join(", "), bsBasis("filed") + ' Schedule A, plan year ending ' + esc(bsDay(f.policy_to))); })
+    function card(k, text) { return '<div class="ln st-yes"><span class="k">' + esc(k) + '</span><div>' + esc(text) + '</div></div>'; }   /* v1.13: plain cards, category and description only (owner: no status chips, dates or links here) */
+    function oc(o) { return card(o.name, o.detail); }
+    var ben = fb.map(function (f) { return card(BS_LINE[f.line] || f.line, (f.carriers || []).join(", ")); })
       .concat(off.filter(function (o) { return o.group === "Benefits"; }).map(oc));
     var svc = off.filter(function (o) { return o.group === "Services"; }).map(oc);
     box.innerHTML = (ben.length ? '<div class="offh">Benefits offered</div><div class="lines">' + ben.join("") + '</div>' : "") +
