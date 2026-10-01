@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
+  INDUSTRY INTEL surface v1.7 (2026-09-30, Instance B mig 2299: Benefits strategy gains a "Size and count check" block - owner: "WSE count and insured can differ ... some peo's count all belly buttons insured and some count only the wse. be sure we state which". Every size fact names what it counts; a PEO whose research row carries size_check.basis = all_insured shows its carrier counts as "~WSE | total". New basis label "Owner knowledge".)
   INDUSTRY INTEL surface v1.6 (2026-09-30, Instance B mig 2295/2296: BENEFITS STRATEGY on every PEO profile - owner: "create a section on the PEO intel Profile tab called Benefits strategy ... carriers, networks and counts, how and when they distribute renewals, and a narrative". Section "Benefits strategy" reads peo_benefits_strategy_for_profile(slug): live carriers (Insured standard) + live networks + filing renewal months, plus the researched row from peo_benefits_strategy - funding, renewal calendar, where the insured sit, dated facts with basis and source, narrative, open items. ADP TotalSource is the template example (draft for owner review). Top-25 rule: peo_benefits_strategy_queue.)
   INDUSTRY INTEL surface v1.5 (2026-09-28, Instance B mig 2217: FAMILY BRAND AFFILIATION LOG on every PEO profile - owner: "confirm all family
   brands are assigned based on peo intel research of acquisitions ... that should be logged on each of the peo profile tabs". Section
@@ -88,6 +89,7 @@
   .bsb-filed { border-color: var(--good); color: var(--good); }
   .bsb-published { border-color: var(--series-1); color: var(--series-1); }
   .bsb-market, .bsb-calc { border-color: var(--warning); color: var(--warning); }
+  .bsb-owner { border-color: #9b4fd0; color: #9b4fd0; }
   .bsb-unknown { border-color: var(--serious); color: var(--serious); }
   .bsnet { margin: 0 0 4px; }
   .bsnet summary { cursor: pointer; font-size: 13.5px; padding: 5px 0; }
@@ -522,14 +524,21 @@
      (funding, renewal calendar, where the insured sit, facts, narrative, open items) comes from peo_benefits_strategy and
      shows its status - "Draft for owner review" until the owner approves. Every fact carries a basis and a date.
      Internal intel: this section is owner desk only. */
-  var BS_BASIS = { filed: "Filed", published: "Published", market: "Market intel", calc: "Our calculation", platform: "Platform record", unknown: "Not determined" };
+  var BS_BASIS = { filed: "Filed", published: "Published", market: "Market intel", calc: "Our calculation", platform: "Platform record", unknown: "Not determined", owner: "Owner knowledge" };
   var BS_MONTH = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   function bsN(v) { return v == null || v === "" || isNaN(Number(v)) ? "" : Number(v).toLocaleString("en-US"); }
   function bsBasis(b) { var k = BS_BASIS[b] ? b : "unknown"; return '<span class="bsb bsb-' + k + '">' + esc(BS_BASIS[k]) + '</span>'; }
   function bsLink(u, label) { return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(label || "Source") + ' ↗</a>' : '<span class="mut">no public link</span>'; }
   function bsDay(d) { if (!d) return ""; var t = new Date(String(d).slice(0, 10) + "T00:00:00"); return isNaN(t) ? String(d) : t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); }
   function bsSrcMap(R) { var m = {}; ((R && R.sources) || []).forEach(function (s) { m[s.id] = s; }); return m; }
-  function bsSrc(map, id) { var s = id && map[id]; return s ? bsLink(s.url, s.kind || "Source") : '<span class="mut">no source yet</span>'; }
+  function bsSrc(map, id) { var s = id && map[id]; return s ? (s.url ? bsLink(s.url, s.kind || "Source") : '<span class="mut">' + esc(s.kind || "") + '</span>') : '<span class="mut">no source yet</span>'; }
+  function bsAll(R) { return !!(R && R.size_check && R.size_check.basis === "all_insured"); }
+  function bsIns(c, R) {
+    if (!bsAll(R) || c.insured == null) return c.insured_display || bsN(c.insured);
+    var f = Number(R.size_check.family_factor) || 1.9, w = Number(c.insured) / f;
+    w = w >= 10000 ? Math.round(w / 1000) * 1000 : Math.round(w / 100) * 100;
+    return "~" + bsN(w) + " WSE | " + bsN(c.insured) + " total";
+  }
 
   function renderBenefits(j) {
     var R = j.research || null, cars = j.carriers || [], nets = j.networks || [], fm = j.filing_months || [], q = j.queue || null;
@@ -547,7 +556,7 @@
     /* tiles */
     var lead = cars[0], tiles = [];
     if (R && R.funding && R.funding.model) tiles.push(['Funding', R.funding.model, R.funding.risk || ""]);
-    if (cars.length) tiles.push(['Carriers', cars.length + ' carrier group' + (cars.length === 1 ? "" : "s"), bsN(j.total_insured) + ' insured · ' + bsN(j.total_contracts) + ' contracts · plan year ending ' + bsDay(j.policy_to)]);
+    if (cars.length) tiles.push(['Carriers', cars.length + ' carrier group' + (cars.length === 1 ? "" : "s"), bsN(j.total_insured) + ' insured' + (bsAll(R) ? ' (employees plus family)' : "") + ' · ' + bsN(j.total_contracts) + ' contracts · plan year ending ' + bsDay(j.policy_to)]);
     if (lead) tiles.push(['Lead carrier', lead.carrier, (lead.share_pct != null ? lead.share_pct + '% of the book' : "") + (cars[1] ? ' · next: ' + cars[1].carrier + ' ' + cars[1].share_pct + '%' : "")]);
     if (R && R.renewal && R.renewal.pattern) tiles.push(['Renewals', R.renewal.date || R.renewal.pattern, R.renewal.pattern + (R.renewal.plan_year ? ' · plan year ' + R.renewal.plan_year : "")]);
     else if (P && P.health_renewal_month) tiles.push(['Renewals', BS_MONTH[P.health_renewal_month] || "", 'Master contract month on the filing' + (M && M.master_plan_year ? ' · ' + M.master_plan_year : "")]);
@@ -558,15 +567,24 @@
       h += '<h4>The story</h4><div class="bsnar">' + R.narrative.map(function (p) { return '<p><b>' + esc(p.title) + '.</b> ' + esc(p.body) + '</p>'; }).join("") + '</div>';
     }
 
+    /* size and count check */
+    if (R && R.size_check && R.size_check.rows && R.size_check.rows.length) {
+      var sc = R.size_check;
+      h += '<h4>Size and count check</h4><div class="bsnar"><p><b>What the counts mean.</b> ' + esc(sc.verdict || "") + '</p></div>' +
+        '<table class="bstbl"><thead><tr><th>Measure</th><th class="num">Count</th><th>What it counts</th><th>Basis</th><th>Source</th></tr></thead><tbody>' +
+        sc.rows.map(function (r) { return '<tr><td>' + esc(r.measure) + '</td><td class="num">' + esc(r.count) + '</td><td>' + esc(r.counts) + '</td><td>' + bsBasis(r.basis) + '<div class="mut">' + esc(r.as_of || "") + '</div></td><td>' + bsSrc(smap, r.source) + '</td></tr>'; }).join("") + '</tbody></table>' +
+        (sc.reasoning && sc.reasoning.length ? '<ul class="bsopen" style="margin-top:6px">' + sc.reasoning.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' : "");
+    }
+
     /* carriers */
     if (cars.length) {
       h += '<h4>Carriers and share of the book</h4><table class="bstbl"><thead><tr><th>Carrier</th><th>Insured</th><th class="num">Share</th><th class="num">Prior year</th><th class="num">Change</th></tr></thead><tbody>' +
         cars.map(function (c) {
           var w = Math.max(2, Math.round((Number(c.share_pct) || 0) * 1.2));
           var ch = c.change_pct == null ? "" : (Number(c.change_pct) > 0 ? "+" : "") + c.change_pct + "%";
-          return '<tr><td>' + esc(c.carrier) + '</td><td>' + esc(c.insured_display || bsN(c.insured)) + '</td><td class="num"><span class="bsbar" style="width:' + w + 'px"></span>' + (c.share_pct != null ? c.share_pct + "%" : "") + '</td><td class="num">' + bsN(c.prior) + '</td><td class="num">' + esc(ch) + '</td></tr>';
+          return '<tr><td>' + esc(c.carrier) + '</td><td>' + esc(bsIns(c, R)) + '</td><td class="num"><span class="bsbar" style="width:' + w + 'px"></span>' + (c.share_pct != null ? c.share_pct + "%" : "") + '</td><td class="num">' + bsN(c.prior) + '</td><td class="num">' + esc(ch) + '</td></tr>';
         }).join("") + '</tbody></table>' +
-        '<div class="mut">Filed · Schedule A, plan year ' + esc(bsDay(j.policy_from)) + ' to ' + esc(bsDay(j.policy_to)) + '. Insured shows the filed count and the estimated side with a leading ~. Share is of all medical insured on the filing.</div>';
+        '<div class="mut">Filed · Schedule A, plan year ' + esc(bsDay(j.policy_from)) + ' to ' + esc(bsDay(j.policy_to)) + '. Insured shows the filed count and the estimated side with a leading ~. Share is of all medical insured on the filing.' + (bsAll(R) ? ' This PEO’s carriers count everyone insured, employees plus family, so the filed number is the total and the WSE side is our estimate.' : "") + '</div>';
     }
 
     /* where the insured sit */
@@ -632,7 +650,7 @@
       h += '<h4>Not determined yet</h4><ul class="bsopen">' + R.open_items.map(function (o) { return '<li><b>' + esc(o.item) + '.</b> ' + esc(o.detail) + '</li>'; }).join("") + '</ul>';
     }
     if (R && R.sources && R.sources.length) {
-      h += '<h4>Sources</h4><ul class="bsopen">' + R.sources.map(function (s) { return '<li>' + bsLink(s.url, s.label) + ' <span class="mut">· ' + esc(s.kind || "") + '</span></li>'; }).join("") + '</ul>';
+      h += '<h4>Sources</h4><ul class="bsopen">' + R.sources.map(function (s) { return '<li>' + (s.url ? bsLink(s.url, s.label) : esc(s.label)) + ' <span class="mut">· ' + esc(s.kind || "") + '</span></li>'; }).join("") + '</ul>';
     }
     h += '<div class="note">Internal intel. Filed = a government filing. Published = the PEO’s or a client’s own document. Market intel = brokers and other outside voices, never treated as fact. Anything we could not pin down is listed as not determined, not guessed.</div>';
     return h;
