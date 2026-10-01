@@ -560,6 +560,11 @@
   function bsN(v) { return v == null || v === "" || isNaN(Number(v)) ? "" : Number(v).toLocaleString("en-US"); }
   function bsBasis(b) { var k = BS_BASIS[b] ? b : "unknown"; return '<span class="bsb bsb-' + k + '">' + esc(BS_BASIS[k]) + '</span>'; }
   function bsLink(u, label) { return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(label || "Source") + ' ↗</a>' : '<span class="mut">no public link</span>'; }
+  function bsNetMeta(n) {   /* v1.25: never link to the federal filing site; no label for unnamed contracts */
+    var ef = n.evidence_type === "schedule_a" || /efast\.dol\.gov/i.test(n.source_url || "");
+    var p = [ef ? "" : bsLink(n.source_url, String(n.evidence_type || "source").replace(/_/g, " ")), n.verified_on ? "verified " + esc(bsDay(n.verified_on)) : ""].filter(Boolean);
+    return p.length ? ' <span class="mut">· ' + p.join(" · ") + '</span>' : "";
+  }
   function bsDay(d) { if (!d) return ""; var t = new Date(String(d).slice(0, 10) + "T00:00:00"); return isNaN(t) ? String(d) : t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); }
   function bsSrcMap(R) { var m = {}; ((R && R.sources) || []).forEach(function (s) { m[s.id] = s; }); return m; }
   function bsLoc(u, it) { if (!u || !it) return u; if (it.page) return u + "#page=" + it.page; if (it.frag) return u + "#:~:text=" + encodeURIComponent(it.frag); return u; }
@@ -650,7 +655,7 @@
           var ch = c.change_pct == null ? "" : (Number(c.change_pct) > 0 ? "+" : "") + c.change_pct + "%";
           return '<tr><td>' + esc(c.carrier) + '</td><td>' + esc(bsIns(c, R)) + '</td><td class="num"><span class="bsbar" style="width:' + w + 'px"></span>' + (c.share_pct != null ? c.share_pct + "%" : "") + '</td><td class="num">' + bsN(c.prior) + '</td><td class="num">' + esc(ch) + '</td></tr>';
         }).join("") + '</tbody></table>' +
-        '<div class="mut">Filed · Schedule A, plan year ' + esc(bsDay(j.policy_from)) + ' to ' + esc(bsDay(j.policy_to)) + '. Insured shows the filed count and the estimated side with a leading ~. Share is of all medical insured on the filing.' + (bsAll(R) ? ' This PEO’s carriers count everyone insured, employees plus family, so the filed number is the total and the WSE side is our estimate.' : "") + '</div>';
+        '<div class="mut">Filed · plan year ' + esc(bsDay(j.policy_from)) + ' to ' + esc(bsDay(j.policy_to)) + '. Insured shows the filed count and the estimated side with a leading ~. Share is of all medical insured on the filing.' + (bsAll(R) ? ' This PEO’s carriers count everyone insured, employees plus family, so the filed number is the total and the WSE side is our estimate.' : "") + '</div>';
     }
 
     /* where the insured sit */
@@ -663,7 +668,7 @@
           return '<tr class="grp"><td colspan="2">' + esc(c) + '</td><td class="num">' + bsN(byC[c].sum) + '</td></tr>' +
             byC[c].rows.map(function (m) { return '<tr><td title="' + esc(m.filed_as || "") + '">' + esc(m.market) + '</td><td>' + esc(m.plan_types || "") + '</td><td class="num">' + bsN(m.insured) + '</td></tr>'; }).join("");
         }).join("") + '</tbody></table>' +
-        '<div class="mut">Filed · one row per insurance contract on the Schedule A, grouped the way a member or broker sees the carrier. The market is our reading of the contract on the filing.</div>';
+        '<div class="mut">Filed · one row per insurance contract, grouped the way a member or broker sees the carrier.</div>';
     }
 
     /* networks */
@@ -677,8 +682,8 @@
           to.map(function (t) {
             return '<div class="tier">' + esc(t) + '</div>' + tiers[t].map(function (n) {
               return '<div class="nl">' + esc(n.network) + (n.plan_type && n.plan_type !== "Other" && n.plan_type !== "Unidentified" ? '<span class="pt">' + esc(n.plan_type) + '</span>' : " ") +
-                esc(n.label || "") + (n.region ? ' (' + esc(n.region) + ')' : "") + (n.insured != null ? ' (' + bsN(n.insured) + ' insured)' : "") +
-                ' <span class="mut">· ' + bsLink(n.source_url, String(n.evidence_type || "source").replace(/_/g, " ")) + (n.verified_on ? ' · verified ' + esc(bsDay(n.verified_on)) : "") + '</span></div>';
+                esc(/^contract on file$/i.test(n.label || "") ? "" : (n.label || "")) + (n.region ? ' (' + esc(n.region) + ')' : "") + (n.insured != null ? ' (' + bsN(n.insured) + ' insured)' : "") +
+                bsNetMeta(n) + '</div>';
             }).join("");
           }).join("") + '</details>';
       }).join("") +
@@ -706,7 +711,7 @@
       if (fm.length) {
         h += '<table class="bstbl" style="margin-top:8px"><thead><tr><th>Filing check: plan year</th><th>Contracts start in</th><th class="num">Contracts</th><th class="num">Insured</th></tr></thead><tbody>' +
           fm.map(function (r) { return '<tr><td>' + esc(r.plan_year) + '</td><td>' + esc(BS_MONTH[r.month] || r.month) + '</td><td class="num">' + bsN(r.contracts) + '</td><td class="num">' + bsN(r.insured) + '</td></tr>'; }).join("") + '</tbody></table>' +
-          '<div class="mut">Filed · the month each medical contract starts, from the Schedule A. This is the PEO’s contract calendar with its carriers.</div>';
+          '<div class="mut">Filed · the month each medical contract starts. This is the PEO’s contract calendar with its carriers.</div>';
       }
     }
 
@@ -722,7 +727,7 @@
     if (R && R.sources && R.sources.length) {
       h += '<h4>Sources</h4><ul class="bsopen">' + R.sources.map(function (s) { return '<li>' + (s.url ? bsLink(s.url, s.label) : esc(s.label)) + ' <span class="mut">· ' + esc(s.kind || "") + '</span>' + (bsStale(s) ? ' <span class="bsb bsb-unknown">older than 2 years, needs refresh</span>' : "") + '</li>'; }).join("") + '</ul>';
     }
-    h += '<div class="note">Internal intel. Filed = a government filing. Published = the PEO’s or a client’s own document. Market intel = what we know from the market, dated like everything else. Every source carries its date and none is more than two years old. Anything we could not pin down is listed as not determined, not guessed.</div>';
+    h += '<div class="note">Filed = a government filing. Published = the PEO’s or a client’s own document. Market intel = what we know from the market, dated like everything else. Every source carries its date and none is more than two years old. Anything we could not pin down is listed as not determined, not guessed.</div>';
     return h;
   }
 
@@ -746,7 +751,7 @@
     return '<table class="bstbl"><thead><tr><th>' + h1 + '</th><th class="num">Clients</th><th class="num">' + h2 + '</th><th class="num">Net</th></tr></thead><tbody>' +
       rows.map(function (r) {
         var net = h2 === "Lost back" ? r.n - r.other : r.other - r.n;
-        return '<tr><td><a href="#peo=' + esc(r.slug) + '">' + esc(r.name) + '</a><div class="mut">' + esc(r.window || "") + '</div></td><td class="num">' + bsN(r.n) + '</td><td class="num">' + bsN(r.other) + '</td><td class="num">' + (net > 0 ? "+" : "") + bsN(net) + '</td></tr>';
+        return '<tr><td><a href="#peo=' + esc(r.slug) + '">' + esc(r.name) + '</a></td><td class="num">' + bsN(r.n) + '</td><td class="num">' + bsN(r.other) + '</td><td class="num">' + (net > 0 ? "+" : "") + bsN(net) + '</td></tr>';
       }).join("") + '</tbody></table>';
   }
   function drawWinLoss(slug, tok) {
@@ -769,7 +774,7 @@
           '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px">' +
           '<div><h4>Wins clients from</h4>' + wlTable(j.wins || [], "PEO", "Lost back") + '</div>' +
           '<div><h4>Loses clients to</h4>' + wlTable(j.losses || [], "PEO", "Won back") + '</div></div>' +
-          '<div class="mut" style="margin-top:8px">Counts are client companies seen moving between PEOs.</div>';
+          '<div class="mut" style="margin-top:8px">Counts are client companies seen moving between PEOs, ' + (j.since ? esc(bsDay(j.since)) + ' (trailing 3 years) to present.' : 'trailing 3 years to present.') + '</div>';   /* v1.24 (2320) */
         box.innerHTML = h;
       })
       .catch(function (e) { if (tok !== loadToken) return; var box = $("intelWinLoss"); if (box) box.innerHTML = '<h3>Where it wins and loses clients</h3><div class="empty">Could not load: ' + esc(e.message) + '</div>'; });
