@@ -682,7 +682,7 @@
           to.map(function (t) {
             return '<div class="tier">' + esc(t) + '</div>' + tiers[t].map(function (n) {
               return '<div class="nl">' + esc(n.network) + (n.plan_type && n.plan_type !== "Other" && n.plan_type !== "Unidentified" ? '<span class="pt">' + esc(n.plan_type) + '</span>' : " ") +
-                esc(/^contract on file$/i.test(n.label || "") ? "" : (n.label || "")) + (n.region ? ' (' + esc(n.region) + ')' : "") + (n.insured != null ? ' (' + bsN(n.insured) + ' insured)' : "") +
+                esc(/^contract on file$/i.test(n.label || "") ? "" : String(n.label || "").replace(/^Likely Network$/i, "Inferred Network")) + (n.region ? ' (' + esc(n.region) + ')' : "") + (n.insured != null ? ' (' + bsN(n.insured) + ' insured)' : "") +
                 bsNetMeta(n) + '</div>';
             }).join("");
           }).join("") + '</details>';
