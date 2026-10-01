@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.124 (owner 2026-10-01 14:20/14:22, Instance B claim 485, on the swipe preview: "i like this - make the carriers more prominent / easy to see: also list the plans
+            right under the carriers ... Lets install this" + "make sure the aetna and united are colored in the same carrier color at the top"): SWIPE DIVIDER replaces
+            the v3.99 stripes. When network heat layers from 2+ carriers are on, a draggable vertical line splits the map: the lead carrier's layers show LEFT of it,
+            every other carrier's layers RIGHT of it - never mixed, never striped. At the top of the line each carrier gets a label filled in its own map colour
+            (UHC blue, Aetna purple ...) with its switched-on plans listed underneath by the same names and National/Regional/Local tags as the legend.
+            Drag the round handle (or focus it and use the arrow keys). Applies to every PEO and every carrier combination; same-carrier sister networks keep the
+            lighter/darker rule. Display only, no data change. Retires map-swipe-preview.html.
      v3.123 (owner 2026-10-01 13:36, Instance B): the Current Users pin icon is about 20% larger (12x17) and green (#2fbf4a). Display only.
      v3.122 (owner 2026-10-01 12:58, Instance B claim pin-icon): the Current Users button carries a small pin icon, drawn exactly like a current-user map pin, matching the ringed icon on Former Users. Display only.
      v3.121 (owner 2026-09-30 21:13, Instance B, migration 2287): joint-venture networks (Banner|Aetna, Innovation Health / Inova|Aetna, Texas Health Aetna ...) are their own network offerings, flagged jv in the catalogue, and the network panel has an "Include joint-venture networks" checkbox (on by default, so nothing changes until it is switched off). Off hides every JV layer and card and switches any JV layer that was on back off. A carrier whose only networks are JV disappears from the PEO's list while it is off.
@@ -570,6 +577,18 @@ body.panel-drag{cursor:col-resize;user-select:none}
 @media (max-width:760px){ #tablepane .thd input{width:140px} #tablepane .cov{display:none} }
 /* v3.42 network strength layer (renewal_intel 5024) */
 #netcanvas{position:absolute;left:0;top:0;pointer-events:none;z-index:4}
+#swipe{position:absolute;top:0;bottom:0;width:22px;margin-left:-11px;z-index:6;cursor:ew-resize;display:none;touch-action:none;outline:none}
+#swipe .ln{position:absolute;left:10px;top:0;bottom:0;width:2px;background:#e8e8ea;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+#swipe .kn{position:absolute;left:-4px;top:50%;width:30px;height:30px;margin-top:-15px;border-radius:50%;background:#e8e8ea;color:#1e1f24;font:700 14px/30px system-ui;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#swipe:focus-visible .kn{box-shadow:0 0 0 3px #6390ee}
+#swipe .side{position:absolute;top:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+#swipe .side.l{right:22px;align-items:flex-end} #swipe .side.r{left:22px;align-items:flex-start}
+#swipe .car{background:rgba(18,19,24,.92);border-radius:8px;overflow:hidden;min-width:170px;width:max-content;max-width:46vw;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+#swipe .car .cn{font:700 15px/1.2 system-ui;padding:7px 12px;white-space:nowrap}
+#swipe .car .pl{padding:5px 12px 7px;display:flex;flex-direction:column;gap:3px}
+#swipe .car .pr{font:500 12px/1.3 system-ui;color:#e8e8ea;display:flex;align-items:center;gap:6px;white-space:nowrap}
+#swipe .car .pr i{display:inline-block;width:9px;height:9px;border-radius:2px;flex:none}
+#swipe .car .pr .nettier{font-size:9px;color:#b9bcc4;border-color:#4a4d57}
 #netsec .netsub{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:9px 0 5px}
 .netchips{display:flex;flex-wrap:wrap;gap:5px}
 .svcn{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -605,7 +624,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.121 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.124 · 2026-10-01</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3496,17 +3515,52 @@ function drawNet(){
   N.frame={W:W,H:H,z:z,scale:scale,cx:cx,cy:cy};
   var heat=N.view==='heat'||N.view==='both', pins=N.view==='pins'||N.view==='both', lead=leadCarrier();
   pinDim(heat&&!!N.sel);   // v3.110: client pins step back while a network heat layer is on   // v3.99
+  SW.on=swipeOn(heat&&N.method==='dens',lead);   // v3.124: swipe divider (replaces the v3.99 stripes)
   N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     var col=netHex(n), rp=ramp(col);
-    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]) drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy,lead!=null&&keyCarrier(n.network_key)!==lead); }   // v3.99: other carriers draw striped
+    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]){
+      if(SW.on){ var other=keyCarrier(n.network_key)!==lead, sx=SW.f*W;   // v3.124: lead carrier left of the line, every other carrier right of it
+        nctx.save(); nctx.beginPath(); if(other) nctx.rect(sx,0,W-sx,H); else nctx.rect(0,0,sx,H); nctx.clip();
+        drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy,false); nctx.restore(); }
+      else drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy,false); } }
     else if(heat&&N.layers[n.network_key]) drawHeat(N.layers[n.network_key],rp,W,H,z,scale,cx,cy,col);
   });
   if(pins) N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     if(N.pts[n.network_key]) drawPins(N.pts[n.network_key],ramp(netHex(n)),W,H,z,scale,cx,cy,n);
   });
+  swipeUi(lead,W);
   legend();
+}
+// v3.124 (owner 2026-10-01): SWIPE DIVIDER. Lead carrier's heat LEFT of the line, every other carrier's RIGHT of it. Shown only when heat layers
+// from 2+ carriers are on. Top of the line: one label per carrier in its own map colour, its switched-on plans listed underneath by legend name.
+var SW={f:0.5,on:false};
+function otherCarriers(lead){ var cars={}; (N.cat&&N.cat.networks||[]).forEach(function(n){ if(!netVisible(n)) return; var c=keyCarrier(n.network_key); if(c) cars[c]=true; });
+  return Object.keys(cars).filter(function(c){ return c!==lead; }); }
+function swipeOn(heatOn,lead){ return !!(heatOn&&lead!=null&&otherCarriers(lead).length); }
+function swipeCard(car){
+  var lgR=function(n){ return (n.clinicians||0)+(n.hospitals||0)/1000; };
+  var nets=(N.cat.networks||[]).filter(function(n){ return netVisible(n)&&keyCarrier(n.network_key)===car; })
+    .sort(function(a,b){ var d=lgR(b)-lgR(a); return d||String(legendName(a)).localeCompare(String(legendName(b))); });   // same order as the legend
+  var hx=carrierHex(car), rgb=[1,3,5].map(function(i){ return parseInt(hx.substr(i,2),16)/255; }).map(function(v){ return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }),
+      lum=0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2], ink=lum>0.32?'#16171c':'#fff';   // dark lettering on light carrier colours (Cigna gold), white on the rest
+  return '<div class="car" style="border:2px solid '+hx+'"><div class="cn" style="background:'+hx+';color:'+ink+'">'+esc(shortCarrier(car))+'</div>'+
+    '<div class="pl">'+nets.map(function(n){ return '<div class="pr"><i style="background:'+netHex(n)+'"></i>'+esc(legendName(n))+' <span class="nettier">'+esc(n.tier)+'</span></div>'; }).join('')+'</div></div>';
+}
+function swipeUi(lead,W){
+  var el=$n('swipe');
+  if(!el){ el=document.createElement('div'); el.id='swipe'; el.tabIndex=0; el.setAttribute('role','slider'); el.setAttribute('aria-label','Carrier comparison divider');
+    el.innerHTML='<div class="ln"></div><div class="kn">⇔</div><div class="side l" id="sw-l"></div><div class="side r" id="sw-r"></div>';
+    $n('mapwrap').appendChild(el);
+    var drag=false, mv=function(e){ if(!drag) return; var r=$n('mapwrap').getBoundingClientRect(); SW.f=Math.max(0.03,Math.min(0.97,(e.clientX-r.left)/r.width)); redraw(); e.preventDefault(); };
+    el.addEventListener('pointerdown',function(e){ drag=true; try{ el.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); e.stopPropagation(); });
+    el.addEventListener('pointermove',mv); el.addEventListener('pointerup',function(){ drag=false; }); el.addEventListener('pointercancel',function(){ drag=false; });
+    el.addEventListener('keydown',function(e){ var d=e.key==='ArrowLeft'?-0.03:e.key==='ArrowRight'?0.03:0; if(!d) return; SW.f=Math.max(0.03,Math.min(0.97,SW.f+d)); redraw(); e.preventDefault(); }); }
+  el.style.display=SW.on?'block':'none'; if(!SW.on) return;
+  el.style.left=(SW.f*W)+'px'; el.setAttribute('aria-valuenow',String(Math.round(SW.f*100)));
+  var hL=swipeCard(lead), hR=otherCarriers(lead).map(swipeCard).join('');
+  if($n('sw-l').innerHTML!==hL) $n('sw-l').innerHTML=hL; if($n('sw-r').innerHTML!==hR) $n('sw-r').innerHTML=hR;
 }
 // 'dens' (previewed 2026-09-23, approved as the only heat view 2026-09-29 v3.94): network DENSITY drawn at client-pin precision.
 // Every ZIP's in-network clinician count is dropped at that ZIP's centre (no 14 sq mi cells, no 12-mile catchment), then a
@@ -3749,7 +3803,7 @@ function legend(){
   vis=vis.slice().sort(function(a,b){ var d=lgR(b)-lgR(a); return d||String(legendName(a)).localeCompare(String(legendName(b))); });
   var html='';   // v3.94: no preview banner - density is the one view
   var pp=peoOf(N.peo); if(pp) html+='<div class="netmut" style="margin-bottom:3px">'+esc(pp.peo)+'\'s plan rides:</div>';
-  var ld=leadCarrier(); if(ld&&vis.some(function(n){ return keyCarrier(n.network_key)!==ld; })) html+='<div class="netmut" style="margin-bottom:3px">Solid = '+esc(shortCarrier(ld))+' (lead carrier) · striped = another carrier, layered on top</div>';   // v3.99
+  var ld=leadCarrier(); if(ld&&vis.some(function(n){ return keyCarrier(n.network_key)!==ld; })) html+='<div class="netmut" style="margin-bottom:3px">Left of the line = '+esc(shortCarrier(ld))+' (lead carrier) · right of the line = '+esc(otherCarriers(ld).map(shortCarrier).join(' + '))+' · drag the line to compare</div>';   // v3.124 (was v3.99 stripes)
   vis.forEach(function(n){
     var rp=ramp(netHex(n));
     html+='<div class="lgrow"><i class="netsw" style="background:'+netHex(n)+'"></i><b>'+esc(legendName(n))+'</b> <span class="nettier">'+n.tier+'</span></div>'+
