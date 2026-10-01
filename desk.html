@@ -648,6 +648,8 @@ let latest = null;
 const history = new Map();         /* key -> [{t, v}] */
 
 const $ = (s) => document.querySelector(s);
+/* 2026-10-01 (owner 14:34): display-only rename - stored "Elevance / Anthem" reads "BCBS | Anthem"; "Anthem BCBS" plan names read "BCBS | Anthem" (CA "Anthem Blue Cross" unchanged). */
+const bcbsAnthem = (t) => String(t ?? "").replace(/\bElevance \/ Anthem\b/g, "BCBS | Anthem").replace(/\bAnthem \(Empire\) BCBS\b/g, "BCBS | Anthem (Empire)").replace(/\bAnthem Blue Cross Blue Shield\b/g, "BCBS | Anthem").replace(/\bAnthem BCBS\b/g, "BCBS | Anthem");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 /* ================= theme ================= */
@@ -1175,7 +1177,7 @@ function renderCarrierSupervisor(d) {
   fb.innerHTML = (row.findings || []).map((f) =>
     `<tr><td>${esc(f.check)}</td><td><span class="chip ${sev[f.severity] || ""}">${esc(f.severity)}</span></td><td class="num">${fmtN(f.n)}</td><td>${esc(f.disposition)}</td></tr>`).join("") || `<tr><td colspan="4">no findings</td></tr>`;
   const tc = m.top_carriers || [], tf = m.top_families || [];
-  $("#tblCsTop tbody").innerHTML = tc.map((x) => `<tr><td>${esc(x.carrier)}</td><td class="num">${fmtN(x.clients)}</td></tr>`).join("");
+  $("#tblCsTop tbody").innerHTML = tc.map((x) => `<tr><td>${esc(bcbsAnthem(x.carrier))}</td><td class="num">${fmtN(x.clients)}</td></tr>`).join("");
   $("#tblCsTopPeo tbody").innerHTML = tf.map((x) => `<tr><td>${esc(x.family)}</td><td class="num">${fmtN(x.clients)}</td></tr>`).join("");
   const hist = [{ run_id: row.run_id, finished_at: row.finished_at, status: row.status, inserted: r.inserted, reversions: r.reversions, current: m.current_determinations }].concat(row.history || []);
   $("#tblCsHist tbody").innerHTML = hist.slice(0, 10).map((h) =>
@@ -1194,7 +1196,7 @@ document.addEventListener("change", (e) => {
   if (latest) renderPeoNetworks(latest);
 });
 function renderPeoNetworks(d) {
-  const rows = d.desk_peo_networks?.rows || [];
+  const rows = (d.desk_peo_networks?.rows || []).map((r) => { const o = { ...r }; for (const k in o) if (typeof o[k] === "string" && !/url|link|href/i.test(k)) o[k] = bcbsAnthem(o[k]); return o; });   /* 2026-10-01: BCBS | Anthem */
   const cb = $("#pnOnlyNet"); if (cb) cb.checked = pnOnly;
   const fmtN = (v) => (v == null ? "—" : Number(v).toLocaleString());
   const pairs = new Map();

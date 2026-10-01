@@ -293,6 +293,11 @@
   function sget(k) { try { return localStorage.getItem(k); } catch (e) { return mem[k] || null; } }
   function sset(k, v) { try { localStorage.setItem(k, v); } catch (e) { mem[k] = v; } }
   var $ = function (id) { return document.getElementById(id); };
+  /* 2026-10-01 (owner 14:34: "This needs to read like BCBS | Anthem here and anywhere else we are using this carrier name"): display-only rename of the
+     stored "Elevance / Anthem" carrier label and "Anthem BCBS" plan names. California's "Anthem Blue Cross" is left as is (Blue Cross licence only). */
+  function bcbsAnthem(t) { return String(t).replace(/\bElevance \/ Anthem\b/g, "BCBS | Anthem").replace(/\bAnthem \(Empire\) BCBS\b/g, "BCBS | Anthem (Empire)").replace(/\bAnthem Blue Cross Blue Shield\b/g, "BCBS | Anthem").replace(/\bAnthem BCBS\b/g, "BCBS | Anthem"); }
+  function bcbsAnthemDeep(v) { if (typeof v === "string") return bcbsAnthem(v); if (Array.isArray(v)) return v.map(bcbsAnthemDeep);
+    if (v && typeof v === "object") { var o = {}; for (var k in v) o[k] = /url|link|href/i.test(k) ? v[k] : bcbsAnthemDeep(v[k]); return o; } return v; }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
 
   var saved = sget("desk_theme");
@@ -738,7 +743,7 @@
     sql("select peo_benefits_strategy_for_profile('" + slug + "') as j", "benefits strategy", 45000)
       .then(function (res) {
         if (tok !== loadToken) return;
-        var J = (res.rows && res.rows[0] && res.rows[0].j) || {};
+        var J = bcbsAnthemDeep((res.rows && res.rows[0] && res.rows[0].j) || {});   /* 2026-10-01: BCBS | Anthem */
         BS_LAST = { slug: slug, j: J }; bsPaintOffer(slug);
         var box = $("profBenefits"); if (!box) return;
         box.innerHTML = renderBenefits(J);
