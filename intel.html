@@ -762,8 +762,8 @@
         var t = [['Won from other PEOs', bsN(j.wins_total), 'client companies, from ' + bsN(j.wins_peos) + ' PEOs'],
                  ['Lost to other PEOs', bsN(j.losses_total), 'client companies, to ' + bsN(j.losses_peos) + ' PEOs'],
                  ['Net against other PEOs', (net > 0 ? "+" : "") + bsN(net), 'wins minus losses']];
-        if (j.open_market_wins != null) t.push(['Won from the open market', bsN(j.open_market_wins), 'clients that had their own plan before']);
-        if (left.confirmed != null) t.push(['Left, no new PEO seen', bsN(left.confirmed), 'confirmed' + (left.assumed != null ? ' · ' + bsN(left.assumed) + ' more assumed' : "")]);
+        t.push(['Won from the open market', bsN(Number(j.open_market_wins || 0)), 'client companies that had no PEO before']);   /* v1.23: shown for every PEO with data, plain statement */
+        if (left.confirmed != null) t.push(['Left, no new PEO seen', bsN(Number(left.confirmed || 0) + Number(left.assumed || 0)), 'client companies']);
         if (rt) t.unshift(rt);
         h += '<div class="bstiles">' + t.map(function (x) { return '<div class="bstile"><span class="k">' + esc(x[0]) + '</span><b>' + esc(x[1]) + '</b><div>' + esc(x[2]) + '</div></div>'; }).join("") + '</div>' +
           '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px">' +
