@@ -133,6 +133,12 @@
     { id:"window", file:"window.html", label:"The Window", hint:"owner only: any hub's tables, plus results sent to you from chat", refresh:false }
   ];
   var DEEP = { client:1, lineage:1 };   /* routes that take a record id: #/<route>?id=<uuid> */
+  var intelHash = null;   /* 2026-09-30: a link to one PEO (#peo=slug) from the news feed or anywhere opens that PEO on the Industry Intel tab */
+  function intelGo(h) {
+    var f = frames.intel;
+    if (f && f.dataset.loaded) { intelHash = null; try { f.contentWindow.location.hash = h; } catch (e) {} }
+    else intelHash = h;
+  }
   var STALE_MS = 5 * 60 * 1000;   /* a refreshable surface hidden this long reloads on return */
 
   var stage   = document.getElementById("stage");
@@ -210,6 +216,7 @@
           location.hash = "#/map?" + u.searchParams.toString();
           return;
         }
+        if (id === "intel" && /^#peo=[a-z0-9_]+$/.test(u.hash)) intelGo(u.hash.slice(1));
         location.hash = "#/" + id + (m ? "?id=" + m[1] : "");
       }
     }, true);
@@ -237,7 +244,8 @@
     var f = frames[id];
     if (!f) {
       f = document.createElement("iframe");
-      f.src = r.file + "?" + (id === "map" && mapQ ? mapQ + "&" : "") + "t=" + Date.now() + (DEEP[id] && clientParam() ? "#id=" + clientParam() : (r.frag ? "#" + r.frag : ""));
+      f.src = r.file + "?" + (id === "map" && mapQ ? mapQ + "&" : "") + "t=" + Date.now() + (DEEP[id] && clientParam() ? "#id=" + clientParam() : (r.frag ? "#" + r.frag : (id === "intel" && intelHash ? "#" + intelHash : "")));
+      if (id === "intel") intelHash = null;
       if (id === "map" && mapQ) f.dataset.q = mapQ;   /* 2026-09-30 (owner "fix the cache"): always ask for the newest copy of a surface, never a browser-saved one */
       f.title = r.label;
       f.setAttribute("allow", "clipboard-write");
