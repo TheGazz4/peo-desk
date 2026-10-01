@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
+  INDUSTRY INTEL surface v1.8 (2026-09-30, Instance B mig 2305/2306: "What this PEO offers" now lists the benefits and services the PEO offers (filed benefit lines live + researched offerings). Source currency rule - owner: "within the last 2 years ... make sure all your sources are current and credible here and always in a peo profile": every source shows its date, anything past 24 months is flagged, and the database refuses to save one. Links open the exact page (PDF #page) or the exact passage (text fragment). Intel the owner provides is labelled Market intel.)
   INDUSTRY INTEL surface v1.7 (2026-09-30, Instance B mig 2299: Benefits strategy gains a "Size and count check" block - owner: "WSE count and insured can differ ... some peo's count all belly buttons insured and some count only the wse. be sure we state which". Every size fact names what it counts; a PEO whose research row carries size_check.basis = all_insured shows its carrier counts as "~WSE | total". New basis label "Owner knowledge".)
   INDUSTRY INTEL surface v1.6 (2026-09-30, Instance B mig 2295/2296: BENEFITS STRATEGY on every PEO profile - owner: "create a section on the PEO intel Profile tab called Benefits strategy ... carriers, networks and counts, how and when they distribute renewals, and a narrative". Section "Benefits strategy" reads peo_benefits_strategy_for_profile(slug): live carriers (Insured standard) + live networks + filing renewal months, plus the researched row from peo_benefits_strategy - funding, renewal calendar, where the insured sit, dated facts with basis and source, narrative, open items. ADP TotalSource is the template example (draft for owner review). Top-25 rule: peo_benefits_strategy_queue.)
   INDUSTRY INTEL surface v1.5 (2026-09-28, Instance B mig 2217: FAMILY BRAND AFFILIATION LOG on every PEO profile - owner: "confirm all family
@@ -89,7 +90,8 @@
   .bsb-filed { border-color: var(--good); color: var(--good); }
   .bsb-published { border-color: var(--series-1); color: var(--series-1); }
   .bsb-market, .bsb-calc { border-color: var(--warning); color: var(--warning); }
-  .bsb-owner { border-color: #9b4fd0; color: #9b4fd0; }
+  .bsb-owner { border-color: var(--warning); color: var(--warning); }
+  .offh { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-muted); font-weight: 600; margin: 14px 0 6px; }
   .bsb-unknown { border-color: var(--serious); color: var(--serious); }
   .bsnet { margin: 0 0 4px; }
   .bsnet summary { cursor: pointer; font-size: 13.5px; padding: 5px 0; }
@@ -524,14 +526,35 @@
      (funding, renewal calendar, where the insured sit, facts, narrative, open items) comes from peo_benefits_strategy and
      shows its status - "Draft for owner review" until the owner approves. Every fact carries a basis and a date.
      Internal intel: this section is owner desk only. */
-  var BS_BASIS = { filed: "Filed", published: "Published", market: "Market intel", calc: "Our calculation", platform: "Platform record", unknown: "Not determined", owner: "Owner knowledge" };
+  var BS_BASIS = { filed: "Filed", published: "Published", market: "Market intel", calc: "Our calculation", platform: "Platform record", unknown: "Not determined", owner: "Market intel" };
+  var BS_LAST = null;
+  var BS_LINE = { dental: "Dental", vision: "Vision", life: "Life insurance", std: "Short-term disability", ltd: "Long-term disability" };
   var BS_MONTH = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   function bsN(v) { return v == null || v === "" || isNaN(Number(v)) ? "" : Number(v).toLocaleString("en-US"); }
   function bsBasis(b) { var k = BS_BASIS[b] ? b : "unknown"; return '<span class="bsb bsb-' + k + '">' + esc(BS_BASIS[k]) + '</span>'; }
   function bsLink(u, label) { return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(label || "Source") + ' ↗</a>' : '<span class="mut">no public link</span>'; }
   function bsDay(d) { if (!d) return ""; var t = new Date(String(d).slice(0, 10) + "T00:00:00"); return isNaN(t) ? String(d) : t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); }
   function bsSrcMap(R) { var m = {}; ((R && R.sources) || []).forEach(function (s) { m[s.id] = s; }); return m; }
-  function bsSrc(map, id) { var s = id && map[id]; return s ? (s.url ? bsLink(s.url, s.kind || "Source") : '<span class="mut">' + esc(s.kind || "") + '</span>') : '<span class="mut">no source yet</span>'; }
+  function bsLoc(u, it) { if (!u || !it) return u; if (it.page) return u + "#page=" + it.page; if (it.frag) return u + "#:~:text=" + encodeURIComponent(it.frag); return u; }
+  function bsStale(s) { if (!s || !s.dated) return false; var t = new Date(String(s.dated).slice(0, 10) + "T00:00:00"), n = new Date(); n.setMonth(n.getMonth() - 24); return t < n; }
+  function bsSrc(map, id, it) {
+    var s = id && map[id]; if (!s) return '<span class="mut">no source yet</span>';
+    var where = it && it.page ? ", page " + it.page : "";
+    return (s.url ? bsLink(bsLoc(s.url, it), (s.kind || "Source") + where) : '<span class="mut">' + esc(s.kind || "") + '</span>') + (bsStale(s) ? ' <span class="bsb bsb-unknown">older than 2 years</span>' : "");
+  }
+  function bsPaintOffer(slug) {
+    var box = $("profOffer"); if (!box || !BS_LAST || BS_LAST.slug !== slug) return;
+    var j = BS_LAST.j, R = j.research || null, smap = bsSrcMap(R), fb = j.filed_benefits || [], off = (R && R.offerings) || [];
+    if (!fb.length && !off.length) { box.innerHTML = ""; return; }
+    function card(k, text, foot) { return '<div class="ln st-yes"><span class="k">' + esc(k) + '</span><div>' + esc(text) + '</div><div class="mut">' + foot + '</div></div>'; }
+    function oc(o) { return card(o.name, o.detail, bsBasis(o.basis) + ' ' + esc(o.as_of || "") + ' · ' + bsSrc(smap, o.source, o)); }
+    var ben = fb.map(function (f) { return card(BS_LINE[f.line] || f.line, (f.carriers || []).join(", "), bsBasis("filed") + ' Schedule A, plan year ending ' + esc(bsDay(f.policy_to))); })
+      .concat(off.filter(function (o) { return o.group === "Benefits"; }).map(oc));
+    var svc = off.filter(function (o) { return o.group === "Services"; }).map(oc);
+    box.innerHTML = (ben.length ? '<div class="offh">Benefits offered</div><div class="lines">' + ben.join("") + '</div>' : "") +
+      (svc.length ? '<div class="offh">Services offered</div><div class="lines">' + svc.join("") + '</div>' : "") +
+      (off.length ? "" : '<div class="mut" style="margin-top:6px">Services and other benefits are added when this PEO is researched.</div>');
+  }
   function bsAll(R) { return !!(R && R.size_check && R.size_check.basis === "all_insured"); }
   function bsIns(c, R) {
     if (!bsAll(R) || c.insured == null) return c.insured_display || bsN(c.insured);
@@ -572,7 +595,7 @@
       var sc = R.size_check;
       h += '<h4>Size and count check</h4><div class="bsnar"><p><b>What the counts mean.</b> ' + esc(sc.verdict || "") + '</p></div>' +
         '<table class="bstbl"><thead><tr><th>Measure</th><th class="num">Count</th><th>What it counts</th><th>Basis</th><th>Source</th></tr></thead><tbody>' +
-        sc.rows.map(function (r) { return '<tr><td>' + esc(r.measure) + '</td><td class="num">' + esc(r.count) + '</td><td>' + esc(r.counts) + '</td><td>' + bsBasis(r.basis) + '<div class="mut">' + esc(r.as_of || "") + '</div></td><td>' + bsSrc(smap, r.source) + '</td></tr>'; }).join("") + '</tbody></table>' +
+        sc.rows.map(function (r) { return '<tr><td>' + esc(r.measure) + '</td><td class="num">' + esc(r.count) + '</td><td>' + esc(r.counts) + '</td><td>' + bsBasis(r.basis) + '<div class="mut">' + esc(r.as_of || "") + '</div></td><td>' + bsSrc(smap, r.source, r) + '</td></tr>'; }).join("") + '</tbody></table>' +
         (sc.reasoning && sc.reasoning.length ? '<ul class="bsopen" style="margin-top:6px">' + sc.reasoning.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join("") + '</ul>' : "");
     }
 
@@ -628,7 +651,7 @@
           (ren.varies_by ? '<p><b>What it varies by.</b> ' + esc(ren.varies_by) + '</p>' : "") + '</div>';
         if (ren.timeline && ren.timeline.length) {
           h += '<table class="bstbl"><thead><tr><th>When</th><th>What happens</th><th>Basis</th><th>Source</th></tr></thead><tbody>' +
-            ren.timeline.map(function (t) { return '<tr><td style="white-space:nowrap">' + esc(t.when) + '</td><td>' + esc(t.what) + '</td><td>' + bsBasis(t.basis) + '<div class="mut">' + esc(t.as_of || "") + '</div></td><td>' + bsSrc(smap, t.source) + '</td></tr>'; }).join("") + '</tbody></table>';
+            ren.timeline.map(function (t) { return '<tr><td style="white-space:nowrap">' + esc(t.when) + '</td><td>' + esc(t.what) + '</td><td>' + bsBasis(t.basis) + '<div class="mut">' + esc(t.as_of || "") + '</div></td><td>' + bsSrc(smap, t.source, t) + '</td></tr>'; }).join("") + '</tbody></table>';
         }
       } else if (M) {
         h += '<div class="bsnar"><p><b>Master plan year ' + esc(M.master_plan_year || "") + '.</b> ' + esc(M.client_renewal_rule || "") + ' <span class="mut">Platform record, researched ' + esc(bsDay(M.researched_at)) + '. The full renewal calendar comes with the research.</span></p></div>';
@@ -643,16 +666,16 @@
     /* facts */
     if (R && R.facts && R.facts.length) {
       h += '<h4>Facts and sources</h4><table class="bstbl"><thead><tr><th>Topic</th><th>What we know</th><th>Basis</th><th>Source</th></tr></thead><tbody>' +
-        R.facts.map(function (f) { return '<tr><td>' + esc(f.topic) + '</td><td>' + esc(f.fact) + '</td><td>' + bsBasis(f.basis) + '<div class="mut">as of ' + esc(f.as_of || "") + '</div></td><td>' + bsSrc(smap, f.source) + '</td></tr>'; }).join("") + '</tbody></table>';
+        R.facts.map(function (f) { return '<tr><td>' + esc(f.topic) + '</td><td>' + esc(f.fact) + '</td><td>' + bsBasis(f.basis) + '<div class="mut">as of ' + esc(f.as_of || "") + '</div></td><td>' + bsSrc(smap, f.source, f) + '</td></tr>'; }).join("") + '</tbody></table>';
     }
     /* open items */
     if (R && R.open_items && R.open_items.length) {
       h += '<h4>Not determined yet</h4><ul class="bsopen">' + R.open_items.map(function (o) { return '<li><b>' + esc(o.item) + '.</b> ' + esc(o.detail) + '</li>'; }).join("") + '</ul>';
     }
     if (R && R.sources && R.sources.length) {
-      h += '<h4>Sources</h4><ul class="bsopen">' + R.sources.map(function (s) { return '<li>' + (s.url ? bsLink(s.url, s.label) : esc(s.label)) + ' <span class="mut">· ' + esc(s.kind || "") + '</span></li>'; }).join("") + '</ul>';
+      h += '<h4>Sources</h4><ul class="bsopen">' + R.sources.map(function (s) { return '<li>' + (s.url ? bsLink(s.url, s.label) : esc(s.label)) + ' <span class="mut">· ' + esc(s.kind || "") + '</span>' + (bsStale(s) ? ' <span class="bsb bsb-unknown">older than 2 years, needs refresh</span>' : "") + '</li>'; }).join("") + '</ul>';
     }
-    h += '<div class="note">Internal intel. Filed = a government filing. Published = the PEO’s or a client’s own document. Market intel = brokers and other outside voices, never treated as fact. Anything we could not pin down is listed as not determined, not guessed.</div>';
+    h += '<div class="note">Internal intel. Filed = a government filing. Published = the PEO’s or a client’s own document. Market intel = what we know from the market, dated like everything else. Every source carries its date and none is more than two years old. Anything we could not pin down is listed as not determined, not guessed.</div>';
     return h;
   }
 
@@ -660,8 +683,10 @@
     sql("select peo_benefits_strategy_for_profile('" + slug + "') as j", "benefits strategy", 45000)
       .then(function (res) {
         if (tok !== loadToken) return;
+        var J = (res.rows && res.rows[0] && res.rows[0].j) || {};
+        BS_LAST = { slug: slug, j: J }; bsPaintOffer(slug);
         var box = $("profBenefits"); if (!box) return;
-        box.innerHTML = renderBenefits((res.rows && res.rows[0] && res.rows[0].j) || {});
+        box.innerHTML = renderBenefits(J);
       })
       .catch(function (e) { if (tok !== loadToken) return; var box = $("profBenefits"); if (box) box.innerHTML = '<h3>Benefits strategy</h3><div class="empty">Could not load: ' + esc(e.message) + '</div>'; });
   }
@@ -715,7 +740,7 @@
       .then(function (res) {
         if (tok !== loadToken) return;
         var rows = res.rows || [], box = $("profLines"); if (!box) return;
-        if (!rows.length) { box.innerHTML = '<h3>What this PEO offers</h3><div class="empty">Not on the PEO directory list.</div>'; return; }
+        if (!rows.length) { box.innerHTML = '<h3>What this PEO offers</h3><div class="empty">Not on the PEO directory list.</div><div id="profOffer"></div>'; bsPaintOffer(slug); return; }
         box.innerHTML = '<h3>What this PEO offers</h3><div class="lines">' + rows.map(function (r) {
           var cls = LN_CLASS[r.state] || "unk";
           return '<div class="ln st-' + cls + '"><span class="k">' + (r.line === "medical" ? "Group medical" : "Workers' comp") + '</span>' +
@@ -723,7 +748,8 @@
             (r.rule ? '<div>' + esc(r.rule) + '</div>' : "") +
             (r.note && !/^Researched 2026-09-24 \(company website/.test(r.note) ? '<div class="mut">' + esc(r.note) + '</div>' : "") +
             '<div class="mut">' + lnProof(r) + (r.confidence ? ' · ' + esc(CONF_WORD[r.confidence] || r.confidence) : "") + '</div></div>';
-        }).join("") + '</div>';
+        }).join("") + '</div><div id="profOffer"></div>';
+        bsPaintOffer(slug);
       })
       .catch(function (e) { if (tok !== loadToken) return; var box = $("profLines"); if (box) box.innerHTML = '<h3>What this PEO offers</h3><div class="empty">Could not load: ' + esc(e.message) + '</div>'; });
   }
