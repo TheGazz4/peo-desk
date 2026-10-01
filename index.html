@@ -127,6 +127,7 @@
     { id:"send",   file:"send.html",   label:"Send Desk",     hint:"outbound gate + lanes",       refresh:true  },
     { id:"review", file:"review.html", label:"Review",        hint:"adjudication queue",          refresh:false },
     { id:"intel",  file:"intel.html",  label:"Industry Intel", hint:"pick a PEO: industry yardsticks + full profile", refresh:false },
+    { id:"news",   file:"intel.html",  frag:"news", label:"Industry News Feed", hint:"news that touches PEOs, carriers and the industry: what happened and why it matters", refresh:false },
     { id:"client", file:"client.html", label:"Client Lifecycle", hint:"one company: lifecycle story, PEO periods, renewal clock", refresh:false },
     { id:"lineage", file:"lineage.html", label:"Record Lineage", hint:"owner only: latest 100 appended records; where each record came from and every append since", refresh:false },
     { id:"window", file:"window.html", label:"The Window", hint:"owner only: any hub's tables, plus results sent to you from chat", refresh:false }
@@ -200,6 +201,7 @@
       if (u.origin !== location.origin) return;
       var file = u.pathname.split("/").pop();
       var id = FILE2ID[file];
+      if (id === "intel" && u.hash === "#news") id = "news";   /* 2026-09-30: "All industry news" links open the Industry News Feed tab */
       if (id) {
         e.preventDefault();
         var m = DEEP[id] ? (u.hash || "").match(/id=([0-9a-f-]{36})/i) : null;
@@ -235,7 +237,7 @@
     var f = frames[id];
     if (!f) {
       f = document.createElement("iframe");
-      f.src = r.file + "?" + (id === "map" && mapQ ? mapQ + "&" : "") + "t=" + Date.now() + (DEEP[id] && clientParam() ? "#id=" + clientParam() : "");
+      f.src = r.file + "?" + (id === "map" && mapQ ? mapQ + "&" : "") + "t=" + Date.now() + (DEEP[id] && clientParam() ? "#id=" + clientParam() : (r.frag ? "#" + r.frag : ""));
       if (id === "map" && mapQ) f.dataset.q = mapQ;   /* 2026-09-30 (owner "fix the cache"): always ask for the newest copy of a surface, never a browser-saved one */
       f.title = r.label;
       f.setAttribute("allow", "clipboard-write");
@@ -261,7 +263,7 @@
     if (frames[current]) { loading.classList.add("show"); frames[current].contentWindow.location.reload(); }
   };
   document.getElementById("popBtn").onclick = function () {
-    var r = route(current); if (r) window.open(r.file + (DEEP[current] && clientParam() ? "#id=" + clientParam() : ""), "_blank", "noopener");
+    var r = route(current); if (r) window.open(r.file + (DEEP[current] && clientParam() ? "#id=" + clientParam() : (r.frag ? "#" + r.frag : "")), "_blank", "noopener");
   };
 
   /* ---------- keyboard 1..6 ---------- */
