@@ -583,6 +583,7 @@
   function bsPaintOffer(slug) {
     var box = $("profOffer"); if (!box || !BS_LAST || BS_LAST.slug !== slug) return;
     var j = BS_LAST.j, R = j.research || null, smap = bsSrcMap(R), fb = j.filed_benefits || [], off = (R && R.offerings) || [];
+    var lf = $("lnFund"); if (lf) { var fc = R && R.funding && (R.funding.card || R.funding.model); lf.textContent = fc ? "Funding: " + fc : ""; }
     if (!fb.length && !off.length) { box.innerHTML = ""; return; }
     function card(k, text) { return '<div class="ln st-yes"><span class="k">' + svcIcon(k) + esc(k) + '</span><div>' + esc(fixCase(text)) + '</div></div>'; }   /* v1.13: plain cards, category and description only (owner: no status chips, dates or links here) */
     function oc(o) { return card(o.name, o.detail); }
@@ -681,7 +682,7 @@
     }
 
     /* renewals */
-    var ren = R && R.renewal;
+    var ren = R && R.renewal && (R.renewal.pattern || R.renewal.statement) ? R.renewal : null;
     if (ren || fm.length || M) {
       h += '<h4>How and when renewals are distributed</h4>';
       var rd = j.defaults && j.defaults.renewal_release;
@@ -895,9 +896,7 @@
           var cls = LN_CLASS[r.state] || "unk";
           return '<div class="ln st-' + cls + '"><span class="k">' + svcIcon(r.line === "medical" ? "Group medical" : "Workers comp") + (r.line === "medical" ? "Group medical" : "Workers' comp") + '</span>' +
             '<b>' + esc(r.label || "") + '</b>' +
-            (r.rule ? '<div>' + esc(r.rule) + '</div>' : "") +
-            (r.note && !/^Researched 2026-09-24 \(company website/.test(r.note) ? '<div class="mut">' + esc(r.note) + '</div>' : "") +
-            '<div class="mut">' + lnProof(r) + (r.confidence ? ' · ' + esc(CONF_WORD[r.confidence] || r.confidence) : "") + '</div></div>';
+            (r.line === "medical" ? '<div class="mut" id="lnFund"></div>' : "") + '</div>';   /* v1.20 (owner): the card shows what the PEO offers and, for health, its funding model - no filing, count or proof lines */
         }).join("") + '</div><div id="profOffer"></div>';
         bsPaintOffer(slug);
       })
