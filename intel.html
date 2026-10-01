@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
+  INDUSTRY INTEL surface v1.9 (2026-09-30, Instance B mig 2307: Benefits strategy renewals block says when renewals reach clients. A researched PEO shows its own timing; every other PEO shows the owner default - renewals surface 60 to 90 days before the renewal date - until client feedback and research on that PEO firm it up. The first-year note (two rate sets, rate lock) is shown.)
   INDUSTRY INTEL surface v1.8 (2026-09-30, Instance B mig 2305/2306: "What this PEO offers" now lists the benefits and services the PEO offers (filed benefit lines live + researched offerings). Source currency rule - owner: "within the last 2 years ... make sure all your sources are current and credible here and always in a peo profile": every source shows its date, anything past 24 months is flagged, and the database refuses to save one. Links open the exact page (PDF #page) or the exact passage (text fragment). Intel the owner provides is labelled Market intel.)
   INDUSTRY INTEL surface v1.7 (2026-09-30, Instance B mig 2299: Benefits strategy gains a "Size and count check" block - owner: "WSE count and insured can differ ... some peo's count all belly buttons insured and some count only the wse. be sure we state which". Every size fact names what it counts; a PEO whose research row carries size_check.basis = all_insured shows its carrier counts as "~WSE | total". New basis label "Owner knowledge".)
   INDUSTRY INTEL surface v1.6 (2026-09-30, Instance B mig 2295/2296: BENEFITS STRATEGY on every PEO profile - owner: "create a section on the PEO intel Profile tab called Benefits strategy ... carriers, networks and counts, how and when they distribute renewals, and a narrative". Section "Benefits strategy" reads peo_benefits_strategy_for_profile(slug): live carriers (Insured standard) + live networks + filing renewal months, plus the researched row from peo_benefits_strategy - funding, renewal calendar, where the insured sit, dated facts with basis and source, narrative, open items. ADP TotalSource is the template example (draft for owner review). Top-25 rule: peo_benefits_strategy_queue.)
@@ -646,9 +647,13 @@
     var ren = R && R.renewal;
     if (ren || fm.length || M) {
       h += '<h4>How and when renewals are distributed</h4>';
+      var rd = j.defaults && j.defaults.renewal_release;
+      if (rd && rd.text && !(ren && ren.release)) h += '<div class="bsnar"><p><b>When renewals reach clients.</b> ' + esc(rd.text) + ' ' + bsBasis("market") + '</p></div>';
       if (ren) {
         h += '<div class="bsnar"><p><b>' + esc(ren.pattern || "") + (ren.date ? ': ' + esc(ren.date) : "") + '.</b> ' + esc(ren.statement || "") + '</p>' +
-          (ren.varies_by ? '<p><b>What it varies by.</b> ' + esc(ren.varies_by) + '</p>' : "") + '</div>';
+          (ren.varies_by ? '<p><b>What it varies by.</b> ' + esc(ren.varies_by) + '</p>' : "") +
+          (ren.release ? '<p><b>When renewals reach clients.</b> ' + esc(ren.release) + ' ' + bsBasis("market") + '</p>' : "") +
+          (ren.first_year ? '<p><b>The first year.</b> ' + esc(ren.first_year) + ' ' + bsBasis("market") + '</p>' : "") + '</div>';
         if (ren.timeline && ren.timeline.length) {
           h += '<table class="bstbl"><thead><tr><th>When</th><th>What happens</th><th>Basis</th><th>Source</th></tr></thead><tbody>' +
             ren.timeline.map(function (t) { return '<tr><td style="white-space:nowrap">' + esc(t.when) + '</td><td>' + esc(t.what) + '</td><td>' + bsBasis(t.basis) + '<div class="mut">' + esc(t.as_of || "") + '</div></td><td>' + bsSrc(smap, t.source, t) + '</td></tr>'; }).join("") + '</tbody></table>';
