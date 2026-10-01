@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.121 (owner 2026-09-30 21:13, Instance B, migration 2287): joint-venture networks (Banner|Aetna, Innovation Health / Inova|Aetna, Texas Health Aetna ...) are their own network offerings, flagged jv in the catalogue, and the network panel has an "Include joint-venture networks" checkbox (on by default, so nothing changes until it is switched off). Off hides every JV layer and card and switches any JV layer that was on back off. A carrier whose only networks are JV disappears from the PEO's list while it is off.
      v3.120 (owner 2026-09-30 19:03, Instance B claim 467, migration 2313): time with the current PEO beside the company name on the hover and the record card, e.g. "ABC Plumbing (2.9 yrs)"; "+" = at least that long; blank when not provable (Keystone feed key "ten"). The record card now shows Benefits renewal only (never WC renewal), and only when known.
      v3.119 (owner 2026-09-30 16:54, Instance B): new checkbox "Include records with International HQ" (on by default, so the map is unchanged). Off hides companies whose headquarters is outside the US (their US locations still map otherwise). Both servers bake the flag (key ih; migration 9020); the Keystone feed carries no HQ country yet, so it flags none. URL ih=0 when off.
      v3.118 (owner 2026-09-30, Instance B): every remaining toggle and selection now says what it is refining - Data feed, Relationship chips, Employees chips, the three checkboxes (Administrative Beacons, Multi-state, Multi-location), the PEOs list, States, and Network strength view. One muted line under each, kept current by a light 0.5s refresh so saved links, Reset and All/None buttons are all reflected.
@@ -602,7 +603,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.120 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.121 · 2026-09-30</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3050,7 +3051,7 @@ var CARRIER_HEX={aetna:'#9b4fd0',unitedhealthcare:'#2f7fe0',uhc:'#2f7fe0',oxford
 var BAND_NAMES=['Thin','Moderate','Solid','Strong'];
 var BAND_RANGE=['under 35%','35–44%','45–54%','55%+'];
 var N={method:'dens',   // v3.94 (owner 2026-09-29 10:47): one heat method - where each network's contracted clinicians practise (density); the share-of-registered view is gone
-cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],
+cat:null,view:'off',nets:{},tiers:{national:true,regional:true,local:true},bands:[true,true,true,true],jv:true,   // v3.121: include joint-venture networks
        layers:{},pts:{},loading:{},carriersOff:{},hover:null,peo:null,sel:null,on:{},note:null,car:null,pt:{}};
 var NET_MAX_ON=4;
 // v3.83 (owner 2026-09-28 16:39): progressive, indented tree - carrier > plan type > network toggles. SAMPLE on ADP TotalSource > Aetna;
@@ -3066,8 +3067,9 @@ window.NETSTATE=N;
 // v3.87: full Reset hook - everything in the network panel back to its defaults (layers off; tiers and bands all on)
 window.netReset=function(){
   N.on={}; N.peo=null; N.sel=null; N.car=null; N.note=null; N.carriersOff={}; N.hover=null;
-  N.tiers={national:true,regional:true,local:true}; N.bands=[true,true,true,true];
+  N.tiers={national:true,regional:true,local:true}; N.bands=[true,true,true,true]; N.jv=true;
   try{ [].forEach.call($n('nettiers').children,function(b){ b.classList.add('on'); }); }catch(_){}
+  try{ [].forEach.call($n('netjvchips').children,function(b){ b.classList.add('on'); }); }catch(_){}
   try{ setView('off'); }catch(_){}
   try{ if(N.cat){ renderCarriers(); renderList(); } }catch(_){}
 };
@@ -3117,6 +3119,8 @@ function buildSection(){
      '<div class="netsub" title="Pick a PEO, open a carrier, then switch each of its networks on or off (up to 4 layers at once, from any of its carriers). Each carrier keeps its colour; sister networks of one carrier get their own shade. The heat map is always tied to a PEO\'s plan.">PEO plan · network</div><div id="netlist"></div>'+
      '<div class="netsub">Plan reach</div><div class="netchips" id="nettiers">'+
        '<span class="netchip on" data-t="national">National</span><span class="netchip on" data-t="regional">Regional</span><span class="netchip on" data-t="local">Local</span></div>'+
+     '<div class="netsub">Joint ventures</div><div class="netchips" id="netjvchips">'+
+       '<span class="netchip on" data-jv="1" title="Carrier + health-system joint ventures (Banner|Aetna, Innovation Health / Inova|Aetna, Texas Health Aetna ...) are narrow networks built around one health system. Switch off to analyse only the carriers\' standard networks.">Include joint-venture networks</span></div>'+
    '</div>';
   var anchor=$n('states'); anchor=anchor?anchor.parentNode:null;
   if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec,anchor); else $n('panel').appendChild(sec);
@@ -3175,6 +3179,9 @@ function buildSection(){
     var pn=$n('panel'); if(pn) pn.addEventListener('scroll',hide,{passive:true});
   })();
   $n('nettiers').addEventListener('click',function(e){ var t=e.target.dataset&&e.target.dataset.t; if(!t) return; N.tiers[t]=!N.tiers[t]; e.target.classList.toggle('on',N.tiers[t]); renderList(); redraw(); });
+  // v3.121: include / exclude joint-venture networks everywhere in the network analysis (list, layers, legend, pins)
+  $n('netjvchips').addEventListener('click',function(e){ if(!(e.target.dataset&&e.target.dataset.jv)) return; N.jv=!N.jv; e.target.classList.toggle('on',N.jv);
+    pruneOn(); N.note=null; try{ renderCarriers(); }catch(_){} renderList(); ensureData(); redraw(); });
   var cv=document.createElement('canvas'); cv.id='netcanvas'; $n('mapwrap').insertBefore(cv,$n('pincanvas'));
   var lg=document.createElement('div'); lg.id='netlegend'; $n('mapwrap').appendChild(lg);
 }
@@ -3268,7 +3275,7 @@ function peoOf(slug,cat){ return (((cat||N.cat)||{}).peos||[]).filter(function(p
 // for all carriers"): when a PEO is selected, every carrier with a map starts with ONE layer on - its PPO network with the most contracted
 // clinicians (no PPO on file -> its most robust network). Carriers are taken in plan-share order until the cross-carrier cap is reached.
 function carrierDefault(c,cat){ var best=null, bestV=-1, bestPPO=false;
-  (c.networks||[]).forEach(function(x){ if(!x.mapped) return; var k=x.map_key||x.network_key, m=netMeta(k,cat); if(!k||!m) return;
+  (c.networks||[]).forEach(function(x){ if(!x.mapped) return; var k=x.map_key||x.network_key, m=netMeta(k,cat); if(!k||!m||(!N.jv&&m.jv)) return;
     var v=(m.clinicians||0)+(m.hospitals||0)/1000, ppo=/^ppo$/i.test(x.plan_type||'');
     if((ppo&&!bestPPO)||(ppo===bestPPO&&v>bestV)){ best=k; bestV=v; bestPPO=ppo; } });
   return best; }
@@ -3285,23 +3292,26 @@ function defaultOn(slug,cat){ var p=peoOf(slug,cat); N.on={}; N.sel=null; if(!p)
     N.on[k]=true; if(!N.sel) N.sel=k; n++; } }
 function leadCarrier(){ var ks=onKeys(); return ks.length?keyCarrier(ks[0]):null; }
 function alsoOnPlan(p){ var on={}; onKeys().forEach(function(k){ on[keyCarrier(k)]=true; });
-  return (p.carriers||[]).filter(function(c){ return !on[c.carrier]&&!N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return x.mapped; }); })
+  return (p.carriers||[]).filter(function(c){ return !on[c.carrier]&&!N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return x.mapped&&!jvHidden(x.map_key||x.network_key); }); })
     .sort(function(a,b){ return (b.share_pct||0)-(a.share_pct||0); }).slice(0,3); }
 function firstMapped(slug,cat){ var p=peoOf(slug,cat); if(!p) return null;
   for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if(N.carriersOff[c.carrier]) continue;
-    for(var j=0;j<(c.networks||[]).length;j++){ var x=c.networks[j]; if(x.mapped&&(x.map_key||x.network_key)) return x.map_key||x.network_key; } }
+    for(var j=0;j<(c.networks||[]).length;j++){ var x=c.networks[j]; if(x.mapped&&(x.map_key||x.network_key)&&!jvHidden(x.map_key||x.network_key)) return x.map_key||x.network_key; } }
   return null; }
 // v3.78 (owner 2026-09-28, Instance B): every network is its own ON/OFF toggle (checkbox), up to NET_MAX_ON at once, from any of the
 // selected PEO's carriers. N.on = {network_key:true}. N.sel = the last one switched on (drives the carrier auto-open only).
 function onKeys(){ return Object.keys(N.on).filter(function(k){ return N.on[k]; }); }
-function keyAllowed(key){ var p=peoOf(N.peo); if(!p) return false; return (p.carriers||[]).some(function(c){ return !N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return (x.map_key||x.network_key)===key&&x.mapped; }); }); }
+// v3.121: a joint-venture network (catalogue flag jv) is hidden everywhere while "Include joint-venture networks" is off
+function isJvKey(k){ var m=k?netMeta(k):null; return !!(m&&m.jv); }
+function jvHidden(k){ return !N.jv&&isJvKey(k); }
+function keyAllowed(key){ if(jvHidden(key)) return false; var p=peoOf(N.peo); if(!p) return false; return (p.carriers||[]).some(function(c){ return !N.carriersOff[c.carrier]&&(c.networks||[]).some(function(x){ return (x.map_key||x.network_key)===key&&x.mapped; }); }); }
 // v3.92 (owner 2026-09-29 10:09: "the exception should be if its the same carrier so we can understand their full breadth of coverage"):
 // the NET_MAX_ON cap applies ACROSS carriers; any number of one carrier's own networks may be on together.
 function keyCarrier(k){ var p=peoOf(N.peo); if(!p) return null; for(var i=0;i<(p.carriers||[]).length;i++){ var c=p.carriers[i]; if((c.networks||[]).some(function(x){ return (x.map_key||x.network_key)===k; })) return c.carrier; } return null; }
 function capHit(k){ var on=onKeys(); if(on.length<NET_MAX_ON) return false; var c=keyCarrier(k); return !(c&&on.every(function(o){ return keyCarrier(o)===c; })); }
 function pruneOn(){ onKeys().forEach(function(k){ if(!keyAllowed(k)) delete N.on[k]; }); N.sel=onKeys().slice(-1)[0]||null; }
 function selAllowed(){ return !!N.sel&&keyAllowed(N.sel); }
-function netVisible(n){ return !!N.on[n.network_key] && N.tiers[n.tier]!==false; }
+function netVisible(n){ return !!N.on[n.network_key] && N.tiers[n.tier]!==false && !(n.jv&&!N.jv); }
 // each carrier keeps its own colour; a second/third network of the SAME carrier gets its own shade of that hue
 function hslToHex(h,s,l){ s/=100; l/=100; var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2, r=0,g=0,b=0;
   if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
@@ -3326,7 +3336,11 @@ function renderList(){
   var peos=(N.cat&&N.cat.peos)||[];
   if(!peos.length){ box.innerHTML='<div class="netmut">No PEO plan networks identified yet.</div>'; return; }
   peos.forEach(function(p){
-    var cars=(p.carriers||[]).filter(function(c){ return !N.carriersOff[c.carrier] && ((c.networks||[]).length || (c.lives||0)>=1000); });
+    // v3.121: with "Include joint-venture networks" off, JV networks leave every card list; a carrier with only JV networks leaves with them
+    var cars=(p.carriers||[]).map(function(c){ if(N.jv||!(c.networks||[]).some(function(x){ return isJvKey(x.map_key||x.network_key); })) return c;
+        var keep=(c.networks||[]).filter(function(x){ return !isJvKey(x.map_key||x.network_key); }); if(!keep.length) return null;
+        var c2={}; for(var q in c) c2[q]=c[q]; c2.networks=keep; return c2; })
+      .filter(function(c){ return c && !N.carriersOff[c.carrier] && ((c.networks||[]).length || (c.lives||0)>=1000); });
     if(!cars.some(function(c){ return (c.networks||[]).length; })) return;
     var open=N.peo===p.family_slug, ready=0;
     cars.forEach(function(c){ (c.networks||[]).forEach(function(x){ if(x.mapped) ready++; }); });
