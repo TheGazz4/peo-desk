@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.128 (owner 2026-10-01 16:00 "how do we solve for map visibility when we turn each carrier all the way on" -> 16:01 "ok, do it", Instance B): three fixes.
+            (1) A carrier label on the swipe line with more than 3 plans on folds to one line ("BCBS | Anthem · 25 plans · 16 states"); click to list every plan, click to fold.
+            (2) The legend has ONE entry per carrier with one colour bar (every plan uses the same scale) and "N plans" that unfolds to the names; a Minimise button
+            shrinks the legend to one line. (3) Several plans of one carrier are painted as ONE heat layer in the carrier's colour, each spot showing the STRONGEST
+            plan there (a max, never a sum) - overlapping plans (GA PPO + HMO + EPO) no longer stack into a falsely dark spot. One plan per carrier draws exactly as
+            before (pixel-checked). Both data feeds. Display only.
      v3.127 (owner 2026-10-01 14:41, Instance B): the Current Users pin icon is red (#e5332a). Display only.
      v3.126 (owner 2026-10-01 14:34: "This needs to read like BCBS | Anthem here and anywhere else we are using this carrier name. Also at the plan detail level make it
             read BCBS | Anthem as well (where both need to be present)"; 14:35: "make sure all this feedback is incorporated and build onto the keystone map"):
@@ -596,12 +602,17 @@ body.panel-drag{cursor:col-resize;user-select:none}
 #swipe:focus-visible .kn{box-shadow:0 0 0 3px #6390ee}
 #swipe .side{position:absolute;top:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 #swipe .side.l{right:22px;align-items:flex-end} #swipe .side.r{left:22px;align-items:flex-start}
-#swipe .car{background:rgba(18,19,24,.92);border-radius:8px;overflow:hidden;min-width:170px;width:max-content;max-width:46vw;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+#swipe .car{pointer-events:auto;cursor:pointer;background:rgba(18,19,24,.92);border-radius:8px;overflow:hidden;min-width:170px;width:max-content;max-width:46vw;box-shadow:0 2px 10px rgba(0,0,0,.5)}
 #swipe .car .cn{font:700 15px/1.2 system-ui;padding:7px 12px;white-space:nowrap}
 #swipe .car .pl{padding:5px 12px 7px;display:flex;flex-direction:column;gap:3px}
 #swipe .car .pr{font:500 12px/1.3 system-ui;color:#e8e8ea;display:flex;align-items:center;gap:6px;white-space:nowrap}
 #swipe .car .pr i{display:inline-block;width:9px;height:9px;border-radius:2px;flex:none}
 #swipe .car .pr .nettier{font-size:9px;color:#b9bcc4;border-color:#4a4d57}
+#swipe .car .tg2{font:600 11px/1.3 system-ui;color:#9fb4ff;margin-top:2px}
+#netlegend .lgtop{display:flex;align-items:center;gap:8px;margin-bottom:3px}#netlegend .lgtop .netmut{flex:1}
+#netlegend .lgbtn{font:inherit;font-size:11px;line-height:1;padding:3px 7px;border-radius:6px;cursor:pointer;color:var(--ink2);background:transparent;border:1px solid var(--border)}
+#netlegend .lgbtn:hover{color:var(--ink,#fff)}#netlegend .lgcar{cursor:pointer;user-select:none}#netlegend .lgcar .lgcnt{font-weight:500;color:var(--ink2)}
+#netlegend .lgplans{margin:2px 0 4px 14px}#netlegend .lgplans div{font-size:11.5px;line-height:1.45}
 #netsec .netsub{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:9px 0 5px}
 .netchips{display:flex;flex-wrap:wrap;gap:5px}
 .svcn{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -637,7 +648,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.126 · 2026-10-01</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.128 · 2026-10-01</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -3553,16 +3564,21 @@ function drawNet(){
   var heat=N.view==='heat'||N.view==='both', pins=N.view==='pins'||N.view==='both', lead=leadCarrier();
   pinDim(heat&&!!N.sel);   // v3.110: client pins step back while a network heat layer is on   // v3.99
   SW.on=swipeOn(heat&&N.method==='dens',lead);   // v3.124: swipe divider (replaces the v3.99 stripes)
+  // v3.128: in density view each carrier is painted ONCE - one plan draws as before (its own shade); several plans of the same carrier merge into one
+  // layer in the carrier's colour, strongest plan per spot. Swipe divider: lead carrier left of the line, every other carrier right of it (v3.124).
+  var dGroups={}, dOrder=[];
   N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     var col=netHex(n), rp=ramp(col);
-    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]){
-      if(SW.on){ var other=keyCarrier(n.network_key)!==lead, sx=SW.f*W;   // v3.124: lead carrier left of the line, every other carrier right of it
-        nctx.save(); nctx.beginPath(); if(other) nctx.rect(sx,0,W-sx,H); else nctx.rect(0,0,sx,H); nctx.clip();
-        drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy,false); nctx.restore(); }
-      else drawDensity(N.pts[n.network_key],rp,W,H,z,scale,cx,cy,false); } }
+    if(heat&&N.method==='dens'){ if(N.pts[n.network_key]){ var car=keyCarrier(n.network_key)||n.network_key;
+        if(!dGroups[car]){ dGroups[car]=[]; dOrder.push(car); } dGroups[car].push(n); } }
     else if(heat&&N.layers[n.network_key]) drawHeat(N.layers[n.network_key],rp,W,H,z,scale,cx,cy,col);
   });
+  dOrder.forEach(function(car){ var ns=dGroups[car];
+    if(SW.on){ var sx=SW.f*W; nctx.save(); nctx.beginPath(); if(car!==lead) nctx.rect(sx,0,W-sx,H); else nctx.rect(0,0,sx,H); nctx.clip(); }
+    if(ns.length===1) drawDensity(N.pts[ns[0].network_key],ramp(netHex(ns[0])),W,H,z,scale,cx,cy);
+    else drawDensityGroup(ns.map(function(n){ return N.pts[n.network_key]; }),ramp(carrierHex(car)),W,H,z,scale,cx,cy);
+    if(SW.on) nctx.restore(); });
   if(pins) N.cat.networks.forEach(function(n){
     if(!netVisible(n)) return;
     if(N.pts[n.network_key]) drawPins(N.pts[n.network_key],ramp(netHex(n)),W,H,z,scale,cx,cy,n);
@@ -3572,7 +3588,7 @@ function drawNet(){
 }
 // v3.124 (owner 2026-10-01): SWIPE DIVIDER. Lead carrier's heat LEFT of the line, every other carrier's RIGHT of it. Shown only when heat layers
 // from 2+ carriers are on. Top of the line: one label per carrier in its own map colour, its switched-on plans listed underneath by legend name.
-var SW={f:0.5,on:false};
+var SW={f:0.5,on:false,open:{}};
 function otherCarriers(lead){ var cars={}; (N.cat&&N.cat.networks||[]).forEach(function(n){ if(!netVisible(n)) return; var c=keyCarrier(n.network_key); if(c) cars[c]=true; });
   return Object.keys(cars).filter(function(c){ return c!==lead; }); }
 function swipeOn(heatOn,lead){ return !!(heatOn&&lead!=null&&otherCarriers(lead).length); }
@@ -3582,8 +3598,14 @@ function swipeCard(car){
     .sort(function(a,b){ var d=lgR(b)-lgR(a); return d||String(legendName(a)).localeCompare(String(legendName(b))); });   // same order as the legend
   var hx=carrierHex(car), rgb=[1,3,5].map(function(i){ return parseInt(hx.substr(i,2),16)/255; }).map(function(v){ return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }),
       lum=0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2], ink=lum>0.32?'#16171c':'#fff';   // dark lettering on light carrier colours (Cigna gold), white on the rest
-  return '<div class="car" style="border:2px solid '+hx+'"><div class="cn" style="background:'+hx+';color:'+ink+'">'+esc(shortCarrier(car))+'</div>'+
-    '<div class="pl">'+nets.map(function(n){ return '<div class="pr"><i style="background:'+netHex(n)+'"></i>'+esc(legendName(n))+' <span class="nettier">'+esc(n.tier)+'</span></div>'; }).join('')+'</div></div>';
+  // v3.128: more than 3 plans on -> the label folds to a one-line summary ("25 plans · 16 states"); click it to list every plan, click again to fold
+  var many=nets.length>3, open=!many||!!SW.open[car], sw=nets.length>1?hx:null, sts={};
+  nets.forEach(function(n){ var m=/\(([A-Z]{2})\)/.exec(legendName(n)); if(m) sts[m[1]]=1; });
+  var ns=Object.keys(sts).length, sum=nets.length+' plans'+(ns?' · '+ns+' state'+(ns>1?'s':''):'');
+  var body=open?nets.map(function(n){ return '<div class="pr"><i style="background:'+(sw||netHex(n))+'"></i>'+esc(legendName(n))+' <span class="nettier">'+esc(n.tier)+'</span></div>'; }).join('')+(many?'<div class="tg2">Hide plans ▴</div>':'')
+    :'<div class="pr"><i style="background:'+hx+'"></i>'+esc(sum)+'</div><div class="tg2">Show plans ▾</div>';
+  return '<div class="car" data-car="'+esc(car)+'" title="'+(many?(open?'Click to fold the plan list':'Click to list every plan'):'')+'" style="border:2px solid '+hx+'"><div class="cn" style="background:'+hx+';color:'+ink+'">'+esc(shortCarrier(car))+'</div>'+
+    '<div class="pl">'+body+'</div></div>';
 }
 function swipeUi(lead,W){
   var el=$n('swipe');
@@ -3591,7 +3613,9 @@ function swipeUi(lead,W){
     el.innerHTML='<div class="ln"></div><div class="kn">⇔</div><div class="side l" id="sw-l"></div><div class="side r" id="sw-r"></div>';
     $n('mapwrap').appendChild(el);
     var drag=false, mv=function(e){ if(!drag) return; var r=$n('mapwrap').getBoundingClientRect(); SW.f=Math.max(0.03,Math.min(0.97,(e.clientX-r.left)/r.width)); redraw(); e.preventDefault(); };
-    el.addEventListener('pointerdown',function(e){ drag=true; try{ el.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); e.stopPropagation(); });
+    el.addEventListener('click',function(e){ var cd=e.target&&e.target.closest?e.target.closest('.car'):null; if(!cd) return;   // v3.128: fold / unfold a carrier label
+      var car=cd.getAttribute('data-car'); SW.open[car]=!SW.open[car]; redraw(); });
+    el.addEventListener('pointerdown',function(e){ if(e.target&&e.target.closest&&e.target.closest('.car')) return; drag=true; try{ el.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); e.stopPropagation(); });
     el.addEventListener('pointermove',mv); el.addEventListener('pointerup',function(){ drag=false; }); el.addEventListener('pointercancel',function(){ drag=false; });
     el.addEventListener('keydown',function(e){ var d=e.key==='ArrowLeft'?-0.03:e.key==='ArrowRight'?0.03:0; if(!d) return; SW.f=Math.max(0.03,Math.min(0.97,SW.f+d)); redraw(); e.preventDefault(); }); }
   el.style.display=SW.on?'block':'none'; if(!SW.on) return;
@@ -3627,15 +3651,25 @@ function fitNet(k){
 }
 var NET_JUMP={us:[24.3,-125.5,49.6,-66.5],hi:[18.8,-160.4,22.3,-154.7],ak:[54.5,-168,71.5,-140]};
 function netJump(j){ var r=NET_JUMP[j]; if(!r||!S.map||typeof google==='undefined') return; S.map.fitBounds(new google.maps.LatLngBounds({lat:r[0],lng:r[1]},{lat:r[2],lng:r[3]}),{top:20,right:20,bottom:20,left:20}); }
-function drawDensity(P,rp,W,H,z,scale,cx,cy,hatch){
-  if(!P||!P.mx) return;
+// v3.128 (owner 2026-10-01 16:01 "ok, do it" on the all-plans-on visibility fixes): the density layer is split into geometry / field / paint so several plans of ONE
+// carrier can be painted as ONE layer. drawDensityGroup takes, at every spot, the STRONGEST plan's density (a max, never a sum), so a carrier's footprint never
+// looks denser than any single one of its networks really is (the Georgia PPO + HMO + EPO used to stack three see-through layers).
+function densGeom(W,H,z,scale,cy,small){
   var lat=Math.atan(Math.sinh(Math.PI*(1-2*cy))), pxKm=scale/(40075.017*Math.cos(lat));
-  var small=netSmall(P), spx=Math.max(8*Math.pow(2,0.45*(z-4.6)),1.2*pxKm); if(small) spx=Math.max(1.2*pxKm,Math.min(spx,15*pxKm));
+  var spx=Math.max(8*Math.pow(2,0.45*(z-4.6)),1.2*pxKm); if(small) spx=Math.max(1.2*pxKm,Math.min(spx,15*pxKm));
   var G=Math.max(3,Math.min(16,Math.round(spx/5))), sig=spx/G;
-  var pad=Math.ceil(3*sig*(small?1.8:1))+2, ow=Math.ceil(W/G), oh=Math.ceil(H/G), gw=ow+2*pad, gh=oh+2*pad, n=gw*gh;
-  if(!HB.A||HB.A.length<n){ HB.A=new Float32Array(n); HB.B=new Float32Array(n); HB.T=new Float32Array(n); }
-  var A=HB.A; A.fill(0,0,n);
-  var sg=scale/G;
+  var pad=Math.ceil(3*sig*(small?1.8:1))+2, ow=Math.ceil(W/G), oh=Math.ceil(H/G), gw=ow+2*pad, gh=oh+2*pad;
+  return {G:G,sig:sig,pad:pad,ow:ow,oh:oh,gw:gw,gh:gh,n:gw*gh,sg:scale/G,k2:(pxKm/G)*(pxKm/G)};
+}
+function densBuffers(g){
+  if(!HB.A||HB.A.length<g.n){ HB.A=new Float32Array(g.n); HB.B=new Float32Array(g.n); HB.T=new Float32Array(g.n); }
+  if(!HB.D||HB.D.length<g.ow*g.oh) HB.D=new Float32Array(g.ow*g.oh);
+  HB.D.fill(0,0,g.ow*g.oh); return HB.D;
+}
+// clinicians per sq km of one network on grid g, max-combined into D (one cell per output pixel)
+function densField(P,g,cx,cy,D){
+  if(!P||!P.mx) return;
+  var small=netSmall(P), A=HB.A, gw=g.gw, gh=g.gh, ow=g.ow, oh=g.oh, pad=g.pad, sg=g.sg, sig=g.sig; A.fill(0,0,g.n);
   for(var j=0;j<P.n;j++){
     if(P.k[j]===1) continue;
     var c=+P.nc[j]; if(!(c>0)) continue;
@@ -3645,40 +3679,50 @@ function drawDensity(P,rp,W,H,z,scale,cx,cy,hatch){
     A[i]+=c*(1-fx)*(1-fy); A[i+1]+=c*fx*(1-fy); A[i+gw]+=c*(1-fx)*fy; A[i+gw+1]+=c*fx*fy;
   }
   gaussBlur(A,HB.T,gw,gh,sig);
-  if(!off||off.width!==ow||off.height!==oh){ off=off||document.createElement('canvas'); off.width=ow; off.height=oh; octx=off.getContext('2d'); HB.img=null; }
-  if(!HB.img) HB.img=octx.createImageData(ow,oh);
-  var d=HB.img.data, pal=heatPalette(rp), k2=(pxKm/G)*(pxKm/G);   // grid px^2 per km^2
   // v3.109 (owner 2026-09-30: Kaiser Hawaii "i dont believe its reflecting correctly"): a regional network (one HMO's service area, a few hundred ZIPs) tops out at a
   // few clinicians per sq km, so against the national scale its islands/cities washed out. Networks of <=400 points are lifted (max 12x) so their busiest spot reads strong.
   var bst=1, Bp=null, pinv=0;
   if(small){   // base tint: presence of any in-network ZIP, blurred wider than the density so a thin island still reads as covered
-    Bp=HB.B; Bp.fill(0,0,gw*gh); pinv=2*Math.PI*Math.pow(1.8*sig,2)/0.35;
+    Bp=HB.B; Bp.fill(0,0,g.n); pinv=2*Math.PI*Math.pow(1.8*sig,2)/0.35;
     for(var j2=0;j2<P.n;j2++){ var gx2=(P.mx[j2]-cx)*sg+ow/2+pad, gy2=(P.my[j2]-cy)*sg+oh/2+pad; if(gx2<0||gy2<0||gx2>=gw-1||gy2>=gh-1) continue;
       var x2=gx2|0, y2=gy2|0, fx2=gx2-x2, fy2=gy2-y2, i2=y2*gw+x2;
       Bp[i2]+=(1-fx2)*(1-fy2); Bp[i2+1]+=fx2*(1-fy2); Bp[i2+gw]+=(1-fx2)*fy2; Bp[i2+gw+1]+=fx2*fy2; }
-    gaussBlur(Bp,HB.T,gw,gh,sig*1.8); }
-  if(small){ var pk=0; for(var yy=0;yy<oh;yy++){ var rr=(yy+pad)*gw+pad; for(var xx=0;xx<ow;xx++){ if(A[rr+xx]>pk) pk=A[rr+xx]; } }
-    pk*=k2; if(pk>0&&pk<10) bst=Math.min(12,10/pk); }
-  for(var y=0;y<oh;y++){
-    var row=(y+pad)*gw+pad, p=y*ow*4;
+    gaussBlur(Bp,HB.T,gw,gh,sig*1.8);
+    var pk=0; for(var yy=0;yy<oh;yy++){ var rr=(yy+pad)*gw+pad; for(var xx=0;xx<ow;xx++){ if(A[rr+xx]>pk) pk=A[rr+xx]; } }
+    pk*=g.k2; if(pk>0&&pk<10) bst=Math.min(12,10/pk); }
+  for(var y=0;y<oh;y++){ var row=(y+pad)*gw+pad, o=y*ow;
+    for(var x=0;x<ow;x++){ var dens=A[row+x]*g.k2*bst; if(Bp){ var fl=Bp[row+x]*pinv; if(fl>0.05){ fl=Math.min(1,fl)*0.6; if(fl>dens) dens=fl; } }
+      if(dens>D[o+x]) D[o+x]=dens; } }
+}
+// Colour and opacity both follow log10(in-network clinicians per sq km): 0.003 -> invisible, 30+ -> deepest.
+function densPaint(D,g,rp,W,H,cx,cy,scale){
+  var ow=g.ow, oh=g.oh, G=g.G;
+  if(!off||off.width!==ow||off.height!==oh){ off=off||document.createElement('canvas'); off.width=ow; off.height=oh; octx=off.getContext('2d'); HB.img=null; }
+  if(!HB.img) HB.img=octx.createImageData(ow,oh);
+  var d=HB.img.data, pal=heatPalette(rp);
+  for(var y=0;y<oh;y++){ var o=y*ow, p=o*4;
     for(var x=0;x<ow;x++,p+=4){
-      var dens=A[row+x]*k2*bst; if(Bp){ var fl=Bp[row+x]*pinv; if(fl>0.05){ fl=Math.min(1,fl)*0.6; if(fl>dens) dens=fl; } } if(dens<0.003){ d[p+3]=0; continue; }
+      var dens=D[o+x]; if(dens<0.003){ d[p+3]=0; continue; }
       var L10=Math.log(dens)/Math.LN10;
       var I=Math.round(Math.max(0,Math.min(100,(L10+1.5)*100/3))*2.55)*4;
       var c2=Math.min(1,Math.max(0,(L10+2.5)/2)), cov=c2*c2*(3-2*c2);
       d[p]=pal[I]; d[p+1]=pal[I+1]; d[p+2]=pal[I+2]; d[p+3]=Math.round(pal[I+3]*cov);
-    }
-  }
+    } }
   octx.putImageData(HB.img,0,0);
   nctx.save();
   if(heatClip(W,H,cx,cy,scale)) nctx.clip('evenodd');
   nctx.imageSmoothingEnabled=true; nctx.imageSmoothingQuality='high';
   nctx.drawImage(off,0,0,ow,oh,0,0,ow*G,oh*G);
-  if(hatch){   // v3.99: a second carrier's layer is striped (diagonal gaps cut out of the heat) so it reads as layered over the lead carrier
-    nctx.globalCompositeOperation='destination-out'; nctx.strokeStyle='rgba(0,0,0,.72)'; nctx.lineWidth=7;
-    nctx.beginPath(); for(var q=-H;q<W+H;q+=18){ nctx.moveTo(q,0); nctx.lineTo(q+H,H); } nctx.stroke();
-    nctx.globalCompositeOperation='source-over'; }
   nctx.restore();
+}
+function drawDensity(P,rp,W,H,z,scale,cx,cy){   // one network (the v3.99 hatch argument is retired - v3.124 swipe divider)
+  if(!P||!P.mx) return;
+  var g=densGeom(W,H,z,scale,cy,netSmall(P)), D=densBuffers(g); densField(P,g,cx,cy,D); densPaint(D,g,rp,W,H,cx,cy,scale);
+}
+function drawDensityGroup(Ps,rp,W,H,z,scale,cx,cy){   // several plans of ONE carrier, painted once (strongest plan per spot)
+  Ps=Ps.filter(function(P){ return P&&P.mx; }); if(!Ps.length) return;
+  var g=densGeom(W,H,z,scale,cy,Ps.every(netSmall)), D=densBuffers(g);
+  Ps.forEach(function(P){ densField(P,g,cx,cy,D); }); densPaint(D,g,rp,W,H,cx,cy,scale);
 }
 function drawHeat(L,rp,W,H,z,scale,cx,cy,col){
   // v3.46 (owner 2026-09-23: "research how REAL heat maps are drawn ... this is just a series of dots").
@@ -3831,6 +3875,10 @@ function drawPins(P,rp,W,H,z,scale,cx,cy,net){
 }
 function legend(){
   var lg=$n('netlegend'); if(!lg) return;
+  if(!lg.__wired){ lg.__wired=true; N.lgOpen=N.lgOpen||{};   // v3.128: minimise + fold/unfold a carrier's plan list
+    lg.addEventListener('click',function(e){ var t=e.target&&e.target.closest?e.target.closest('[data-act]'):null; if(!t) return; e.stopPropagation();
+      if(t.getAttribute('data-act')==='min') N.lgMin=!N.lgMin; else { var c=t.getAttribute('data-car'); N.lgOpen[c]=!N.lgOpen[c]; }
+      legend(); }); }
   if(!N.cat||N.view==='off'){ lg.style.display='none'; return; }
   var vis=(N.cat.networks||[]).filter(netVisible);
   if(!vis.length){ lg.style.display='none'; return; }
@@ -3839,18 +3887,31 @@ function legend(){
   var lgR=function(n){ return (n.clinicians||0)+(n.hospitals||0)/1000; };
   vis=vis.slice().sort(function(a,b){ var d=lgR(b)-lgR(a); return d||String(legendName(a)).localeCompare(String(legendName(b))); });
   var html='';   // v3.94: no preview banner - density is the one view
-  var pp=peoOf(N.peo); if(pp) html+='<div class="netmut" style="margin-bottom:3px">'+esc(pp.peo)+'\'s plan rides:</div>';
-  var ld=leadCarrier(); if(ld&&vis.some(function(n){ return keyCarrier(n.network_key)!==ld; })) html+='<div class="netmut" style="margin-bottom:3px">Left of the line = '+esc(shortCarrier(ld))+' (lead carrier) · right of the line = '+esc(otherCarriers(ld).map(shortCarrier).join(' + '))+' · drag the line to compare</div>';   // v3.124 (was v3.99 stripes)
-  vis.forEach(function(n){
-    var rp=ramp(netHex(n));
-    html+='<div class="lgrow"><i class="netsw" style="background:'+netHex(n)+'"></i><b>'+esc(legendName(n))+'</b> <span class="nettier">'+n.tier+'</span></div>'+
-      '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div>'+
-      '<div class="lgscale"><span>Few</span><span>Some</span><span>Many</span><span>Most</span></div>'+
-      '<div class="netmut" title="Carrier network file '+fmtDate(n.data_as_of)+' · provider registry '+fmtDate(n.registry_as_of)+'. Both refresh automatically every month.">Current as of '+fmtMonth(n.data_as_of,n.registry_as_of)+' · updates monthly</div>';
-    if(N.frame&&N.view!=='pins') html+='<div class="netmut">Heat blends the ~'+Math.max(1,Math.round(Math.min(heatSpan(N.frame.z,N.frame.cy,N.frame.scale).km,netSmall(N.pts[n.network_key])?15:1e9)*2*0.621))+' mi around each spot at this zoom (zoom in for street-level detail)</div>';
-    if(N.loading['h'+n.network_key]||N.loading['p'+n.network_key]) html+='<div class="netmut">loading…</div>';
-  });
-  html+='<div class="netmut" style="margin-top:4px">Deeper colour = more of this network\'s contracted clinicians practising nearby (clinicians per sq mi, from the carrier\'s own federal network file). Each network is drawn on the same scale.</div>';
+  // v3.128 (owner 2026-10-01 16:01): ONE legend entry per carrier. Every plan is drawn on the same scale, so a carrier with several plans on gets one colour bar
+  // (its combined layer) and a "N plans" line that unfolds to the plan names; a single plan reads as before. The whole legend can be minimised to one line.
+  var pp=peoOf(N.peo), dens=N.method==='dens', nOn=vis.length;
+  var groups={}, gOrder=[]; vis.forEach(function(n){ var c=keyCarrier(n.network_key)||n.network_key; if(!groups[c]){ groups[c]=[]; gOrder.push(c); } groups[c].push(n); });
+  html+='<div class="lgtop"><span class="netmut">'+(pp?esc(pp.peo)+'\'s plan rides':'Networks on')+(N.lgMin?' · '+nOn+' plan'+(nOn>1?'s':'')+' on, '+gOrder.length+' carrier'+(gOrder.length>1?'s':''):':')+'</span>'+
+    '<button type="button" class="lgbtn" data-act="min" title="'+(N.lgMin?'Show the legend':'Minimise the legend')+'">'+(N.lgMin?'Show ▴':'Minimise ▾')+'</button></div>';
+  if(!N.lgMin){
+    var ld=leadCarrier(); if(ld&&vis.some(function(n){ return keyCarrier(n.network_key)!==ld; })) html+='<div class="netmut" style="margin-bottom:3px">Left of the line = '+esc(shortCarrier(ld))+' (lead carrier) · right of the line = '+esc(otherCarriers(ld).map(shortCarrier).join(' + '))+' · drag the line to compare</div>';   // v3.124 (was v3.99 stripes)
+    var bar=function(hx){ var rp=ramp(hx); return '<div class="lgbar" style="background:linear-gradient(90deg,'+rp[5]+','+rp[35]+','+rp[60]+','+rp[85]+','+rp[100]+')"></div><div class="lgscale"><span>Few</span><span>Some</span><span>Many</span><span>Most</span></div>'; };
+    var asOf=function(ns){ var d=[], r=[]; ns.forEach(function(n){ if(n.data_as_of) d.push(String(n.data_as_of)); if(n.registry_as_of) r.push(String(n.registry_as_of)); }); d.sort(); r.sort();
+      return '<div class="netmut" title="Carrier network file '+fmtDate(d[d.length-1])+' · provider registry '+fmtDate(r[r.length-1])+'. Both refresh automatically every month.">Current as of '+fmtMonth(d[d.length-1],r[r.length-1])+' · updates monthly</div>'; };
+    gOrder.forEach(function(c){ var ns=groups[c];
+      if(ns.length===1){ var n=ns[0];
+        html+='<div class="lgrow"><i class="netsw" style="background:'+netHex(n)+'"></i><b>'+esc(legendName(n))+'</b> <span class="nettier">'+n.tier+'</span></div>'+bar(netHex(n))+asOf(ns);
+        return; }
+      var hx=carrierHex(c), op=!!(N.lgOpen&&N.lgOpen[c]);
+      html+='<div class="lgrow lgcar" data-act="grp" data-car="'+esc(c)+'" title="'+(op?'Fold the plan list':'List every plan')+'"><i class="netsw" style="background:'+hx+'"></i><b>'+esc(shortCarrier(c))+'</b> <span class="lgcnt">· '+ns.length+' plans '+(op?'▴':'▾')+'</span></div>'+bar(dens?hx:netHex(ns[0]));
+      if(op) html+='<div class="lgplans">'+ns.map(function(n){ return '<div>'+esc(legendName(n))+' <span class="nettier">'+esc(n.tier)+'</span></div>'; }).join('')+'</div>';
+      html+=asOf(ns)+(dens?'<div class="netmut">Plans combined: each spot shows the strongest of these '+ns.length+' networks</div>':'');
+    });
+    var f0=vis[0];
+    if(N.frame&&N.view!=='pins'&&f0) html+='<div class="netmut" style="margin-top:3px">Heat blends the ~'+Math.max(1,Math.round(Math.min(heatSpan(N.frame.z,N.frame.cy,N.frame.scale).km,netSmall(N.pts[f0.network_key])?15:1e9)*2*0.621))+' mi around each spot at this zoom (zoom in for street-level detail)</div>';
+    if(vis.some(function(n){ return N.loading['h'+n.network_key]||N.loading['p'+n.network_key]; })) html+='<div class="netmut">loading…</div>';
+    html+='<div class="netmut" style="margin-top:4px">Deeper colour = more of this network\'s contracted clinicians practising nearby (clinicians per sq mi, from the carrier\'s own federal network file). Each network is drawn on the same scale.</div>';
+  }
   if(N.hover) html+='<div class="lghover">'+N.hover+'</div>';
   lg.innerHTML=html; lg.style.display='block';
 }
