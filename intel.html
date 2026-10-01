@@ -753,7 +753,7 @@
   /* ---------- 2310: industry news feed (route #news) + recent news per PEO + reviews and NPS ----------
      industry_news_feed_list(days, slug, group): dated items with a title, one line on why it matters, the number that
      matters and a link to the exact source. Items tagged owner only are not for users. */
-  var NF_KIND = { annual_report: "Annual report", quarterly_report: "Quarterly report", earnings: "Results", "5500_filing": "5500 filing", acquisition: "Acquisition", rebrand: "Rebrand", leadership: "Leadership", certification: "Certification", regulation: "Regulation", carrier_network: "Carrier network", carrier_market: "Carrier market", carrier_rates: "Carrier rates", carrier_change: "Carrier change", other: "Other" };
+  var NF_KIND = { annual_report: "Annual report", quarterly_report: "Quarterly report", earnings: "Results", "5500_filing": "5500 filing", acquisition: "Acquisition", rebrand: "Rebrand", leadership: "Leadership", certification: "Certification", regulation: "Regulation", carrier_network: "Carrier network", carrier_market: "Carrier market", carrier_rates: "Carrier rates", carrier_change: "Carrier change", napeo: "NAPEO", esac: "ESAC", irs_cpeo: "IRS CPEO program", other: "Other" };
   var NEWS = { rows: [], group: "", q: "" };
   function nfItem(r, showPeo) {
     var peos = (r.peos || []).map(function (p) { return '<a href="#peo=' + esc(p.slug) + '">' + esc(p.name) + '</a>'; }).join(", ");
@@ -778,9 +778,9 @@
     current = null; ++loadToken;
     try { if (location.hash !== "#news") history.replaceState(null, "", "#news"); } catch (e) { /* ignore */ }
     $("peo").value = "";
-    $("main").innerHTML = '<div class="title"><h2>Industry news feed</h2><span class="meta">every PEO · last 90 days · newest first</span></div>' +
-      '<p class="blurb">Reports, filings, deals, leadership and carrier news that touch PEOs. Every item links to its source.</p>' +
-      '<div class="upbar"><label>Show <select id="nfGroup"><option value="">everything</option><option value="reports">annual and quarterly reports</option><option value="filings">5500 filings</option><option value="deals">acquisitions and rebrands</option><option value="people">leadership and certification</option><option value="carriers">carriers</option><option value="rules">regulation</option></select></label> ' +
+    $("main").innerHTML = '<div class="title"><h2>Industry News Feed</h2><span class="meta">every PEO · last 90 days · newest first</span></div>' +
+      '<p class="blurb">Reports, filings, deals, leadership, carrier news, and anything from NAPEO, ESAC or the IRS Certified PEO Program that touches PEOs. Every item links to its source.</p>' +
+      '<div class="upbar"><label>Show <select id="nfGroup"><option value="">everything</option><option value="reports">annual and quarterly reports</option><option value="filings">5500 filings</option><option value="deals">acquisitions and rebrands</option><option value="people">leadership and certification</option><option value="carriers">carriers</option><option value="bodies">NAPEO, ESAC and IRS CPEO</option><option value="rules">regulation</option></select></label> ' +
       '<input id="nfQ" type="search" placeholder="Filter by PEO or word…"></div><section id="nfBody"><div class="empty">Loading…</div></section>';
     $("nfGroup").value = NEWS.group;
     $("nfGroup").onchange = function () { NEWS.group = this.value; loadNews(); };
