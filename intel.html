@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
+  INDUSTRY INTEL surface v1.28 (2026-10-01, Instance B claim 483, owner: "make them load faster"): the News Feed and the PEO in the link (or the last one opened) start loading immediately, alongside the PEO list, instead of after it. Content and layout unchanged. (Paired with migration 9023: the Industry Intel panel's client ranking is read from a saved table refreshed every 10 minutes.)
   INDUSTRY INTEL surface v1.12 (2026-09-30, Instance B, owner: "in all instances on the peo profiles - this specific link needs to take the user back to the map and auto-display only that PEO's current customers on the map"). Both "See <PEO> on the map" links (listed PEO, and "part of <PEO>" for acquired/older entities) now go to map.html?grain=brand&on=<slug> in the SAME window, no new tab: inside the platform the shell reloads the Coverage Map tab clean with only that PEO switched on (PEO-specific view, current customers only, every other filter at default); opened on its own it lands on index.html#/map with the same settings. Shell: index.html map view links (#/map?<settings>).
   INDUSTRY INTEL surface v1.11 (2026-09-30, Instance B mig 2310: INDUSTRY NEWS FEED - owner: "an industry news feed view for our users ... quarterly reports, 5500 filings, anything important impacting the peos, the industry or carriers", title plus why it matters, same day. Header button "News feed" (route #news, industry_news_feed_list) and "Recent news" on each PEO's Intel tab. Profile tab gains "Reviews and NPS" (peo_reputation_for_profile). The wins and losses block shows the most recent known client retention.)
   INDUSTRY INTEL surface v1.10 (2026-09-30, Instance B mig 2308: owner - "where a peo wins from and losses clients to should be at or near the top of the Intel tab ... make sure profile related things are profile and intel related things are intel". The Intel tab now leads with "Where it wins and loses clients" (peo_win_loss_for_intel), then Benefits strategy (moved from the Profile tab), then the existing panel in #intelBody. Profile tab keeps who the PEO is: facts, what it offers, 5500 filings, family, events, profile text.)
@@ -308,6 +309,7 @@
   var ALL = [];
   var current = null;
   var loadToken = 0;
+  var PENDING = null;   /* v1.28: a PEO opened before the PEO list arrived; its name and map links are filled in when the list lands */
 
   /* ---------- PEO logos (owner 2026-09-24: see each PEO's logo on its profile) ----------
      Same source as the Coverage Map chips: map-data mode=logos_all = every saved logo (pub.map_logos <- peo_logo_registry,
@@ -402,8 +404,9 @@
         ALL.sort(function (a, b) { return String(a.peo_name).toLowerCase().localeCompare(String(b.peo_name).toLowerCase()) || String(a.family_slug).localeCompare(String(b.family_slug)); });
         drawOptions();
         setStatus(ALL.length.toLocaleString() + " PEOs · same list as the map filter");
+        if (PENDING) { finishEarly(); return; }   /* v1.28: the page already opened early - just finish it */
         if (location.hash === "#upcoming") { showUpcoming(); return; }
-        if (location.hash === "#news") { showNews(); return; }
+        if (location.hash === "#news") { if (!NEWS.shown) showNews(); return; }
         var want = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1] || sget("intel_last_peo");
         if (want) { if (ALL.some(function (r) { return r.family_slug === want; })) $("peo").value = want; open(want); }
         else showUpcoming();
@@ -446,7 +449,10 @@
     sset("intel_last_peo", slug);
     try { history.replaceState(null, "", "#peo=" + slug); } catch (e) { /* ignore */ }
     var tok = ++loadToken;
-    var row = ALL.filter(function (r) { return r.family_slug === slug; })[0] || { peo_name: slug };
+    var row = ALL.filter(function (r) { return r.family_slug === slug; })[0];
+    var early = !ALL.length;   /* v1.28: the PEO list is not in yet - open straight away and finish the header when it lands */
+    if (row) sset("intel_last_name", slug + "|" + row.peo_name);
+    else { var ln = String(sget("intel_last_name") || "").split("|"); row = { peo_name: early ? (ln[0] === slug && ln[1] ? ln.slice(1).join("|") : "Loading…") : slug }; }
     $("main").innerHTML =
       '<div class="title"><span class="plogo" id="pLogo"></span><h2>' + esc(row.peo_name) + '</h2><span class="meta" id="titleMeta"></span></div>' +
       '<div class="dirlinks" id="dirLinks"></div>' +
@@ -471,7 +477,7 @@
     });
     setStatus("loading " + row.peo_name + "…");
     drawLogo(slug, row.peo_name, tok);
-    drawDirLinks(slug, row, tok);
+    if (early) PENDING = { slug: slug, tok: tok }; else drawDirLinks(slug, row, tok);
     drawFamily(slug, tok);
     drawEvents(slug, tok);
     drawLines(slug, tok);
@@ -823,6 +829,7 @@
       .catch(function (e) { if (tok !== loadToken) return; var box = $("intelNews"); if (box) box.innerHTML = '<h3>Recent news</h3><div class="empty">Could not load: ' + esc(e.message) + '</div>'; });
   }
   function showNews() {
+    NEWS.shown = true; PENDING = null;
     current = null; ++loadToken;
     try { if (location.hash !== "#news") history.replaceState(null, "", "#news"); } catch (e) { /* ignore */ }
     $("peo").value = "";
@@ -1395,7 +1402,23 @@
   $("newsBtn").onclick = function () { if (location.hash === "#news") showNews(); else location.hash = "news"; };
 
   /* ---------- start ---------- */
-  if (!KEY) askKey(); else loadList();
+  /* v1.28 (owner 2026-10-01 "make them load faster"): the news feed, or the PEO in the link / last opened, starts loading
+     at once, alongside the PEO list, instead of waiting for the list. finishEarly() fills in the name and map links when the list lands. */
+  function finishEarly() {
+    var p = PENDING; PENDING = null;
+    if (!p || p.tok !== loadToken || current !== p.slug) return;
+    var row = ALL.filter(function (r) { return r.family_slug === p.slug; })[0];
+    if (row) { $("peo").value = p.slug; sset("intel_last_name", p.slug + "|" + row.peo_name); }
+    var h2 = document.querySelector(".title h2"); if (h2) h2.textContent = row ? row.peo_name : p.slug;
+    drawDirLinks(p.slug, row || { peo_name: p.slug }, p.tok);
+  }
+  function startEarly() {
+    if (location.hash === "#news") { showNews(); return; }
+    if (location.hash === "#upcoming") return;
+    var want = (location.hash.match(/peo=([a-z0-9_]+)/) || [])[1] || sget("intel_last_peo");
+    if (want) open(want);
+  }
+  if (!KEY) askKey(); else { startEarly(); loadList(); }
 })();
 </script>
 </body>
