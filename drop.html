@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keystone Drop Box</title>
+<!--
+  KEYSTONE DROP BOX — Instance B, 2026-09-30, claim 469, migrations 2319/2321/2323.
+  Owner 2026-09-30 20:00-20:02 MST: "the wiring to make the data free flow into the tables and map is a big deal - lets fix asap";
+  "we only use data that comes through the data door and keystone"; "no more copying in - it flows properly and auto-updates".
+  Florida's Digital Download asks a person to prove they are not a robot, so the owner downloads the state's .xlsx files and drops them here.
+  Each file goes straight to storage keystone-intake/fl_wc/<date>/ (signed upload from edge function ks-drop, x-desk-key).
+  Every 5 minutes cron ks_fl_wc_flow registers it, ks-fl-wc-load sends every row through the Keystone door, matching is queued,
+  and the 15-minute rebake carries it to the map. Status: The Window -> Product 2.0 -> "Keystone — Florida comp intake".
+-->
+<style>
+  :root { color-scheme:dark; --surface-1:#1a1a19; --page:#0d0d0d; --ink-1:#fff; --ink-2:#c3c2b7; --ink-muted:#898781;
+          --grid:#2c2c2a; --border:rgba(255,255,255,.10); --accent:#3987e5; --good:#0ca30c; --warning:#fab219; --critical:#d03b3b; }
+  :root[data-theme="light"] { color-scheme:light; --surface-1:#fcfcfb; --page:#f9f9f7; --ink-1:#0b0b0b; --ink-2:#52514e;
+          --ink-muted:#898781; --grid:#e1e0d9; --border:rgba(11,11,11,.10); --accent:#2a78d6; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { color-scheme:light; --surface-1:#fcfcfb; --page:#f9f9f7; --ink-1:#0b0b0b;
+          --ink-2:#52514e; --grid:#e1e0d9; --border:rgba(11,11,11,.10); --accent:#2a78d6; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink-1); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap { max-width:820px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--ink-2); margin:0 0 20px; }
+  .card { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:16px; }
+  ol { margin:0; padding-left:20px; color:var(--ink-2); } ol li { margin:4px 0; } ol b { color:var(--ink-1); }
+  a { color:var(--accent); }
+  #zone { border:2px dashed var(--grid); border-radius:10px; padding:36px 16px; text-align:center; color:var(--ink-2); cursor:pointer; transition:.15s; }
+  #zone.over { border-color:var(--accent); color:var(--ink-1); background:rgba(57,135,229,.08); }
+  #zone b { color:var(--ink-1); font-size:16px; display:block; margin-bottom:4px; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--grid); }
+  th { color:var(--ink-muted); font-weight:600; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .ok { color:var(--good); } .bad { color:var(--critical); } .busy { color:var(--warning); }
+  #gate { display:none; } #gate.show { display:block; }
+  input[type=password] { width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--page); color:var(--ink-1); }
+  button { padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  .muted { color:var(--ink-muted); font-size:12px; }
+  @media (max-width:520px) { th:nth-child(3), td:nth-child(3) { display:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Keystone Drop Box</h1>
+  <p class="sub">Florida workers' comp files go in here. Everything after the drop is automatic.</p>
+
+  <div class="card" id="gate">
+    <p style="margin-top:0">Enter your desk key (the same one the other desk pages use).</p>
+    <input type="password" id="keyInput" autocomplete="off">
+    <p><button id="keySave">Save</button></p>
+  </div>
+
+  <div class="card">
+    <ol>
+      <li>Open Florida's <a href="https://dwcdataportal.fldfs.com/DigitalDownload.aspx" target="_blank" rel="noopener">Digital Download</a> page.</li>
+      <li>For each letter: <b>policy effective dates</b> from the last month you loaded to this month, <b>County: ALL</b>, then <b>Export to Excel</b>. The state asks you to prove you're not a robot.</li>
+      <li>Drag the downloaded <b>.xlsx</b> files below. You can drop many at once.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <div id="zone"><b>Drop Florida .xlsx files here</b>or click to choose files<input type="file" id="pick" accept=".xlsx" multiple hidden></div>
+    <table id="tbl" hidden>
+      <thead><tr><th>File</th><th class="num">Size</th><th>Saved as</th><th>Status</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="muted" id="after" hidden>Each file is picked up within 5 minutes, loaded through the Keystone door, matched, and reaches the map on the next refresh. Track it in The Window → Product 2.0 → "Keystone — Florida comp intake".</p>
+  </div>
+</div>
+<script>
+(function(){
+  "use strict";
+  var API = "https://lzasgflrxxrssjntrfmt.supabase.co/functions/v1/ks-drop";
+  var ANON = "sb_publishable_HhVH7JdPftsLC1WAw6P_Cg_wMj2Fl_V";
+  function ls(k){ try{return localStorage.getItem(k);}catch(e){return null;} }
+  function lset(k,v){ try{localStorage.setItem(k,v);}catch(e){} }
+  var theme = ls("desk_theme"); if (theme) document.documentElement.dataset.theme = theme;
+  var $ = function(id){ return document.getElementById(id); };
+  function key(){ return ls("desk_key") || ls("peo_dash_key"); }
+  function gate(show){ $("gate").className = "card" + (show ? " show" : ""); }
+  $("keySave").onclick = function(){ var v = $("keyInput").value.trim(); if(!v) return; lset("desk_key", v); $("keyInput").value = ""; gate(false); };
+  if (!key()) gate(true);
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function mb(n){ return n >= 1048576 ? (n/1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n/1024)) + " KB"; }
+
+  async function sign(name){
+    var r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", "apikey":ANON, "Authorization":"Bearer "+ANON, "x-desk-key": key()||"" },
+                               body: JSON.stringify({ mode:"sign", source:"fl_wc", name:name }) });
+    if (r.status === 401) { gate(true); throw new Error("desk key refused"); }
+    var j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || ("HTTP " + r.status)); return j;
+  }
+  async function send(file, row){
+    var st = row.querySelector(".st"), at = row.querySelector(".at");
+    try {
+      if (!/\.xlsx$/i.test(file.name)) throw new Error("only .xlsx files");
+      st.textContent = "preparing…"; st.className = "st busy";
+      var s = await sign(file.name);
+      st.textContent = "uploading…";
+      var up = await fetch(s.signedUrl, { method:"PUT", headers:{ "x-upsert":"true", "Content-Type": file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }, body:file });
+      if (!up.ok) throw new Error("upload failed (HTTP " + up.status + ")");
+      at.textContent = s.path;
+      st.textContent = "in the drop box ✓"; st.className = "st ok";
+    } catch(e) { st.textContent = "failed: " + e.message; st.className = "st bad"; }
+  }
+  async function handle(files){
+    if (!key()) { gate(true); return; }
+    $("tbl").hidden = false; $("after").hidden = false;
+    var list = Array.prototype.slice.call(files);
+    var jobs = list.map(function(f){
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + esc(f.name) + "</td><td class='num'>" + mb(f.size) + "</td><td class='at muted'>—</td><td class='st'>waiting</td>";
+      $("rows").appendChild(tr); return { f:f, tr:tr };
+    });
+    for (var i = 0; i < jobs.length; i += 3) {   // three at a time
+      await Promise.all(jobs.slice(i, i + 3).map(function(j){ return send(j.f, j.tr); }));
+    }
+  }
+  var zone = $("zone");
+  zone.onclick = function(){ $("pick").click(); };
+  $("pick").onchange = function(e){ handle(e.target.files); e.target.value = ""; };
+  ["dragenter","dragover"].forEach(function(ev){ zone.addEventListener(ev, function(e){ e.preventDefault(); zone.classList.add("over"); }); });
+  ["dragleave","drop"].forEach(function(ev){ zone.addEventListener(ev, function(e){ e.preventDefault(); zone.classList.remove("over"); }); });
+  zone.addEventListener("drop", function(e){ if (e.dataTransfer && e.dataTransfer.files) handle(e.dataTransfer.files); });
+})();
+</script>
+</body>
+</html>
