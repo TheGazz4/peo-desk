@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Engine — Industry Intel</title>
 <!--
+  INDUSTRY INTEL surface v1.12 (2026-09-30, Instance B, owner: "in all instances on the peo profiles - this specific link needs to take the user back to the map and auto-display only that PEO's current customers on the map"). Both "See <PEO> on the map" links (listed PEO, and "part of <PEO>" for acquired/older entities) now go to map.html?grain=brand&on=<slug> in the SAME window, no new tab: inside the platform the shell reloads the Coverage Map tab clean with only that PEO switched on (PEO-specific view, current customers only, every other filter at default); opened on its own it lands on index.html#/map with the same settings. Shell: index.html map view links (#/map?<settings>).
   INDUSTRY INTEL surface v1.11 (2026-09-30, Instance B mig 2310: INDUSTRY NEWS FEED - owner: "an industry news feed view for our users ... quarterly reports, 5500 filings, anything important impacting the peos, the industry or carriers", title plus why it matters, same day. Header button "News feed" (route #news, industry_news_feed_list) and "Recent news" on each PEO's Intel tab. Profile tab gains "Reviews and NPS" (peo_reputation_for_profile). The wins and losses block shows the most recent known client retention.)
   INDUSTRY INTEL surface v1.10 (2026-09-30, Instance B mig 2308: owner - "where a peo wins from and losses clients to should be at or near the top of the Intel tab ... make sure profile related things are profile and intel related things are intel". The Intel tab now leads with "Where it wins and loses clients" (peo_win_loss_for_intel), then Benefits strategy (moved from the Profile tab), then the existing panel in #intelBody. Profile tab keeps who the PEO is: facts, what it offers, 5500 filings, family, events, profile text.)
   INDUSTRY INTEL surface v1.9 (2026-09-30, Instance B mig 2307: Benefits strategy renewals block says when renewals reach clients. A researched PEO shows its own timing; every other PEO shows the owner default - renewals surface 60 to 90 days before the renewal date - until client feedback and research on that PEO firm it up. The first-year note (two rate sets, rate lock) is shown.)
@@ -884,11 +885,27 @@
   }
 
   /* ---------- 1283: one list, two doors - links between this profile and the map ---------- */
-  function mapHref(slug) { return "map.html?on=" + encodeURIComponent(slug); }
+  /* v1.11 (owner 2026-09-30): "See <PEO> on the map" takes the user BACK to the Coverage Map (same platform window, not a new
+     tab) showing ONLY that PEO's current customers: PEO-specific view (grain=brand - every profile slug exists there; 70 do
+     not exist in Family brand), that one PEO switched on, every other filter at its default (current customers only, PEO
+     relationship only). Inside the platform frame the shell reloads the map tab clean with these settings; standalone it
+     opens the map in this same tab. */
+  function mapHref(slug) { return "map.html?grain=brand&on=" + encodeURIComponent(slug); }
+  /* Opened on its own (the map opens profiles in a separate tab): land back inside the platform on the Map tab with the
+     same settings. Inside the platform frame the shell catches the click first, so this only runs standalone. */
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest ? e.target.closest("a.maplink") : null;
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    var inShell = false; try { inShell = window.parent !== window; } catch (err) { inShell = true; }
+    if (inShell) return;
+    var q = (a.getAttribute("href").split("?")[1] || "");
+    e.preventDefault();
+    location.href = "index.html#/map?" + q + "&go=" + Date.now();
+  });
   function drawDirLinks(slug, row, tok) {
     var box = $("dirLinks"); if (!box) return;
     if (row && row.family_slug === slug) {   // a PEO on the map filter
-      var h = '<a class="maplink" href="' + mapHref(slug) + '" target="_blank" rel="noopener">See ' + esc(row.peo_name) + ' on the map →</a>';
+      var h = '<a class="maplink" href="' + mapHref(slug) + '" title="Back to the Coverage Map showing only this PEO\'s current customers">See ' + esc(row.peo_name) + ' on the map →</a>';
       if (row.legal_name && row.legal_name !== row.peo_name) h += '<span class="mut">Legal name: ' + esc(row.legal_name) + '</span>';
       var ms = row.members || [];
       if (ms.length) {
@@ -908,7 +925,7 @@
         if (m && m.directory_slug) {
           var pl = '<a href="#peo=' + esc(m.directory_slug) + '">' + esc(m.directory_display) + '</a>';
           box.innerHTML = '<div class="also notlisted">Not listed on its own on the map — ' + esc(String(m.relation).replace("this PEO", "\u0001")).replace("\u0001", pl) +
-            '. On the map and in the PEO list it is part of ' + pl + ' · <a class="maplink" href="' + mapHref(m.directory_slug) + '" target="_blank" rel="noopener">see ' + esc(m.directory_display) + ' on the map →</a></div>';
+            '. On the map and in the PEO list it is part of ' + pl + ' · <a class="maplink" href="' + mapHref(m.directory_slug) + '" title="Back to the Coverage Map showing only this PEO\'s current customers">see ' + esc(m.directory_display) + ' on the map →</a></div>';
         } else {
           box.innerHTML = '<div class="also notlisted">Not on the map filter (no current clients, or not a PEO). Kept here for history only.</div>';
         }

@@ -13,6 +13,9 @@
   Surfaces are mounted in same-origin iframes so each page keeps its own
   version, its own publish path, and the shared localStorage desk_key.
   Publish door: RE-SYNC -> desk_assets -> desk_asset_commit('index.html', ...)
+  2026-09-30 (owner, Instance B): MAP VIEW LINKS. A link to map.html?<settings> from any surface (e.g. a PEO
+  profile's "See <PEO> on the map") switches to the Coverage Map tab and reloads it clean with those settings
+  (#/map?<settings>). The plain Map tab / "Back to map" (#/map, no settings) keeps whatever filters it has.
   ============================================================================
 -->
 <style>
@@ -200,14 +203,27 @@
       if (id) {
         e.preventDefault();
         var m = DEEP[id] ? (u.hash || "").match(/id=([0-9a-f-]{36})/i) : null;
+        if (id === "map" && u.search.length > 1) {   /* map view link: carry its settings (e.g. one PEO's current customers) */
+          u.searchParams.delete("t"); u.searchParams.set("go", String(Date.now()));   /* go = each click re-applies, even the same PEO twice */
+          location.hash = "#/map?" + u.searchParams.toString();
+          return;
+        }
         location.hash = "#/" + id + (m ? "?id=" + m[1] : "");
       }
     }, true);
   }
 
-  function show(id) {
+  function show(id, mapQ) {
     var r = route(id);
     if (!r) { location.hash = "#/" + ROUTES[0].id; return; }
+    var fm = frames[id];
+    /* map view link (#/map?<settings>): reload the map tab clean with exactly those settings, once per distinct link */
+    if (id === "map" && mapQ && fm && fm.dataset.q !== mapQ) {
+      fm.dataset.q = mapQ;
+      loading.classList.add("show");
+      fm.src = r.file + "?" + mapQ + "&t=" + Date.now();
+      hiddenAt[id] = 0;
+    }
     if (current === id) return;
 
     if (current && frames[current]) {
@@ -219,7 +235,8 @@
     var f = frames[id];
     if (!f) {
       f = document.createElement("iframe");
-      f.src = r.file + "?t=" + Date.now() + (DEEP[id] && clientParam() ? "#id=" + clientParam() : "");   /* 2026-09-30 (owner "fix the cache"): always ask for the newest copy of a surface, never a browser-saved one */
+      f.src = r.file + "?" + (id === "map" && mapQ ? mapQ + "&" : "") + "t=" + Date.now() + (DEEP[id] && clientParam() ? "#id=" + clientParam() : "");
+      if (id === "map" && mapQ) f.dataset.q = mapQ;   /* 2026-09-30 (owner "fix the cache"): always ask for the newest copy of a surface, never a browser-saved one */
       f.title = r.label;
       f.setAttribute("allow", "clipboard-write");
       loading.classList.add("show");
@@ -262,8 +279,9 @@
     return m ? m[1] : null;
   }
   function fromHash() {
-    var h = (location.hash || "").replace(/^#\/?/, "").split("?")[0];
-    show(h || ROUTES[0].id);
+    var hq = (location.hash || "").replace(/^#\/?/, "").split("?");
+    var h = hq[0];
+    show(h || ROUTES[0].id, h === "map" && hq[1] ? hq[1] : null);
     if (DEEP[h] && frames[h] && frames[h].dataset.loaded) {
       try {
         var cw = frames[h].contentWindow, want = clientParam() ? "#id=" + clientParam() : "";
