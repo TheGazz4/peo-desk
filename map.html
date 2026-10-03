@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.131 (owner 2026-10-03 13:06 MST "Go", Instance B, migration 9039): "Show all locations" checkbox under Multi-location (off by default). When on, every
+            multi-location client's other worksites (comp filings of the last 12 months, any state; one dot per ZIP) show as hollow dots in its PEO colour, from
+            state-level zoom in, only for clients that pass the current filters. Hover names the company and the location; click opens the company card. Counts
+            never include sites. URL sites=1. Data: Keystone bake key sit (v2pub.map_sites).
      v3.130 (owner 2026-10-03 08:16 MST, Instance B, migration 9031): client tenure reads years.months ("4.9 yrs" = 4 years 9 months; "+" = at least that long),
             and "With PEO since" on the record card now uses the same start date as the tenure; when the tenure is an "at least" figure the date reads "... or earlier".
      v3.129 (owner 2026-10-03 08:06 MST "Yes. Always open to keystone", Instance B): the map ALWAYS opens on the Keystone feed. The last choice in this browser
@@ -653,7 +657,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.130 · 2026-10-03</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.131 · 2026-10-03</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -677,6 +681,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
         <label class="chk" title="A PEO's own administrative offices ◆ — each diamond renders in that PEO's assigned colour. Extra detail, off by default to keep the map clean"><input type="checkbox" id="beacons-on"> Display PEO Administrative Beacons <span id="beaconGlyph" style="color:var(--muted)">◆</span></label>
         <label class="chk" style="margin-top:8px" title="Only clients observed operating in 2+ states in our footprint data"><input type="checkbox" id="ms-only"> Multi-state clients only</label>
         <label class="chk" title="Only clients observed at 2+ locations (distinct city/state — own address, branch locations, WC filings) or in 2+ states"><input type="checkbox" id="ml-only"> Multi-location clients only</label>
+        <label class="chk" title="Show each multi-location client's other worksites as hollow dots in its PEO colour (from workers' comp filings of the last 12 months; one dot per ZIP). Shown from state-level zoom in. Sites are never counted as clients."><input type="checkbox" id="sites-on"> Show all locations</label>
         <label class="chk" title="Companies whose headquarters is outside the United States. On = they show (as today); off = they are hidden."><input type="checkbox" id="ih-on" checked> Include records with International HQ</label>
         <h2 style="margin-top:10px" title="Franchise locations (Servpro, Hampton Inn, The Joint …) — flagged from the ruled franchise-systems list. Include = show every pin; Exclude = hide franchise locations; Only = franchise locations alone.">Franchises</h2>
         <div class="seg"><button id="fr-all" class="on" title="Show every client, franchise or not">Include</button><button id="fr-none" title="Hide franchise locations">Exclude</button><button id="fr-only" title="Show franchise locations only">Only</button></div>
@@ -776,7 +781,7 @@ var MONTHS=['','January','February','March','April','May','June','July','August'
 // ------------------------- state -------------------------
 var DARK=true;   // v3.15 (owner: "try taking Google Maps back to a dark background") — false reverts the whole theme
 var S={
-  grain:'brand', placement:'address', msOnly:false, mlOnly:false, fran:'all', minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:false, logoImgs:{}, logoLil:{},
+  grain:'brand', placement:'address', msOnly:false, mlOnly:false, sitesOn:false, fran:'all', minSrc:0, svcOff:{0:true,2:true,3:true,4:true,5:true}, empOff:{}, panelOpen:true, hqLogos:false, logoImgs:{}, logoLil:{},
   lens:'peo', terr:null, drawMode:false, _drawStart:null, hqCand:false,   /* grain default = brand (PEO specific), Gazz 2026-09-14 */
   hist:false, histSw:false, ihOn:true, hCur:true, hFor:false, hP2P:false, histData:null, histLoading:false, flags:{},
   catalog:null, colors:{family:{},brand:{}}, displays:{family:{},brand:{}},
@@ -1001,7 +1006,7 @@ function commitDetail(st,r){
             // v3.68 (audit 2026-09-24): the Employee Count Brain fields were baked but never kept here, so the
             // Employees chips, the card and the table always read Counting. Keep them.
             hc:(r.hc&&r.hc.length===n)?r.hc:null, hct:(r.hct&&r.hct.length===n)?r.hct:null, hcl:(r.hcl&&r.hcl.length===n)?r.hcl:null,
-            lie:(r.lie&&r.lie.length===n)?r.lie:null, pcs:(r.pcs&&r.pcs.length===n)?r.pcs:null, ten:(r.ten&&r.ten.length===n)?r.ten:null, /* v3.120: tenure with the current PEO (Keystone feed only) */ pcsb:(r.pcsb&&r.pcsb.length===n)?r.pcsb:null,
+            lie:(r.lie&&r.lie.length===n)?r.lie:null, pcs:(r.pcs&&r.pcs.length===n)?r.pcs:null, ten:(r.ten&&r.ten.length===n)?r.ten:null, sit:(r.sit&&r.sit.length===n)?r.sit:null, /* v3.131: other worksites */ /* v3.120: tenure with the current PEO (Keystone feed only) */ pcsb:(r.pcsb&&r.pcsb.length===n)?r.pcsb:null,
             // v3.68b (1278h): Workers Comp Carve Out / Benefits Carve Out flags
             wco:(r.wco&&r.wco.length===n)?r.wco:null, bco:(r.bco&&r.bco.length===n)?r.bco:null,
             // v3.81 (9013): website, current client (1 Yes / 2 No / 0 not known), benefits renewal month (0 = not known)
@@ -1257,6 +1262,16 @@ function draw(){
       if(!svcOk(d2.detail,i2)) continue;
       if(!heatOk(d2,i2)) continue;
       if(!brandOk(d2,i2)) continue;
+      if(S.sitesOn && z>=5.5 && d2.detail && d2.detail.sit && d2.detail.sit[i2]){   // v3.131: other worksites of this client (never counted)
+        var sl3=d2.detail.sit[i2], scol=pinColorAt(d2,i2,slugArr2[IDX2[i2]]), srad=z<9.5?3.2:4.6;
+        for(var q3=0;q3<sl3.length;q3++){
+          var sxq=(mercX(sl3[q3][1])-cx)*scale+W/2, syq=(mercY(sl3[q3][0])-cy)*scale+H/2;
+          if(sxq<-8||sxq>W+8||syq<-8||syq>H+8) continue;
+          ctx.beginPath(); ctx.arc(sxq,syq,srad,0,Math.PI*2); ctx.lineWidth=1.6; ctx.strokeStyle=scol; ctx.stroke();
+          ctx.fillStyle='rgba(255,255,255,.55)'; ctx.fill();
+          if(hits.length<90000) hits.push({x:sxq,y:syq,r:srad+3,kind:'site',st:st2,i:i2,q:q3});
+        }
+      }
       var sx3=(MX2[i2]-cx)*scale+W/2, sy3=(MY2[i2]-cy)*scale+H/2;
       if(sx3<-16||sx3>W+16||sy3<-24||sy3>H+8) continue;
       if(dotMode){
@@ -1574,6 +1589,7 @@ function resetAll(){
   S.wcoOnly=false; S.bcoOnly=false; try{ syncCoSeg(); }catch(_){}
   S.msOnly=false; if($('ms-only')) $('ms-only').checked=false;
   S.mlOnly=false; if($('ml-only')) $('ml-only').checked=false;
+  S.sitesOn=false; if($('sites-on')) $('sites-on').checked=false;   // v3.131
   S.ihOn=true; if($('ih-on')) $('ih-on').checked=true;
   S.fran='all'; try{ syncFranButtons(); }catch(_){}
   S.placement='address'; try{ syncPlacementButtons(); }catch(_){}
@@ -1613,6 +1629,14 @@ function onMove(e){
     beaconCursor(h.kind==='beacon'&&h.b&&h.b.family_slug&&!isNP(h.b.family_slug));
     if(h.kind==='beacon'){ tipBeacon(h.b,e); return; }
     if(h.kind==='hist'){ tipHist(h.i,e); return; }
+    if(h.kind==='site'){   // v3.131: another worksite of a client
+      var ds=S.pinData[h.st]; if(!ds||!ds.detail) return;
+      var sa=(S.grain==='brand')?ds.brds:ds.fams, sI=(S.grain==='brand')?ds.bis:ds.fis, ssl=sa[sI[h.i]], sx=ds.detail.sit[h.i][h.q];
+      tipShow('<b>'+esc(ds.detail.names[h.i]||'—')+'</b>'+tenTag(ds.detail,h.i)+'<br><span style="color:'+colorOf(ssl)+';font-weight:650">'+esc(famDisp(ssl))+'</span><br>'+
+        'Location: '+esc(sx[2])+(sx[3]>1?' ('+sx[3]+' sites)':'')+' <span class="mut">· ZIP area</span><br>'+
+        '<span class="mut">Main location: '+esc(ds.detail.cities[h.i]||'')+' · click for details</span>',e);
+      return;
+    }
     var d=S.pinData[h.st];
     var slugArr=(S.grain==='brand')?d.brds:d.fams; var IDX=(S.grain==='brand')?d.bis:d.fis;
     var slug=slugArr[IDX[h.i]];
@@ -2000,6 +2024,7 @@ $('hist-3').onclick=function(){ if(S.hFor) return; setHistView(S.hCur,S.hFor,!S.
     {k:'bea', a:function(){var x=$('beacons-on'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('beacons-on','Showing each PEO\'s administrative offices as colored diamonds.','Administrative offices are hidden.'); }},
     {k:'ms', a:function(){var x=$('ms-only'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ms-only','Showing only clients seen operating in 2 or more states.','Showing clients of any footprint.'); }},
     {k:'ih', a:function(){var x=$('ih-on'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ih-on','Including companies headquartered outside the US (their US locations map).','Hiding companies headquartered outside the US.'); }},
+    {k:'sites', a:function(){var x=$('sites-on'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('sites-on','Showing every other worksite of the clients on screen (hollow dots, from state-level zoom in). Sites are not counted as clients.','Each client shows at its main location only.'); }},
     {k:'ml', a:function(){var x=$('ml-only'); return x&&x.closest?x.closest('label'):null;}, t:function(){ return cbx('ml-only','Showing only clients seen at 2 or more locations.','Showing clients at any number of locations.'); }},
     {k:'peo', a:function(){var x=$('peo-all'); return x?x.parentNode:null;}, t:function(){ var m=selMap(), ks=Object.keys(m), on=ks.filter(function(k){return m[k]===true;}).length; if(!ks.length) return ''; return on===ks.length?('All '+ks.length+' PEOs are on.'):(on===0?'No PEOs are on - no pins show.':('Showing '+on+' of '+ks.length+' PEOs - the rest are hidden.')); }},
     {k:'st', a:function(){var x=$('st-all'); return x?x.parentNode:null;}, t:function(){ var ks=Object.keys(S.states), on=ks.filter(function(k){return S.states[k];}).length; if(!ks.length) return ''; return on===ks.length?('All '+ks.length+' states are on.'):(on===0?'No states are on - no pins show.':('Showing '+on+' of '+ks.length+' states - the rest are hidden.')); }},
@@ -2034,6 +2059,7 @@ function setPlacement(pm){
 }
 $('ms-only').onchange=function(){ setMsOnly($('ms-only').checked); };
 $('ml-only').onchange=function(){ setMlOnly($('ml-only').checked); };   // v3.93
+$('sites-on').onchange=function(){ S.sitesOn=$('sites-on').checked; bump(); scheduleDraw(); writeUrl(); };   // v3.131
 $('lens-peo').onclick=function(){ setLens('peo') };
 $('lens-hea').onclick=function(){ setLens('health') };
 $('lens-wc').onclick=function(){ setLens('wc') };
@@ -2373,6 +2399,7 @@ function buildUrl(){
     if(S.hqLogos==='all') p.set('hl','all'); else if(S.hqLogos==='top') p.set('hl','top');   // v3.109: default = HQ logos Off (owner 2026-09-30); Top 25 / All ride in the link
     if(S.msOnly) p.set('ms','1');
     if(S.mlOnly) p.set('ml','1');
+    if(S.sitesOn) p.set('sites','1');   // v3.131
     if(S.fran!=='all') p.set('fr',S.fran);
     if(!S.ihOn) p.set('ih','0');
     if(S.minSrc) p.set('src',String(S.minSrc));
@@ -2397,6 +2424,7 @@ function readUrl(){
     if(p.get('hl')==='1'||p.get('hl')==='all'){ S.hqLogos='all'; } else if(p.get('hl')==='top'){ S.hqLogos='top'; } else if(p.get('hl')==='0'){ S.hqLogos=false; } syncHqSeg();
     if(p.get('ms')==='1'){ S.msOnly=true; $('ms-only').checked=true; }
     if(p.get('ml')==='1'){ S.mlOnly=true; $('ml-only').checked=true; }
+    if(p.get('sites')==='1'){ S.sitesOn=true; $('sites-on').checked=true; }   // v3.131
     if(p.get('ih')==='0'){ S.ihOn=false; if($('ih-on')) $('ih-on').checked=false; }
     if(p.get('fr')==='none'||p.get('fr')==='only'){ S.fran=p.get('fr'); syncFranButtons(); }
     if(p.get('wco')==='1') S.wcoOnly=true; if(p.get('bco')==='1') S.bcoOnly=true; syncCoSeg();
