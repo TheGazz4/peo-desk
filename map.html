@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEO Coverage Map</title>
 <!-- map v3.38 · 2026-09-14 · Coverage Map (claude/coverage-map-spec)
+     v3.130 (owner 2026-10-03 08:16 MST, Instance B, migration 9031): client tenure reads years.months ("4.9 yrs" = 4 years 9 months; "+" = at least that long),
+            and "With PEO since" on the record card now uses the same start date as the tenure; when the tenure is an "at least" figure the date reads "... or earlier".
      v3.129 (owner 2026-10-03 08:06 MST "Yes. Always open to keystone", Instance B): the map ALWAYS opens on the Keystone feed. The last choice in this browser
             is no longer remembered; Original is still one tap away on the Data feed switch (that view only, reached by a feed=old link). Copy view link carries
             feed=old only when the Original feed is on. Display only; no data change.
@@ -651,7 +653,7 @@ body.panel-drag{cursor:col-resize;user-select:none}
 <div id="app">
   <header>
     <button class="ghost" id="panel-toggle" title="Show/hide the control panel">☰</button>
-    <h1>PEO Coverage Map</h1><span class="stamp">map v3.129 · 2026-10-03</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
+    <h1>PEO Coverage Map</h1><span class="stamp">map v3.130 · 2026-10-03</span><span class="stamp" id="feed-stamp" style="display:none;color:#ffa81e"></span>
     <button class="ghost" id="draw-btn" title="Draw a circle on the map to analyze a territory (results stay on screen — nothing leaves the platform)">◯ Draw</button><button class="ghost" id="reset-btn" title="Clear every filter and go back to the default view: all PEOs on, all states on, current PEO users only, renewal heat off, confidence Any, no circle">↺ Reset</button><button class="ghost" id="table-btn" title="Switch between the map and a table of the same filtered records. The table ignores pan and zoom — it lists everything your filters match. On screen only; nothing exports.">▤ Table</button>
     <div id="searchwrap"><input id="q" placeholder="Search company, city, or ZIP…" autocomplete="off"><div id="q-drop"></div></div>
     <span class="spacer"></span>
@@ -2115,7 +2117,7 @@ function coLines(dd,i){ if(!dd) return ''; var s='';
   return s; }
 // v3.120 (owner 2026-09-30 19:03, Instance B claim 467): time with the current PEO next to the company name, e.g. "ABC Plumbing (2.9 yrs)".
 // "+" = at least that long (the relationship predates our records). Blank when it can't be proven. Server: v2pub.map_pins.tenure_display (migration 2313).
-function tenTag(dd,i){ var t=(dd&&dd.ten)?dd.ten[i]:null; return t?' <span class="mut" style="font-weight:400" title="Time with this PEO. A + means at least this long.">('+esc(t)+')</span>':''; }
+function tenTag(dd,i){ var t=(dd&&dd.ten)?dd.ten[i]:null; return t?' <span class="mut" style="font-weight:400" title="Time with this PEO in years.months (4.9 = 4 years 9 months). A + means at least this long.">('+esc(t)+')</span>':''; }
 function coOf(cid){ for(var st in S.pinData){ var dd=S.pinData[st]&&S.pinData[st].detail; if(!dd||!dd.ids) continue; var j=dd.ids.indexOf(String(cid)); if(j>=0) return {dd:dd,i:j}; } return null; }
 function svcOk(dd,i){ if(!S.ihOn&&dd&&dd.ih&&dd.ih[i]) return false; if(!coOk(dd,i)) return false; if(!empOk(dd,i)) return false; return svcOkRel(dd,i); }
 // v3.69 (owner 2026-09-24: "I want the default map to load only with PEO"): Relationship chips start with PEO on, the rest off.
@@ -2294,7 +2296,7 @@ function openCard(p,slug,history){
   });
   var formerBanner=p.historical?'<div class="note" style="margin-top:0;margin-bottom:6px;font-weight:650">FORMER PEO client — shown from the historical layer</div>':'';
   var hren=p.health_renewal_month?MONTHS[p.health_renewal_month]+' ('+esc(fpr&&fpr.hg?'PEO plan year — not this client’s date':basisWord(p.health_renewal_basis))+')':'unknown';
-  var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+' ('+esc(basisWord(p.peo_current_since_basis))+')':'unknown';
+  var since=p.peo_current_since?String(p.peo_current_since).slice(0,10)+(function(){ var co=p.historical?null:coOf(p.company_id), t=(co&&co.dd&&co.dd.ten)?co.dd.ten[co.i]:null; return (t&&String(t).indexOf('+')>=0)?' or earlier':''; })()+' ('+esc(basisWord(p.peo_current_since_basis))+')':'unknown';   /* v3.130: same start as the tenure; an at-least tenure = "or earlier" */
   c.innerHTML='<div class="hd"><span style="width:12px;height:12px;border-radius:3px;background:'+colorOf(slug)+';margin-top:4px;flex:none"></span>'+
     '<div><b>'+esc(p.company_display)+'</b>'+(function(){ var co=p.historical?null:coOf(p.company_id); return co?tenTag(co.dd,co.i):''; })()+affHeader(p,slug)+foldLine(p)+'</div>'+
     '<button class="x" onclick="document.getElementById(\'card\').style.display=\'none\'">×</button></div>'+
